@@ -1,0 +1,105 @@
+{
+  "entities": {
+    "bookings": {
+      "title": "AdHoc Booking",
+      "description": "Ad-hoc venue booking records created by users or lecturers",
+      "type": "object",
+      "properties": {
+        "id": { "type": "string" },
+        "roomId": { "type": "string" },
+        "roomName": { "type": "string" },
+        "date": { "type": "string" },
+        "startTime": { "type": "string" },
+        "endTime": { "type": "string" },
+        "applicantName": { "type": "string" },
+        "applicantEmail": { "type": "string" },
+        "applicantPhone": { "type": "string" },
+        "applicantRole": { "type": "string" },
+        "department": { "type": "string" },
+        "purposeCategory": { "type": "string" },
+        "title": { "type": "string" },
+        "paxCount": { "type": "number" },
+        "notes": { "type": "string" },
+        "status": { "type": "string", "enum": ["CONFIRMED", "PENDING", "REJECTED", "CANCELLED"] },
+        "createdAt": { "type": "string" }
+      },
+      "required": ["id", "roomId", "date", "startTime", "endTime", "applicantName", "title", "status"]
+    },
+    "rooms": {
+      "title": "Room Facility",
+      "description": "Classrooms, lecture halls, and special rooms in KPMBP",
+      "type": "object",
+      "properties": {
+        "id": { "type": "string" },
+        "code": { "type": "string" },
+        "name": { "type": "string" },
+        "category": { "type": "string" },
+        "capacity": { "type": "number" },
+        "block": { "type": "string" },
+        "level": { "type": "string" },
+        "facilities": { "type": "array", "items": { "type": "string" } },
+        "hasAircond": { "type": "boolean" },
+        "isSmartClassroom": { "type": "boolean" }
+      },
+      "required": ["id", "code", "name", "category", "capacity"]
+    },
+    "schedule": {
+      "title": "Academic Schedule",
+      "description": "Official weekly academic class schedule slots",
+      "type": "object",
+      "properties": {
+        "id": { "type": "string" },
+        "roomId": { "type": "string" },
+        "dayOfWeek": { "type": "string" },
+        "startTime": { "type": "string" },
+        "endTime": { "type": "string" },
+        "courseCode": { "type": "string" },
+        "courseName": { "type": "string" },
+        "className": { "type": "string" },
+        "lecturerName": { "type": "string" },
+        "department": { "type": "string" }
+      },
+      "required": ["id", "roomId", "dayOfWeek", "startTime", "endTime"]
+    },
+    "blocks": {
+      "title": "Institutional Block",
+      "description": "Official institutional events blocking room availability",
+      "type": "object",
+      "properties": {
+        "id": { "type": "string" },
+        "roomId": { "type": "string" },
+        "date": { "type": "string" },
+        "startTime": { "type": "string" },
+        "endTime": { "type": "string" },
+        "title": { "type": "string" },
+        "reason": { "type": "string" },
+        "createdBy": { "type": "string" }
+      },
+      "required": ["id", "roomId", "date", "startTime", "endTime", "title"]
+    }
+  },
+  "security": {
+    "rules": [
+      {
+        "collection": "bookings",
+        "read": "true",
+        "write": "true"
+      },
+      {
+        "collection": "rooms",
+        "read": "true",
+        "write": "true"
+      },
+      {
+        "collection": "schedule",
+        "read": "true",
+        "write": "true"
+      },
+      {
+        "collection": "blocks",
+        "read": "true",
+        "write": "true"
+      }
+    ]
+  }
+}

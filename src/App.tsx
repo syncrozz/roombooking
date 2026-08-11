@@ -13,9 +13,7 @@ import {
 } from './types';
 import { 
   getStoredRooms, 
-  saveStoredRooms, 
   getStoredAcademicSchedule, 
-  saveStoredAcademicSchedule, 
   getStoredAdHocBookings, 
   saveStoredAdHocBookings, 
   getStoredInstitutionalBlocks, 
@@ -24,6 +22,14 @@ import {
   generateBookingId,
   saveUserProfile
 } from './utils/storage';
+import { 
+  subscribeToBookings, 
+  subscribeToBlocks, 
+  saveBookingToCloud, 
+  deleteBookingFromCloud, 
+  saveBlockToCloud, 
+  deleteBlockFromCloud 
+} from './lib/firebase';
 
 import { Header, ActiveTab } from './components/Header';
 import { QuickBookingSearch } from './components/QuickBookingSearch';
@@ -63,8 +69,22 @@ export default function App() {
   useEffect(() => {
     setRooms(getStoredRooms());
     setAcademicSchedule(getStoredAcademicSchedule());
-    setAdhocBookings(getStoredAdHocBookings());
-    setInstitutionalBlocks(getStoredInstitutionalBlocks());
+
+    // Subscribe to Firestore for real-time multi-device booking synchronization
+    const unsubBookings = subscribeToBookings((cloudBookings) => {
+      setAdhocBookings(cloudBookings);
+      saveStoredAdHocBookings(cloudBookings);
+    });
+
+    const unsubBlocks = subscribeToBlocks((cloudBlocks) => {
+      setInstitutionalBlocks(cloudBlocks);
+      saveStoredInstitutionalBlocks(cloudBlocks);
+    });
+
+    return () => {
+      unsubBookings();
+      unsubBlocks();
+    };
   }, []);
 
   const showToast = (msg: string) => {
@@ -86,7 +106,7 @@ export default function App() {
   };
 
   // Submit new booking
-  const handleSubmitBooking = (
+  const handleSubmitBooking = async (
     data: Omit<AdHocBooking, 'id' | 'status' | 'createdAt'>
   ) => {
     const newId = generateBookingId();
@@ -111,36 +131,70 @@ export default function App() {
     setAdhocBookings(updated);
     saveStoredAdHocBookings(updated);
 
+    // Sync to Firestore cloud
+    try {
+      await saveBookingToCloud(newBooking);
+    } catch (err) {
+      console.error('Cloud sync error on create booking:', err);
+    }
+
     setBookingModalInfo(null);
     setQrModalBooking(newBooking);
-    showToast(`🟢 Tempahan ${newBooking.id} di ${newBooking.roomName} berjaya disahkan!`);
+    showToast(`🟢 Tempahan ${newBooking.id} di ${newBooking.roomName} berjaya disahkan & disimpan ke Cloud!`);
   };
 
   // Cancel booking
-  const handleCancelBooking = (bookingId: string) => {
+  const handleCancelBooking = async (bookingId: string) => {
     const updated = adhocBookings.filter(b => b.id !== bookingId);
     setAdhocBookings(updated);
     saveStoredAdHocBookings(updated);
+
+    try {
+      await deleteBookingFromCloud(bookingId);
+    } catch (err) {
+      console.error('Cloud sync error on cancel booking:', err);
+    }
+
     showToast(`Tempahan ID ${bookingId} telah dibatalkan.`);
   };
 
   // Admin approvals
-  const handleApproveBooking = (id: string) => {
+  const handleApproveBooking = async (id: string) => {
+    const target = adhocBookings.find(b => b.id === id);
     const updated = adhocBookings.map(b => b.id === id ? { ...b, status: 'CONFIRMED' as const } : b);
     setAdhocBookings(updated);
     saveStoredAdHocBookings(updated);
+
+    if (target) {
+      try {
+        await saveBookingToCloud({ ...target, status: 'CONFIRMED' });
+      } catch (err) {
+        console.error('Cloud sync error on approve:', err);
+      }
+    }
+
     showToast(`🟢 Tempahan ${id} telah diluluskan oleh Admin.`);
   };
 
-  const handleRejectBooking = (id: string) => {
+  const handleRejectBooking = async (id: string) => {
+    const target = adhocBookings.find(b => b.id === id);
     const updated = adhocBookings.map(b => b.id === id ? { ...b, status: 'REJECTED' as const } : b);
     setAdhocBookings(updated);
     saveStoredAdHocBookings(updated);
+
+    if (target) {
+      try {
+        await saveBookingToCloud({ ...target, status: 'REJECTED' });
+      } catch (err) {
+        console.error('Cloud sync error on reject:', err);
+      }
+    }
+
     showToast(`🔴 Tempahan ${id} telah ditolak.`);
   };
 
   // Institutional block management
-  const handleAddBlock = (blockData: Omit<InstitutionalBlock, 'id'>) => {
+  const handleAddBlock = async (blockData: Omit<InstitutionalBlock, 'id'>) => {
     const newBlock: InstitutionalBlock = {
       ...blockData,
       id: `BLK-${Date.now()}`
@@ -148,13 +202,27 @@ export default function App() {
     const updated = [newBlock, ...institutionalBlocks];
     setInstitutionalBlocks(updated);
     saveStoredInstitutionalBlocks(updated);
+
+    try {
+      await saveBlockToCloud(newBlock);
+    } catch (err) {
+      console.error('Cloud sync error on block:', err);
+    }
+
     showToast(`⚫ Lock Ruang ${blockData.roomId} berjaya ditambah.`);
   };
 
-  const handleDeleteBlock = (id: string) => {
+  const handleDeleteBlock = async (id: string) => {
     const updated = institutionalBlocks.filter(b => b.id !== id);
     setInstitutionalBlocks(updated);
     saveStoredInstitutionalBlocks(updated);
+
+    try {
+      await deleteBlockFromCloud(id);
+    } catch (err) {
+      console.error('Cloud sync error on delete block:', err);
+    }
+
     showToast(`Lock Ruang telah dipadam.`);
   };
 

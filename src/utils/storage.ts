@@ -268,8 +268,7 @@ export function resetToDefaults(): void {
 }
 
 export function generateBookingId(): string {
-  const stored = getStoredAdHocBookings();
-  const nextNum = stored.length + 101;
-  const pad = String(nextNum).padStart(6, '0');
-  return `BK-2026-${pad}`;
+  const rand = Math.floor(100 + Math.random() * 900);
+  const ts = Date.now().toString().slice(-4);
+  return `BK-2026-${ts}${rand}`;
 }
