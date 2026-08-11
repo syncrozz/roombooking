@@ -1,6 +1,6 @@
 import React, { useState } from 'react';
 import { AdHocBooking, BookingStatus } from '../types';
-import { formatDateMalay, generateWhatsAppLink } from '../utils/availabilityEngine';
+import { formatDateMalay, formatWhatsAppMessage, generateWhatsAppLink } from '../utils/availabilityEngine';
 import { 
   QrCode, 
   Share2, 
@@ -15,7 +15,9 @@ import {
   MessageSquare,
   Search,
   ExternalLink,
-  Tag
+  Tag,
+  Copy,
+  Check
 } from 'lucide-react';
 
 interface MyBookingsViewProps {
@@ -31,6 +33,18 @@ export const MyBookingsView: React.FC<MyBookingsViewProps> = ({
 }) => {
   const [statusFilter, setStatusFilter] = useState<BookingStatus | 'Semua'>('Semua');
   const [searchQuery, setSearchQuery] = useState<string>('');
+  const [copiedId, setCopiedId] = useState<string | null>(null);
+
+  const handleCopyText = async (booking: AdHocBooking) => {
+    try {
+      const text = formatWhatsAppMessage(booking);
+      await navigator.clipboard.writeText(text);
+      setCopiedId(booking.id);
+      setTimeout(() => setCopiedId(null), 2500);
+    } catch (err) {
+      console.error('Failed to copy booking text:', err);
+    }
+  };
 
   const filteredBookings = bookings.filter(b => {
     if (statusFilter !== 'Semua' && b.status !== statusFilter) return false;
@@ -211,18 +225,41 @@ export const MyBookingsView: React.FC<MyBookingsViewProps> = ({
 
                 {/* Actions Bar */}
                 <div className="pt-3 border-t border-slate-100 flex flex-wrap items-center justify-between gap-2 text-xs">
-                  <div className="flex items-center gap-2">
+                  <div className="flex flex-wrap items-center gap-2">
+                    {/* Copy Text Button */}
+                    <button
+                      onClick={() => handleCopyText(b)}
+                      className={`font-bold py-2 px-3 rounded-lg shadow-xs transition flex items-center gap-1.5 border ${
+                        copiedId === b.id
+                          ? 'bg-emerald-700 text-white border-emerald-500'
+                          : 'bg-emerald-600 hover:bg-emerald-700 text-white border-emerald-600'
+                      }`}
+                      title="Salin semua butiran tempahan secara teks ke clipboard"
+                    >
+                      {copiedId === b.id ? (
+                        <>
+                          <Check className="w-3.5 h-3.5 text-emerald-200" />
+                          <span>Disalin!</span>
+                        </>
+                      ) : (
+                        <>
+                          <Copy className="w-3.5 h-3.5" />
+                          <span>Salin Teks</span>
+                        </>
+                      )}
+                    </button>
+
                     {/* WhatsApp Share Button */}
                     <a
                       href={generateWhatsAppLink(b)}
                       target="_blank"
                       rel="noopener noreferrer"
-                      className="bg-emerald-600 hover:bg-emerald-700 text-white font-bold py-2 px-3 rounded-lg shadow-xs transition flex items-center gap-1.5"
+                      className="bg-slate-100 hover:bg-slate-200 text-slate-800 font-bold py-2 px-3 rounded-lg shadow-xs transition flex items-center gap-1.5 border border-slate-200"
                       title="Kongsi Ringkasan Tempahan ke WhatsApp"
                     >
-                      <MessageSquare className="w-3.5 h-3.5" />
+                      <MessageSquare className="w-3.5 h-3.5 text-emerald-600" />
                       <span>WhatsApp</span>
-                      <ExternalLink className="w-3 h-3 text-emerald-200" />
+                      <ExternalLink className="w-3 h-3 text-slate-400" />
                     </a>
 
                     {/* QR Code Pass Button */}

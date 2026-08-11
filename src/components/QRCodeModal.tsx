@@ -1,6 +1,6 @@
-import React from 'react';
+import React, { useState } from 'react';
 import { AdHocBooking } from '../types';
-import { formatDateMalay, generateWhatsAppLink } from '../utils/availabilityEngine';
+import { formatDateMalay, formatWhatsAppMessage, generateWhatsAppLink } from '../utils/availabilityEngine';
 import { 
   QrCode, 
   X, 
@@ -12,7 +12,9 @@ import {
   Clock, 
   User, 
   MessageSquare,
-  ExternalLink
+  ExternalLink,
+  Copy,
+  Check
 } from 'lucide-react';
 
 interface QRCodeModalProps {
@@ -21,6 +23,19 @@ interface QRCodeModalProps {
 }
 
 export const QRCodeModal: React.FC<QRCodeModalProps> = ({ booking, onClose }) => {
+  const [copied, setCopied] = useState(false);
+
+  const handleCopyText = async () => {
+    try {
+      const text = formatWhatsAppMessage(booking);
+      await navigator.clipboard.writeText(text);
+      setCopied(true);
+      setTimeout(() => setCopied(false), 2500);
+    } catch (err) {
+      console.error('Failed to copy text:', err);
+    }
+  };
+
   return (
     <div className="fixed inset-0 bg-slate-950/80 backdrop-blur-xs z-50 flex items-center justify-center p-4">
       <div className="bg-white rounded-3xl max-w-sm w-full p-6 shadow-2xl border border-slate-200 space-y-5 text-center animate-in fade-in zoom-in duration-150 relative">
@@ -93,20 +108,42 @@ export const QRCodeModal: React.FC<QRCodeModalProps> = ({ booking, onClose }) =>
 
         {/* Actions */}
         <div className="space-y-2 pt-1">
+          {/* Main Copy Button requested */}
+          <button
+            onClick={handleCopyText}
+            className={`w-full font-bold py-2.5 px-4 rounded-xl shadow-md transition flex items-center justify-center gap-2 text-xs ${
+              copied
+                ? 'bg-emerald-700 text-white ring-2 ring-emerald-400'
+                : 'bg-emerald-600 hover:bg-emerald-700 text-white'
+            }`}
+          >
+            {copied ? (
+              <>
+                <Check className="w-4 h-4 text-emerald-200" />
+                <span>Berjaya Disalin! Sedia Untuk Dipaste</span>
+              </>
+            ) : (
+              <>
+                <Copy className="w-4 h-4" />
+                <span>Salin Teks Detail Tempahan</span>
+              </>
+            )}
+          </button>
+
           <a
             href={generateWhatsAppLink(booking)}
             target="_blank"
             rel="noopener noreferrer"
-            className="w-full bg-emerald-600 hover:bg-emerald-700 text-white font-bold py-2.5 px-4 rounded-xl shadow-md transition flex items-center justify-center gap-2 text-xs"
+            className="w-full bg-slate-100 hover:bg-slate-200 text-slate-800 font-bold py-2 px-4 rounded-xl transition flex items-center justify-center gap-2 text-xs border border-slate-200"
           >
-            <MessageSquare className="w-4 h-4" />
-            <span>Kongsi Mesej WhatsApp</span>
-            <ExternalLink className="w-3 h-3 text-emerald-200" />
+            <MessageSquare className="w-3.5 h-3.5 text-emerald-600" />
+            <span>Kongsi ke WhatsApp</span>
+            <ExternalLink className="w-3 h-3 text-slate-400" />
           </a>
 
           <button
             onClick={onClose}
-            className="w-full bg-slate-100 hover:bg-slate-200 text-slate-800 font-bold py-2 px-4 rounded-xl text-xs transition"
+            className="w-full bg-slate-100 hover:bg-slate-200 text-slate-600 font-medium py-1.5 px-4 rounded-xl text-xs transition"
           >
             Tutup Pas
           </button>

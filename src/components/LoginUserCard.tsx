@@ -269,7 +269,7 @@ export const LoginUserCard: React.FC<LoginUserCardProps> = ({ onProfileChange, c
               />
             </div>
 
-            <div className="grid grid-cols-2 gap-2">
+            <div className="space-y-2">
               <div>
                 <label className="block text-[10px] font-semibold text-slate-400 mb-0.5">No. Telefon:</label>
                 <input
