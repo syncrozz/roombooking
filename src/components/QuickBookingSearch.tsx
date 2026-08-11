@@ -1,4 +1,4 @@
-import React, { useState } from 'react';
+import React, { useState, useEffect } from 'react';
 import { 
   Room, 
   AcademicScheduleSlot, 
@@ -66,6 +66,16 @@ export const QuickBookingSearch: React.FC<QuickBookingSearchProps> = ({
   const [isAircondOnly, setIsAircondOnly] = useState<boolean>(false);
   const [hasSearched, setHasSearched] = useState<boolean>(true);
   const [selectedPopupCheck, setSelectedPopupCheck] = useState<RoomAvailabilityCheck | null>(null);
+
+  useEffect(() => {
+    const handleKeyDown = (e: KeyboardEvent) => {
+      if (e.key === 'Escape' && selectedPopupCheck) {
+        setSelectedPopupCheck(null);
+      }
+    };
+    window.addEventListener('keydown', handleKeyDown);
+    return () => window.removeEventListener('keydown', handleKeyDown);
+  }, [selectedPopupCheck]);
 
   // Purpose options
   const purposeOptions: PurposeCategory[] = [

@@ -1,39 +1,59 @@
-import React, { useState } from 'react';
-import { AdHocBooking, BookingStatus } from '../types';
+import React, { useState, useEffect } from 'react';
+import { AdHocBooking, BookingStatus, StaffUser } from '../types';
 import { formatDateMalay, formatWhatsAppMessage, generateWhatsAppLink } from '../utils/availabilityEngine';
+import { verifyStaffCredentialsLocally } from '../lib/firebase';
+import { INITIAL_STAFF_DATA } from '../data/staffData';
+import { WhatsAppIcon } from './WhatsAppIcon';
 import { 
   QrCode, 
-  Share2, 
   Clock, 
   Calendar, 
   User, 
   Building, 
-  CheckCircle2, 
-  XCircle, 
-  AlertCircle, 
   Trash2, 
-  MessageSquare,
   Search,
   ExternalLink,
-  Tag,
   Copy,
-  Check
+  Check,
+  ShieldAlert,
+  KeyRound,
+  Mail,
+  X,
+  AlertCircle
 } from 'lucide-react';
 
 interface MyBookingsViewProps {
   bookings: AdHocBooking[];
+  staffList?: StaffUser[];
   onOpenQRModal: (booking: AdHocBooking) => void;
   onCancelBooking: (bookingId: string) => void;
 }
 
 export const MyBookingsView: React.FC<MyBookingsViewProps> = ({
   bookings,
+  staffList = INITIAL_STAFF_DATA,
   onOpenQRModal,
   onCancelBooking
 }) => {
   const [statusFilter, setStatusFilter] = useState<BookingStatus | 'Semua'>('Semua');
   const [searchQuery, setSearchQuery] = useState<string>('');
   const [copiedId, setCopiedId] = useState<string | null>(null);
+
+  // Security Cancel Verification Modal state
+  const [targetCancelBooking, setTargetCancelBooking] = useState<AdHocBooking | null>(null);
+  const [cancelEmailInput, setCancelEmailInput] = useState<string>('');
+  const [cancelPasscodeInput, setCancelPasscodeInput] = useState<string>('');
+  const [cancelErrorMsg, setCancelErrorMsg] = useState<string | null>(null);
+
+  useEffect(() => {
+    const handleKeyDown = (e: KeyboardEvent) => {
+      if (e.key === 'Escape' && targetCancelBooking) {
+        setTargetCancelBooking(null);
+      }
+    };
+    window.addEventListener('keydown', handleKeyDown);
+    return () => window.removeEventListener('keydown', handleKeyDown);
+  }, [targetCancelBooking]);
 
   const handleCopyText = async (booking: AdHocBooking) => {
     try {
@@ -44,6 +64,42 @@ export const MyBookingsView: React.FC<MyBookingsViewProps> = ({
     } catch (err) {
       console.error('Failed to copy booking text:', err);
     }
+  };
+
+  const handleOpenCancelModal = (booking: AdHocBooking) => {
+    setTargetCancelBooking(booking);
+    setCancelEmailInput(booking.applicantEmail || '');
+    setCancelPasscodeInput('');
+    setCancelErrorMsg(null);
+  };
+
+  const handleConfirmCancelWithSecurity = (e: React.FormEvent) => {
+    e.preventDefault();
+    if (!targetCancelBooking) return;
+
+    // Verify combination of Email and 4-digit Passcode in Firebase CSV staff database
+    const verifyResult = verifyStaffCredentialsLocally(cancelEmailInput, cancelPasscodeInput, staffList);
+
+    if (!verifyResult.success || !verifyResult.staff) {
+      setCancelErrorMsg(
+        verifyResult.errorMsg || 
+        'Pengesahan Keselamatan Gagal: Kombinasi E-mel dan passcode 4-digit telefon tidak berpadanan dengan pangkalan data CSV KPMBP dalam Firebase.'
+      );
+      return;
+    }
+
+    // Ensure email matches booking email (or is authorised staff)
+    if (
+      verifyResult.staff.email.toLowerCase() !== targetCancelBooking.applicantEmail.toLowerCase() &&
+      !verifyResult.staff.role.toLowerCase().includes('pentadbir')
+    ) {
+      setCancelErrorMsg(`Hanya ${targetCancelBooking.applicantEmail} sahaja dibenarkan membatalkan tempahan ini.`);
+      return;
+    }
+
+    // Proceed with cancel
+    onCancelBooking(targetCancelBooking.id);
+    setTargetCancelBooking(null);
   };
 
   const filteredBookings = bookings.filter(b => {
@@ -175,12 +231,9 @@ export const MyBookingsView: React.FC<MyBookingsViewProps> = ({
                     </span>
                   </div>
 
-                  {/* Booking Title & Applicant */}
+                  {/* Applicant Details */}
                   <div>
-                    <h3 className="text-lg font-bold text-slate-900 leading-snug">
-                      {b.title}
-                    </h3>
-                    <div className="text-xs text-slate-600 mt-1 flex flex-wrap items-center gap-x-2 gap-y-1">
+                    <div className="text-xs text-slate-600 flex flex-wrap items-center gap-x-2 gap-y-1">
                       <div className="flex items-center gap-1">
                         <User className="w-3.5 h-3.5 text-blue-600" />
                         <span className="font-semibold text-slate-900">{b.applicantName}</span>
@@ -254,12 +307,11 @@ export const MyBookingsView: React.FC<MyBookingsViewProps> = ({
                       href={generateWhatsAppLink(b)}
                       target="_blank"
                       rel="noopener noreferrer"
-                      className="bg-slate-100 hover:bg-slate-200 text-slate-800 font-bold py-2 px-3 rounded-lg shadow-xs transition flex items-center gap-1.5 border border-slate-200"
+                      className="bg-[#25D366] hover:bg-[#20bd5a] text-white font-bold py-2 px-2.5 rounded-lg shadow-sm transition flex items-center gap-1 active:scale-95"
                       title="Kongsi Ringkasan Tempahan ke WhatsApp"
                     >
-                      <MessageSquare className="w-3.5 h-3.5 text-emerald-600" />
-                      <span>WhatsApp</span>
-                      <ExternalLink className="w-3 h-3 text-slate-400" />
+                      <WhatsAppIcon className="w-4 h-4 shrink-0" />
+                      <ExternalLink className="w-3 h-3 text-white/80" />
                     </a>
 
                     {/* QR Code Pass Button */}
@@ -272,14 +324,10 @@ export const MyBookingsView: React.FC<MyBookingsViewProps> = ({
                     </button>
                   </div>
 
-                  {/* Cancel Button */}
+                  {/* Cancel Button - Security Verified */}
                   <button
-                    onClick={() => {
-                      if (confirm(`Adakah anda pasti mahu membatalkan tempahan ID ${b.id}?`)) {
-                        onCancelBooking(b.id);
-                      }
-                    }}
-                    className="text-rose-600 hover:text-rose-800 hover:bg-rose-50 font-semibold py-1.5 px-2.5 rounded-lg transition flex items-center gap-1"
+                    onClick={() => handleOpenCancelModal(b)}
+                    className="text-rose-600 hover:text-rose-800 hover:bg-rose-50 font-semibold py-1.5 px-2.5 rounded-lg transition flex items-center gap-1 border border-rose-200"
                   >
                     <Trash2 className="w-3.5 h-3.5" />
                     <span>Batal</span>
@@ -296,6 +344,100 @@ export const MyBookingsView: React.FC<MyBookingsViewProps> = ({
           </div>
         )}
       </div>
+
+      {/* Security Verification Modal for Cancelling Bookings */}
+      {targetCancelBooking && (
+        <div className="fixed inset-0 bg-slate-950/80 backdrop-blur-xs z-50 flex items-center justify-center p-4 overflow-y-auto">
+          <div className="bg-white rounded-2xl max-w-md w-full p-6 shadow-2xl border border-slate-200 space-y-4 animate-in fade-in zoom-in duration-150">
+            <div className="flex items-center justify-between border-b border-slate-100 pb-3">
+              <div className="flex items-center gap-2 text-rose-600">
+                <ShieldAlert className="w-5 h-5" />
+                <h3 className="font-extrabold text-slate-900 text-base">Pengesahan Batal Tempahan</h3>
+              </div>
+              <button
+                onClick={() => setTargetCancelBooking(null)}
+                className="text-slate-400 hover:text-slate-600 p-1 rounded-lg"
+              >
+                <X className="w-5 h-5" />
+              </button>
+            </div>
+
+            <div className="bg-slate-50 border border-slate-200 rounded-xl p-3 text-xs text-slate-700 space-y-1">
+              <div><strong>ID Tempahan:</strong> <span className="font-mono font-bold text-slate-900">{targetCancelBooking.id}</span></div>
+              <div><strong>Ruang:</strong> {targetCancelBooking.roomName}</div>
+              <div><strong>Tarikh & Masa:</strong> {targetCancelBooking.date} ({targetCancelBooking.startTime} - {targetCancelBooking.endTime})</div>
+              <div><strong>Pemohon Rasmi:</strong> {targetCancelBooking.applicantName} ({targetCancelBooking.applicantEmail})</div>
+            </div>
+
+            <p className="text-xs text-slate-600">
+              Sila masukkan <strong>E-mel Rasmi</strong> dan <strong>Passcode 4-Digit Telefon</strong> anda untuk mengesahkan pembatalan ini:
+            </p>
+
+            <form onSubmit={handleConfirmCancelWithSecurity} className="space-y-3 text-xs">
+              <div>
+                <label className="block font-bold text-slate-700 mb-1">E-mel Pengguna (CSV):</label>
+                <div className="relative">
+                  <Mail className="w-3.5 h-3.5 text-slate-400 absolute left-2.5 top-2.5" />
+                  <input
+                    type="email"
+                    required
+                    value={cancelEmailInput}
+                    onChange={(e) => {
+                      setCancelEmailInput(e.target.value);
+                      setCancelErrorMsg(null);
+                    }}
+                    placeholder="khaikerr@gmail.com"
+                    className="w-full bg-slate-50 border border-slate-300 rounded-xl pl-8 pr-3 py-2 text-slate-900 font-bold outline-none focus:ring-2 focus:ring-rose-500"
+                  />
+                </div>
+              </div>
+
+              <div>
+                <label className="block font-bold text-slate-700 mb-1">Passcode (4 Digit Terakhir No. Telefon):</label>
+                <div className="relative">
+                  <KeyRound className="w-3.5 h-3.5 text-slate-400 absolute left-2.5 top-2.5" />
+                  <input
+                    type="password"
+                    maxLength={4}
+                    required
+                    value={cancelPasscodeInput}
+                    onChange={(e) => {
+                      setCancelPasscodeInput(e.target.value);
+                      setCancelErrorMsg(null);
+                    }}
+                    placeholder="3756"
+                    className="w-full bg-slate-50 border border-slate-300 rounded-xl pl-8 pr-3 py-2 text-slate-900 font-mono font-bold outline-none focus:ring-2 focus:ring-rose-500"
+                  />
+                </div>
+              </div>
+
+              {cancelErrorMsg && (
+                <div className="p-2.5 bg-rose-50 border border-rose-200 text-rose-700 rounded-xl text-[11px] font-semibold flex items-start gap-1.5">
+                  <AlertCircle className="w-4 h-4 text-rose-600 shrink-0 mt-0.5" />
+                  <span>{cancelErrorMsg}</span>
+                </div>
+              )}
+
+              <div className="flex items-center gap-2 pt-2">
+                <button
+                  type="button"
+                  onClick={() => setTargetCancelBooking(null)}
+                  className="flex-1 py-2.5 bg-slate-100 hover:bg-slate-200 text-slate-700 font-bold rounded-xl transition"
+                >
+                  Kembali
+                </button>
+                <button
+                  type="submit"
+                  className="flex-1 py-2.5 bg-rose-600 hover:bg-rose-700 text-white font-bold rounded-xl shadow-md transition flex items-center justify-center gap-1.5"
+                >
+                  <Trash2 className="w-4 h-4" />
+                  Sahkan Batal Tempahan
+                </button>
+              </div>
+            </form>
+          </div>
+        </div>
+      )}
     </div>
   );
 };

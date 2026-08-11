@@ -76,6 +76,21 @@
         "createdBy": { "type": "string" }
       },
       "required": ["id", "roomId", "date", "startTime", "endTime", "title"]
+    },
+    "staff_users": {
+      "title": "Registered Staff Directory",
+      "description": "Registered KPMBP staff details from CSV with email and phone passcode",
+      "type": "object",
+      "properties": {
+        "id": { "type": "string" },
+        "department": { "type": "string" },
+        "name": { "type": "string" },
+        "role": { "type": "string" },
+        "phone": { "type": "string" },
+        "email": { "type": "string" },
+        "passcode": { "type": "string" }
+      },
+      "required": ["id", "name", "email", "passcode"]
     }
   },
   "security": {
@@ -97,6 +112,11 @@
       },
       {
         "collection": "blocks",
+        "read": "true",
+        "write": "true"
+      },
+      {
+        "collection": "staff_users",
         "read": "true",
         "write": "true"
       }

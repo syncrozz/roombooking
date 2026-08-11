@@ -93,3 +93,14 @@ export interface SearchFilterParams {
   isAircondOnly?: boolean;
   isSmartClassroomOnly?: boolean;
 }
+
+export interface StaffUser {
+  id: string;
+  department: string;
+  name: string;
+  role: string;
+  phone: string;
+  email: string;
+  passcode: string; // 4 last digits of phone
+}
+

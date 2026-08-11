@@ -1,4 +1,4 @@
-import React, { useState } from 'react';
+import React, { useState, useEffect } from 'react';
 import { 
   Room, 
   AcademicScheduleSlot, 
@@ -62,6 +62,16 @@ export const RoomAvailabilityMatrix: React.FC<RoomAvailabilityMatrixProps> = ({
     endTime: string;
     check: ReturnType<typeof checkRoomAvailability>;
   } | null>(null);
+
+  useEffect(() => {
+    const handleKeyDown = (e: KeyboardEvent) => {
+      if (e.key === 'Escape' && selectedCellInfo) {
+        setSelectedCellInfo(null);
+      }
+    };
+    window.addEventListener('keydown', handleKeyDown);
+    return () => window.removeEventListener('keydown', handleKeyDown);
+  }, [selectedCellInfo]);
 
   // Filtered rooms
   const filteredRooms = rooms.filter(r => {

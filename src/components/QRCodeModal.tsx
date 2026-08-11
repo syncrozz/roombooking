@@ -1,6 +1,7 @@
-import React, { useState } from 'react';
+import React, { useState, useEffect } from 'react';
 import { AdHocBooking } from '../types';
 import { formatDateMalay, formatWhatsAppMessage, generateWhatsAppLink } from '../utils/availabilityEngine';
+import { WhatsAppIcon } from './WhatsAppIcon';
 import { 
   QrCode, 
   X, 
@@ -11,7 +12,6 @@ import {
   Calendar, 
   Clock, 
   User, 
-  MessageSquare,
   ExternalLink,
   Copy,
   Check
@@ -24,6 +24,16 @@ interface QRCodeModalProps {
 
 export const QRCodeModal: React.FC<QRCodeModalProps> = ({ booking, onClose }) => {
   const [copied, setCopied] = useState(false);
+
+  useEffect(() => {
+    const handleKeyDown = (e: KeyboardEvent) => {
+      if (e.key === 'Escape') {
+        onClose();
+      }
+    };
+    window.addEventListener('keydown', handleKeyDown);
+    return () => window.removeEventListener('keydown', handleKeyDown);
+  }, [onClose]);
 
   const handleCopyText = async () => {
     try {
@@ -134,11 +144,11 @@ export const QRCodeModal: React.FC<QRCodeModalProps> = ({ booking, onClose }) =>
             href={generateWhatsAppLink(booking)}
             target="_blank"
             rel="noopener noreferrer"
-            className="w-full bg-slate-100 hover:bg-slate-200 text-slate-800 font-bold py-2 px-4 rounded-xl transition flex items-center justify-center gap-2 text-xs border border-slate-200"
+            className="w-full bg-[#25D366] hover:bg-[#20bd5a] text-white font-bold py-2.5 px-4 rounded-xl transition flex items-center justify-center gap-2 text-xs shadow-sm active:scale-98"
           >
-            <MessageSquare className="w-3.5 h-3.5 text-emerald-600" />
+            <WhatsAppIcon className="w-4 h-4 shrink-0" />
             <span>Kongsi ke WhatsApp</span>
-            <ExternalLink className="w-3 h-3 text-slate-400" />
+            <ExternalLink className="w-3.5 h-3.5 text-white/80" />
           </a>
 
           <button

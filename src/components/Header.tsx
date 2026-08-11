@@ -1,5 +1,6 @@
-import React, { useState } from 'react';
+import React, { useState, useEffect } from 'react';
 import { LoginUserCard } from './LoginUserCard';
+import { StaffUser } from '../types';
 import { 
   Building2, 
   Search, 
@@ -22,18 +23,29 @@ interface HeaderProps {
   activeTab: ActiveTab;
   setActiveTab: (tab: ActiveTab) => void;
   pendingCount: number;
+  staffList?: StaffUser[];
 }
 
-export const Header: React.FC<HeaderProps> = ({ activeTab, setActiveTab, pendingCount }) => {
+export const Header: React.FC<HeaderProps> = ({ activeTab, setActiveTab, pendingCount, staffList }) => {
   const [mobileMenuOpen, setMobileMenuOpen] = useState(false);
+
+  useEffect(() => {
+    const handleKeyDown = (e: KeyboardEvent) => {
+      if (e.key === 'Escape' && mobileMenuOpen) {
+        setMobileMenuOpen(false);
+      }
+    };
+    window.addEventListener('keydown', handleKeyDown);
+    return () => window.removeEventListener('keydown', handleKeyDown);
+  }, [mobileMenuOpen]);
 
   const navItems = [
     { id: 'search' as ActiveTab, label: 'Cari & Tempah', sub: 'Dashboard', icon: Search },
-    { id: 'matrix' as ActiveTab, label: 'Matriks Ketersediaan', sub: 'Calendar View', icon: CalendarDays },
+    { id: 'matrix' as ActiveTab, label: 'Lihat Ketersediaan', sub: 'Calendar View', icon: CalendarDays },
     { id: 'academic' as ActiveTab, label: 'Jadual Akademik', sub: 'Integrated Timetable', icon: BookOpen },
     { id: 'mybookings' as ActiveTab, label: 'Tempahan Saya', sub: 'Pas QR Akses', icon: QrCode },
     { id: 'directory' as ActiveTab, label: 'Direktori Ruang', sub: '33 Managed Spaces', icon: SlidersHorizontal },
-    { id: 'admin' as ActiveTab, label: 'Block Manager', sub: 'Pentadbir Ruang', icon: ShieldCheck, badge: pendingCount },
+    { id: 'admin' as ActiveTab, label: 'Admin Access', sub: 'Pentadbir Ruang', icon: ShieldCheck, badge: pendingCount },
   ];
 
   const handleTabClick = (tab: ActiveTab) => {
@@ -113,7 +125,7 @@ export const Header: React.FC<HeaderProps> = ({ activeTab, setActiveTab, pending
 
         {/* Log Masuk / User Profile Footer */}
         <div className="p-3 border-t border-slate-800">
-          <LoginUserCard />
+          <LoginUserCard staffList={staffList} />
         </div>
       </aside>
 
@@ -187,7 +199,7 @@ export const Header: React.FC<HeaderProps> = ({ activeTab, setActiveTab, pending
             </div>
 
             <div className="pt-2 border-t border-slate-800">
-              <LoginUserCard />
+              <LoginUserCard staffList={staffList} />
             </div>
           </div>
         </div>

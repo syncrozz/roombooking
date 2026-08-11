@@ -1,4 +1,4 @@
-import React, { useState } from 'react';
+import React, { useState, useEffect } from 'react';
 import { Room, RoomCategory, PurposeCategory } from '../types';
 import { formatLevel, isTargetVenue } from '../utils/storage';
 import { 
@@ -29,6 +29,16 @@ export const RoomDirectoryView: React.FC<RoomDirectoryViewProps> = ({
   const [searchQuery, setSearchQuery] = useState<string>('');
   const [isAircondOnly, setIsAircondOnly] = useState<boolean>(false);
   const [selectedRoomModal, setSelectedRoomModal] = useState<Room | null>(null);
+
+  useEffect(() => {
+    const handleKeyDown = (e: KeyboardEvent) => {
+      if (e.key === 'Escape' && selectedRoomModal) {
+        setSelectedRoomModal(null);
+      }
+    };
+    window.addEventListener('keydown', handleKeyDown);
+    return () => window.removeEventListener('keydown', handleKeyDown);
+  }, [selectedRoomModal]);
 
   const filteredRooms = rooms.filter(r => {
     if (categoryFilter !== 'Semua' && r.category !== categoryFilter) return false;

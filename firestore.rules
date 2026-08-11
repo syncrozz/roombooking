@@ -13,5 +13,8 @@ service cloud.firestore {
     match /blocks/{blockId} {
       allow read, write: if true;
     }
+    match /staff_users/{staffId} {
+      allow read, write: if true;
+    }
   }
 }
