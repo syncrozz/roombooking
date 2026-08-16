@@ -52,7 +52,7 @@ import { QRCodeModal } from './components/QRCodeModal';
 import { Building2, Shield, Heart, Sparkles, CheckCircle2, Lock, X, KeyRound, ShieldCheck, AlertCircle } from 'lucide-react';
 
 export default function App() {
-  const [activeTab, setActiveTab] = useState<ActiveTab>('search');
+  const [activeTab, setActiveTab] = useState<ActiveTab>('matrix');
 
   // Admin PIN verification state
   const [isAdminUnlocked, setIsAdminUnlocked] = useState<boolean>(false);
@@ -382,7 +382,6 @@ export default function App() {
         {/* Top Header Bar */}
         <header className="h-16 bg-white border-b border-slate-200 px-6 sm:px-8 flex items-center justify-between sticky top-0 z-30 shadow-xs">
           <div className="flex items-center gap-2 text-sm">
-            <span className="text-slate-400">Modul /</span>
             <span className="text-slate-900 font-bold">{getTabBreadcrumb(activeTab)}</span>
           </div>
         </header>
@@ -476,7 +475,7 @@ export default function App() {
               <span>•</span>
               <button onClick={() => setActiveTab('academic')} className="hover:text-blue-600 transition">Jadual Akademik</button>
               <span>•</span>
-              <button onClick={() => setActiveTab('directory')} className="hover:text-blue-600 transition">33 Ruang KPMBP</button>
+              <button onClick={() => setActiveTab('directory')} className="hover:text-blue-600 transition">42 Ruang KPMBP</button>
             </div>
           </div>
         </footer>

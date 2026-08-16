@@ -1,7 +1,7 @@
 import { Room, AcademicScheduleSlot, AdHocBooking, InstitutionalBlock } from '../types';
 
 export const INITIAL_ROOMS: Room[] = [
-  // Bilik Kuliah (28 rooms)
+  // Bilik Kuliah (28 rooms: BK01 - BK28)
   ...Array.from({ length: 28 }, (_, i) => {
     const num = i + 1;
     const code = `BK${num < 10 ? '0' + num : num}`;
@@ -31,7 +31,91 @@ export const INITIAL_ROOMS: Room[] = [
     };
   }),
 
-  // Dewan Kuliah (2 rooms)
+  // Smart Classroom (1 room)
+  {
+    id: 'SMART_CLASSROOM',
+    code: 'SMART CLASSROOM',
+    name: 'SMART CLASSROOM',
+    category: 'Bilik Kuliah',
+    capacity: 30,
+    block: 'Bangunan Akademik',
+    level: 2,
+    facilities: [
+      'Papan Pintar Interaktif (Smartboard)',
+      'Pendingin Hawa (Aircond)',
+      'Kamera Web HD & Mikrofon Bilik',
+      'Sistem Audio Digital',
+      'Meja Pembelajaran Kolaboratif',
+      'Capaian Wi-Fi KPMBP'
+    ],
+    hasAircond: true,
+    isSmartClassroom: true,
+    notes: 'Bilik kuliah pintar dengan fasiliti hibrid dan skrin interaktif'
+  },
+
+  // Makmal Komputer (5 labs)
+  {
+    id: 'MAKMAL_ALFA',
+    code: 'MAKMAL ALFA',
+    name: 'MAKMAL ALFA',
+    category: 'Makmal Komputer',
+    capacity: 35,
+    block: 'Pusat Komputer & IT',
+    level: 1,
+    facilities: ['35x PC Komputer Berprestasi Tinggi', 'Projektor HD & Skrin Bermotor', 'Pendingin Hawa Pusat', 'Rangkaian Gigabit LAN', 'Papan Putih'],
+    hasAircond: true,
+    notes: 'Makmal komputer utama untuk praktikal pengaturcaraan, perakaunan berkomputer dan peperiksaan online'
+  },
+  {
+    id: 'MAKMAL_BETA',
+    code: 'MAKMAL BETA',
+    name: 'MAKMAL BETA',
+    category: 'Makmal Komputer',
+    capacity: 35,
+    block: 'Pusat Komputer & IT',
+    level: 1,
+    facilities: ['35x PC Komputer', 'Projektor HD', 'Pendingin Hawa Pusat', 'Rangkaian Gigabit LAN', 'Papan Putih'],
+    hasAircond: true,
+    notes: 'Makmal komputer untuk kelas pengkomputeran dan latihan staf'
+  },
+  {
+    id: 'MAKMAL_SIGMA',
+    code: 'MAKMAL SIGMA',
+    name: 'MAKMAL SIGMA',
+    category: 'Makmal Komputer',
+    capacity: 35,
+    block: 'Pusat Komputer & IT',
+    level: 2,
+    facilities: ['35x PC Komputer', 'Projektor HD', 'Pendingin Hawa Pusat', 'Rangkaian Gigabit LAN', 'Papan Putih'],
+    hasAircond: true,
+    notes: 'Makmal komputer multimedia dan sistem maklumat perniagaan'
+  },
+  {
+    id: 'MAKMAL_GAMMA',
+    code: 'MAKMAL GAMMA',
+    name: 'MAKMAL GAMMA',
+    category: 'Makmal Komputer',
+    capacity: 35,
+    block: 'Pusat Komputer & IT',
+    level: 2,
+    facilities: ['35x PC Komputer', 'Projektor HD', 'Pendingin Hawa Pusat', 'Rangkaian Gigabit LAN', 'Papan Putih'],
+    hasAircond: true,
+    notes: 'Makmal komputer untuk pembangunan perisian dan reka bentuk'
+  },
+  {
+    id: 'MAKMAL_DELTA',
+    code: 'MAKMAL DELTA',
+    name: 'MAKMAL DELTA',
+    category: 'Makmal Komputer',
+    capacity: 35,
+    block: 'Pusat Komputer & IT',
+    level: 2,
+    facilities: ['35x PC Komputer', 'Projektor HD', 'Pendingin Hawa Pusat', 'Rangkaian Gigabit LAN', 'Papan Putih'],
+    hasAircond: true,
+    notes: 'Makmal komputer untuk penyelidikan data dan bengkel teknologi'
+  },
+
+  // Dewan Kuliah (2 halls)
   {
     id: 'DKA',
     code: 'DKA',
@@ -57,7 +141,31 @@ export const INITIAL_ROOMS: Room[] = [
     notes: 'Sesuai untuk peperiksaan, taklimat, dan perkongsian ilmu'
   },
 
-  // Ruang Khas (3 rooms)
+  // Ruang Khas (4 spaces)
+  {
+    id: 'ARAS_1_PERPUSTAKAAN',
+    code: 'ARAS 1 PERPUSTAKAAN',
+    name: 'ARAS 1 PERPUSTAKAAN',
+    category: 'Ruang Khas',
+    capacity: 60,
+    block: 'Bangunan Perpustakaan',
+    level: 1,
+    facilities: ['Zon Pembelajaran Terbuka', 'Pendingin Hawa', 'Meja Perbincangan Kumpulan', 'Capaian Wi-Fi KPMBP', 'Palam Kuasa Komputer Riba'],
+    hasAircond: true,
+    notes: 'Ruang pembelajaran kolaboratif dan aktiviti literasi maklumat'
+  },
+  {
+    id: 'BILIK_KOTA_TINGGI',
+    code: 'BILIK KOTA TINGGI',
+    name: 'BILIK KOTA TINGGI',
+    category: 'Ruang Khas',
+    capacity: 30,
+    block: 'Bangunan Pentadbiran',
+    level: 2,
+    facilities: ['Meja Mesyuarat Eksekutif', 'TV Paparan Pintar 75"', 'Sistem Persidangan Video', 'Pendingin Hawa', 'Papan Tulis Kaca'],
+    hasAircond: true,
+    notes: 'Bilik mesyuarat utama pengurusan dan perjumpaan rasmi'
+  },
   {
     id: 'DEWAN_SEMINAR',
     code: 'DEWAN SEMINAR',
@@ -66,33 +174,47 @@ export const INITIAL_ROOMS: Room[] = [
     capacity: 80,
     block: 'Bangunan Perpustakaan',
     level: 4,
-    facilities: ['Skrin LED Interaktif 85"', 'Susunan Meja Fleksibel', 'Sistem Audio Mikrofon Wireless', 'Pentas Kecil', 'AC'],
+    facilities: ['Skrin LED Interaktif 85"', 'Susunan Meja Fleksibel', 'Sistem Audio Mikrofon Wireless', 'Pentas Kecil', 'Pendingin Hawa'],
     hasAircond: true,
     notes: 'Pilihan utama bagi wacana akademik, bengkel kepimpinan, dan mesyuarat pengurusan'
   },
   {
-    id: 'BILIK_SEMINAR',
-    code: 'BILIK SEMINAR',
-    name: 'BILIK SEMINAR',
+    id: 'MINI_SEMINAR',
+    code: 'MINI SEMINAR',
+    name: 'MINI SEMINAR',
     category: 'Ruang Khas',
-    capacity: 40,
+    capacity: 30,
     block: 'Bangunan Perpustakaan',
     level: 3,
-    facilities: ['Meja Persidangan U-Shape', 'Skrin TV Smart Display 75"', 'Papan Tulis Kaca', 'Sistem Persidangan Video'],
+    facilities: ['Meja Persidangan U-Shape', 'Skrin TV Smart Display 65"', 'Pendingin Hawa', 'Papan Putih Kaca'],
     hasAircond: true,
     notes: 'Direka khas untuk mesyuarat jawatankuasa, pembentangan projek khas, dan bengkel kecil'
   },
+
+  // Surau (2 surau)
   {
-    id: 'DEWAN_BESAR',
-    code: 'DEWAN BESAR',
-    name: 'DEWAN BESAR',
-    category: 'Ruang Khas',
-    capacity: 500,
-    block: 'Hadapan Padang KPMBP',
+    id: 'SURAU_1',
+    code: 'SURAU 1',
+    name: 'SURAU 1',
+    category: 'Surau',
+    capacity: 50,
+    block: 'Pusat Islam KPMBP',
     level: 1,
-    facilities: ['Pentas Utama', 'Sistem Audio Konsert & Pencahayaan Stage', 'Gelanggang Sukan Serbaguna', 'LCD Projektor Gergasi'],
+    facilities: ['Sejadah & Karpet Penuh', 'Pendingin Hawa & Kipas', 'Tempat Wuduk Selesa', 'Sistem Pembesar Suara PA'],
     hasAircond: true,
-    notes: 'Ruang rasmi untuk Majlis Graduasi, Perhimpunan Bulanan, Majlis Anugerah, & Sukan Indoor'
+    notes: 'Ruang solat dan pengajian Islam Aras Bawah'
+  },
+  {
+    id: 'SURAU_2',
+    code: 'SURAU 2',
+    name: 'SURAU 2',
+    category: 'Surau',
+    capacity: 50,
+    block: 'Pusat Islam KPMBP',
+    level: 2,
+    facilities: ['Sejadah & Karpet Penuh', 'Pendingin Hawa & Kipas', 'Tempat Wuduk Selesa', 'Sistem Pembesar Suara PA'],
+    hasAircond: true,
+    notes: 'Ruang solat dan pengajian Islam Aras Atas'
   }
 ];
 

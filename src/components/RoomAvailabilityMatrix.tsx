@@ -40,8 +40,10 @@ const TIME_SLOTS = [
   { start: '09:30', end: '10:30', label: '09:30 - 10:30' },
   { start: '10:30', end: '11:30', label: '10:30 - 11:30' },
   { start: '11:30', end: '12:30', label: '11:30 - 12:30' },
-  { start: '14:30', end: '15:30', label: '02:30 - 03:30' },
-  { start: '15:30', end: '16:30', label: '03:30 - 04:30' }
+  { start: '12:30', end: '13:30', label: '12:30 - 13:30' },
+  { start: '13:30', end: '14:30', label: '13:30 - 14:30' },
+  { start: '14:30', end: '15:30', label: '14:30 - 15:30' },
+  { start: '15:30', end: '16:30', label: '15:30 - 16:30' }
 ];
 
 export const RoomAvailabilityMatrix: React.FC<RoomAvailabilityMatrixProps> = ({
@@ -52,7 +54,16 @@ export const RoomAvailabilityMatrix: React.FC<RoomAvailabilityMatrixProps> = ({
   onOpenBookingModal,
   onViewRoomDetails
 }) => {
-  const [selectedDate, setSelectedDate] = useState<string>('2026-08-06'); // Thursday prompt example
+  // Default to today's live current date in YYYY-MM-DD format
+  const getTodayFormatted = () => {
+    const d = new Date();
+    const year = d.getFullYear();
+    const month = String(d.getMonth() + 1).padStart(2, '0');
+    const day = String(d.getDate()).padStart(2, '0');
+    return `${year}-${month}-${day}`;
+  };
+
+  const [selectedDate, setSelectedDate] = useState<string>(getTodayFormatted);
   const [categoryFilter, setCategoryFilter] = useState<RoomCategory | 'Semua'>('Semua');
   const [searchQuery, setSearchQuery] = useState<string>('');
   const [isAircondOnly, setIsAircondOnly] = useState<boolean>(false);
@@ -90,30 +101,34 @@ export const RoomAvailabilityMatrix: React.FC<RoomAvailabilityMatrixProps> = ({
       <div className="bg-white rounded-2xl p-6 shadow-md border border-slate-200">
         <div className="flex flex-col md:flex-row items-start md:items-center justify-between gap-4 border-b border-slate-100 pb-5">
           <div>
-            <div className="inline-flex items-center gap-1.5 bg-indigo-50 text-indigo-700 px-3 py-1 rounded-full text-xs font-bold border border-indigo-200 mb-1">
+            <div className="inline-flex items-center gap-1.5 bg-indigo-50 text-indigo-700 px-3 py-1 rounded-full text-xs font-bold border border-indigo-200">
               <Calendar className="w-3.5 h-3.5" />
               Matriks Ketersediaan (Jadual By Bilik Kuliah)
             </div>
-            <h2 className="text-2xl font-extrabold text-slate-900 tracking-tight">
-              KPMBP Room Calendar Matrix (33 Ruang)
-            </h2>
-            <p className="text-slate-600 text-xs sm:text-sm mt-0.5">
-              Paparan visual langsung untuk menyemak pertembungan jadual akademik, tempahan ad-hoc & program kolej.
-            </p>
           </div>
 
-          <div className="flex items-center gap-2 bg-slate-50 border border-slate-200 p-2.5 rounded-xl">
-            <Calendar className="w-4 h-4 text-emerald-600" />
+          <label 
+            htmlFor="matrix-date-input"
+            className="flex items-center gap-2 bg-slate-50 hover:bg-emerald-50/60 border border-slate-200 hover:border-emerald-300 p-2.5 rounded-xl cursor-pointer transition-all duration-150 shadow-sm active:scale-[0.98] group"
+            title="Klik untuk memilih tarikh"
+          >
+            <Calendar className="w-4 h-4 text-emerald-600 group-hover:scale-110 transition-transform shrink-0" />
             <input
+              id="matrix-date-input"
               type="date"
               value={selectedDate}
               onChange={(e) => setSelectedDate(e.target.value)}
-              className="bg-transparent font-bold text-slate-900 text-sm outline-none cursor-pointer"
+              onClick={(e) => {
+                try {
+                  (e.currentTarget as any).showPicker?.();
+                } catch {}
+              }}
+              className="bg-transparent font-bold text-slate-900 text-sm outline-none cursor-pointer w-auto"
             />
-            <span className="text-xs bg-emerald-100 text-emerald-800 font-semibold px-2 py-0.5 rounded">
+            <span className="text-xs bg-emerald-100 group-hover:bg-emerald-200 text-emerald-800 font-semibold px-2 py-0.5 rounded transition-colors select-none shrink-0">
               {getMalayDayOfWeek(selectedDate)}
             </span>
-          </div>
+          </label>
         </div>
 
         {/* Filter Controls Bar */}
@@ -135,10 +150,12 @@ export const RoomAvailabilityMatrix: React.FC<RoomAvailabilityMatrixProps> = ({
               onChange={(e) => setCategoryFilter(e.target.value as RoomCategory | 'Semua')}
               className="bg-slate-50 border border-slate-300 rounded-lg px-3 py-1.5 font-medium text-slate-800 outline-none focus:ring-2 focus:ring-emerald-500"
             >
-              <option value="Semua">Kategori: Semua (33 Ruang)</option>
-              <option value="Bilik Kuliah">Bilik Kuliah (28)</option>
-              <option value="Dewan Kuliah">Dewan Kuliah (2)</option>
-              <option value="Ruang Khas">Ruang Khas (3)</option>
+              <option value="Semua">Kategori: Semua ({rooms.length} Ruang)</option>
+              <option value="Bilik Kuliah">Bilik Kuliah & Smart Class</option>
+              <option value="Makmal Komputer">Makmal Komputer (5)</option>
+              <option value="Dewan Kuliah">Dewan Kuliah (DKA & DKB)</option>
+              <option value="Ruang Khas">Ruang Khas (4)</option>
+              <option value="Surau">Surau (2)</option>
             </select>
 
             <label className="inline-flex items-center gap-1.5 bg-slate-50 border border-slate-200 px-3 py-1.5 rounded-lg cursor-pointer select-none">
@@ -150,10 +167,6 @@ export const RoomAvailabilityMatrix: React.FC<RoomAvailabilityMatrixProps> = ({
               />
               <span className="font-semibold text-slate-700">⭐ Aircond Sahaja</span>
             </label>
-          </div>
-
-          <div className="text-slate-500 font-medium">
-            Menunjukkan <strong>{filteredRooms.length}</strong> daripada 33 ruang
           </div>
         </div>
 

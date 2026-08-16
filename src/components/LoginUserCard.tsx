@@ -100,7 +100,7 @@ export const LoginUserCard: React.FC<LoginUserCardProps> = ({
   return (
     <div className="w-full bg-slate-900 border border-slate-700/80 rounded-xl overflow-hidden shadow-xl transition-all">
       {/* Header Banner */}
-      <div className="px-3.5 py-2.5 bg-slate-950 border-b border-slate-800 space-y-1.5">
+      <div className="px-3.5 py-2.5 bg-slate-950 border-b border-slate-800">
         <div className="flex items-center justify-end">
           <button
             type="button"
@@ -109,15 +109,6 @@ export const LoginUserCard: React.FC<LoginUserCardProps> = ({
           >
             {isEditing ? 'Batal' : 'Tukar Akaun / Passcode'}
           </button>
-        </div>
-
-        <div className="text-[10px] text-slate-400 flex items-center justify-between pt-1 border-t border-slate-800/80">
-          <span className="flex items-center gap-1">
-            <Database className="w-3 h-3 text-blue-400" /> Validation via 4-Digit Phone Passcode
-          </span>
-          <span className="text-[9px] text-emerald-400 bg-emerald-950/60 px-1.5 py-0.5 rounded border border-emerald-800/40 font-mono">
-            Firebase Synced
-          </span>
         </div>
       </div>
 
@@ -152,13 +143,13 @@ export const LoginUserCard: React.FC<LoginUserCardProps> = ({
             </div>
           </div>
 
-          <div className="bg-slate-950/80 border border-slate-800 rounded-lg p-2 flex items-center justify-between text-[10px]">
-            <span className="text-slate-400 flex items-center gap-1">
-              <span className="w-2 h-2 rounded-full bg-emerald-400 animate-pulse"></span>
+          <div className="bg-slate-950/80 border border-slate-800 rounded-lg p-2 flex flex-col gap-1.5 text-[10px]">
+            <span className="text-slate-400 flex items-center gap-1.5">
+              <span className="w-2 h-2 rounded-full bg-emerald-400 animate-pulse shrink-0"></span>
               Status Pengesahan Tempahan
             </span>
-            <span className="font-semibold text-emerald-400 bg-emerald-950/80 border border-emerald-800/80 px-1.5 py-0.5 rounded flex items-center gap-1">
-              <ShieldCheck className="w-3 h-3" />
+            <span className="font-semibold text-emerald-400 bg-emerald-950/80 border border-emerald-800/80 px-2 py-1 rounded flex items-center gap-1.5 w-fit">
+              <ShieldCheck className="w-3 h-3 shrink-0" />
               E-mel & Passcode Sah
             </span>
           </div>

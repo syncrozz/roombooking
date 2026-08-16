@@ -53,10 +53,16 @@ export const QuickBookingSearch: React.FC<QuickBookingSearchProps> = ({
   onOpenBookingModal,
   onViewRoomDetails
 }) => {
-  // Initial state defaults (e.g. 2026-08-06 Khamis as in WhatsApp screenshot prompt)
-  const todayStr = '2026-08-06';
-  
-  const [selectedDate, setSelectedDate] = useState<string>(todayStr);
+  // Live current date (YYYY-MM-DD)
+  const getTodayFormatted = () => {
+    const d = new Date();
+    const year = d.getFullYear();
+    const month = String(d.getMonth() + 1).padStart(2, '0');
+    const day = String(d.getDate()).padStart(2, '0');
+    return `${year}-${month}-${day}`;
+  };
+
+  const [selectedDate, setSelectedDate] = useState<string>(getTodayFormatted);
   const [startTime, setStartTime] = useState<string>('11:30');
   const [endTime, setEndTime] = useState<string>('12:30');
   const [selectedRoomId, setSelectedRoomId] = useState<string>('ALL'); // default ALL (Semua 33 Ruang)
@@ -192,14 +198,15 @@ export const QuickBookingSearch: React.FC<QuickBookingSearchProps> = ({
                   }}
                   className="w-full bg-slate-50 border border-slate-300 rounded-xl px-2.5 py-2.5 text-sm text-slate-900 font-medium focus:ring-2 focus:ring-emerald-500 outline-none"
                 >
-                  <option value="08:30">08:30 AM</option>
-                  <option value="09:30">09:30 AM</option>
-                  <option value="10:30">10:30 AM</option>
-                  <option value="11:30">11:30 AM</option>
-                  <option value="12:30">12:30 PM</option>
-                  <option value="14:30">02:30 PM</option>
-                  <option value="15:30">03:30 PM</option>
-                  <option value="16:30">04:30 PM</option>
+                  <option value="08:30">08:30 AM (08:30)</option>
+                  <option value="09:30">09:30 AM (09:30)</option>
+                  <option value="10:30">10:30 AM (10:30)</option>
+                  <option value="11:30">11:30 AM (11:30)</option>
+                  <option value="12:30">12:30 PM (12:30)</option>
+                  <option value="13:30">01:30 PM (13:30)</option>
+                  <option value="14:30">02:30 PM (14:30)</option>
+                  <option value="15:30">03:30 PM (15:30)</option>
+                  <option value="16:30">04:30 PM (16:30)</option>
                 </select>
               </div>
 
@@ -213,14 +220,15 @@ export const QuickBookingSearch: React.FC<QuickBookingSearchProps> = ({
                   }}
                   className="w-full bg-slate-50 border border-slate-300 rounded-xl px-2.5 py-2.5 text-sm text-slate-900 font-medium focus:ring-2 focus:ring-emerald-500 outline-none"
                 >
-                  <option value="09:30">09:30 AM</option>
-                  <option value="10:30">10:30 AM</option>
-                  <option value="11:30">11:30 AM</option>
-                  <option value="12:30">12:30 PM</option>
-                  <option value="13:30">01:30 PM</option>
-                  <option value="15:30">03:30 PM</option>
-                  <option value="16:30">04:30 PM</option>
-                  <option value="17:30">05:30 PM</option>
+                  <option value="09:30">09:30 AM (09:30)</option>
+                  <option value="10:30">10:30 AM (10:30)</option>
+                  <option value="11:30">11:30 AM (11:30)</option>
+                  <option value="12:30">12:30 PM (12:30)</option>
+                  <option value="13:30">01:30 PM (13:30)</option>
+                  <option value="14:30">02:30 PM (14:30)</option>
+                  <option value="15:30">03:30 PM (15:30)</option>
+                  <option value="16:30">04:30 PM (16:30)</option>
+                  <option value="17:30">05:30 PM (17:30)</option>
                 </select>
               </div>
             </div>
@@ -243,24 +251,45 @@ export const QuickBookingSearch: React.FC<QuickBookingSearchProps> = ({
               }}
               className="w-full bg-slate-50 border border-slate-300 rounded-xl px-3 py-2.5 text-sm text-slate-900 font-medium focus:ring-2 focus:ring-emerald-500 outline-none"
             >
-              <option value="ALL">🔍 SEMUA 33 RUANG (Cari Automatik)</option>
-              <optgroup label="🏛️ Dewan Kuliah & Ruang Khas">
-                <option value="DKA">DKA</option>
-                <option value="DKB">DKB</option>
-                <option value="DEWAN_SEMINAR">DEWAN SEMINAR</option>
-                <option value="BILIK_SEMINAR">BILIK SEMINAR</option>
-                <option value="DEWAN_BESAR">DEWAN BESAR</option>
-              </optgroup>
-              <optgroup label="🏫 Bilik Kuliah (BK01 - BK28)">
+              <option value="ALL">🔍 SEMUA {rooms.length || 42} RUANG (Cari Automatik)</option>
+              <optgroup label="🏫 Bilik Kuliah (BK01 - BK28 & Smart Classroom)">
                 {rooms.filter(r => r.category === 'Bilik Kuliah').map(r => (
                   <option key={r.id} value={r.id}>
-                    {r.code} {r.hasAircond ? '⭐ Aircond' : ''}
+                    {r.code} {r.isSmartClassroom ? '✨ Smart' : ''} {r.hasAircond ? '⭐ Aircond' : ''}
+                  </option>
+                ))}
+              </optgroup>
+              <optgroup label="💻 Makmal Komputer">
+                {rooms.filter(r => r.category === 'Makmal Komputer').map(r => (
+                  <option key={r.id} value={r.id}>
+                    {r.code}
+                  </option>
+                ))}
+              </optgroup>
+              <optgroup label="🏛️ Dewan Kuliah">
+                {rooms.filter(r => r.category === 'Dewan Kuliah').map(r => (
+                  <option key={r.id} value={r.id}>
+                    {r.code}
+                  </option>
+                ))}
+              </optgroup>
+              <optgroup label="🎓 Ruang Khas & Bilik Mesyuarat">
+                {rooms.filter(r => r.category === 'Ruang Khas').map(r => (
+                  <option key={r.id} value={r.id}>
+                    {r.code}
+                  </option>
+                ))}
+              </optgroup>
+              <optgroup label="🕌 Surau">
+                {rooms.filter(r => r.category === 'Surau').map(r => (
+                  <option key={r.id} value={r.id}>
+                    {r.code}
                   </option>
                 ))}
               </optgroup>
             </select>
             <span className="text-[11px] text-slate-500 block">
-              33 ruang dalam Direktori KPMBP
+              {rooms.length || 42} ruang dalam Direktori KPMBP
             </span>
           </div>
 

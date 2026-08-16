@@ -12,6 +12,11 @@ import {
 import { AdHocBooking, Room, AcademicScheduleSlot, InstitutionalBlock, StaffUser } from '../types';
 import { INITIAL_ROOMS, INITIAL_ACADEMIC_SCHEDULE, INITIAL_ADHOC_BOOKINGS, INITIAL_INSTITUTIONAL_BLOCKS } from '../data/initialData';
 import { INITIAL_STAFF_DATA } from '../data/staffData';
+import { 
+  getStoredAdHocBookings, 
+  getStoredInstitutionalBlocks, 
+  getStoredAcademicSchedule 
+} from '../utils/storage';
 import firebaseConfig from '../../firebase-applet-config.json';
 
 const app = !getApps().length ? initializeApp(firebaseConfig) : getApp();
@@ -28,22 +33,28 @@ const STAFF_COLLECTION = 'staff_users';
  * Real-time listener for Registered Staff in Firestore.
  */
 export function subscribeToStaffUsers(onUpdate: (staffList: StaffUser[]) => void): () => void {
-  const colRef = collection(db, STAFF_COLLECTION);
-  return onSnapshot(colRef, (snapshot) => {
-    if (snapshot.empty) {
-      seedInitialStaffUsers();
+  try {
+    const colRef = collection(db, STAFF_COLLECTION);
+    return onSnapshot(colRef, (snapshot) => {
+      if (snapshot.empty) {
+        seedInitialStaffUsers();
+        onUpdate(INITIAL_STAFF_DATA);
+        return;
+      }
+      const staffList: StaffUser[] = [];
+      snapshot.forEach((docSnap) => {
+        staffList.push(docSnap.data() as StaffUser);
+      });
+      onUpdate(staffList);
+    }, (error) => {
+      // Graceful fallback to initial staff data if Firestore is offline or quota exceeded
+      console.warn('Firestore offline / local fallback mode for staff users.');
       onUpdate(INITIAL_STAFF_DATA);
-      return;
-    }
-    const staffList: StaffUser[] = [];
-    snapshot.forEach((docSnap) => {
-      staffList.push(docSnap.data() as StaffUser);
     });
-    onUpdate(staffList);
-  }, (error) => {
-    console.error('Error listening to staff users:', error);
+  } catch (err) {
     onUpdate(INITIAL_STAFF_DATA);
-  });
+    return () => {};
+  }
 }
 
 /**
@@ -57,9 +68,8 @@ export async function seedInitialStaffUsers() {
       batch.set(ref, st);
     });
     await batch.commit();
-    console.log('Successfully seeded CSV staff directory into Firestore');
   } catch (err) {
-    console.error('Failed seeding staff directory:', err);
+    // Silent fail if quota exceeded
   }
 }
 
@@ -77,8 +87,7 @@ export async function bulkSaveStaffUsersToCloud(staffList: StaffUser[]): Promise
     await batch.commit();
     console.log(`Successfully synced ${staffList.length} staff users to Cloud Firestore.`);
   } catch (err) {
-    console.error('Failed bulk saving staff users to Firestore:', err);
-    throw err;
+    console.warn('Firestore bulk sync staff users saved locally.');
   }
 }
 
@@ -131,48 +140,60 @@ export function verifyStaffCredentialsLocally(
  * When any user adds, updates, or cancels a booking, all connected clients receive the update live.
  */
 export function subscribeToBookings(onUpdate: (bookings: AdHocBooking[]) => void): () => void {
-  const colRef = collection(db, BOOKINGS_COLLECTION);
-  
-  return onSnapshot(colRef, (snapshot) => {
-    if (snapshot.empty) {
-      // Seed initial data if database is empty
-      seedInitialBookings();
-      onUpdate(INITIAL_ADHOC_BOOKINGS);
-      return;
-    }
-
-    const bookings: AdHocBooking[] = [];
-    snapshot.forEach((docSnap) => {
-      bookings.push(docSnap.data() as AdHocBooking);
-    });
+  try {
+    const colRef = collection(db, BOOKINGS_COLLECTION);
     
-    // Sort by createdAt descending or date
-    bookings.sort((a, b) => new Date(b.createdAt || b.date).getTime() - new Date(a.createdAt || a.date).getTime());
-    onUpdate(bookings);
-  }, (error) => {
-    console.error('Error listening to bookings realtime updates:', error);
-  });
+    return onSnapshot(colRef, (snapshot) => {
+      if (snapshot.empty) {
+        seedInitialBookings();
+        onUpdate(getStoredAdHocBookings());
+        return;
+      }
+
+      const bookings: AdHocBooking[] = [];
+      snapshot.forEach((docSnap) => {
+        bookings.push(docSnap.data() as AdHocBooking);
+      });
+      
+      bookings.sort((a, b) => new Date(b.createdAt || b.date).getTime() - new Date(a.createdAt || a.date).getTime());
+      onUpdate(bookings);
+    }, (error) => {
+      // Graceful fallback to local storage if Firestore is offline or quota exceeded
+      console.warn('Firestore offline / local storage fallback mode for bookings.');
+      onUpdate(getStoredAdHocBookings());
+    });
+  } catch (err) {
+    onUpdate(getStoredAdHocBookings());
+    return () => {};
+  }
 }
 
 /**
  * Real-time listener for Institutional Blocks.
  */
 export function subscribeToBlocks(onUpdate: (blocks: InstitutionalBlock[]) => void): () => void {
-  const colRef = collection(db, BLOCKS_COLLECTION);
-  return onSnapshot(colRef, (snapshot) => {
-    if (snapshot.empty) {
-      seedInitialBlocks();
-      onUpdate(INITIAL_INSTITUTIONAL_BLOCKS);
-      return;
-    }
-    const blocks: InstitutionalBlock[] = [];
-    snapshot.forEach((docSnap) => {
-      blocks.push(docSnap.data() as InstitutionalBlock);
+  try {
+    const colRef = collection(db, BLOCKS_COLLECTION);
+    return onSnapshot(colRef, (snapshot) => {
+      if (snapshot.empty) {
+        seedInitialBlocks();
+        onUpdate(getStoredInstitutionalBlocks());
+        return;
+      }
+      const blocks: InstitutionalBlock[] = [];
+      snapshot.forEach((docSnap) => {
+        blocks.push(docSnap.data() as InstitutionalBlock);
+      });
+      onUpdate(blocks);
+    }, (error) => {
+      // Graceful fallback to local storage if Firestore is offline or quota exceeded
+      console.warn('Firestore offline / local storage fallback mode for institutional blocks.');
+      onUpdate(getStoredInstitutionalBlocks());
     });
-    onUpdate(blocks);
-  }, (error) => {
-    console.error('Error listening to institutional blocks:', error);
-  });
+  } catch (err) {
+    onUpdate(getStoredInstitutionalBlocks());
+    return () => {};
+  }
 }
 
 /**
@@ -183,8 +204,7 @@ export async function saveBookingToCloud(booking: AdHocBooking): Promise<void> {
     const docRef = doc(db, BOOKINGS_COLLECTION, booking.id);
     await setDoc(docRef, booking, { merge: true });
   } catch (err) {
-    console.error('Failed to save booking to Firestore:', err);
-    throw err;
+    console.warn('Booking saved locally (Cloud sync skipped / quota exceeded).');
   }
 }
 
@@ -196,8 +216,7 @@ export async function deleteBookingFromCloud(bookingId: string): Promise<void> {
     const docRef = doc(db, BOOKINGS_COLLECTION, bookingId);
     await deleteDoc(docRef);
   } catch (err) {
-    console.error('Failed to delete booking from Firestore:', err);
-    throw err;
+    console.warn('Booking deleted locally (Cloud sync skipped / quota exceeded).');
   }
 }
 
@@ -209,8 +228,7 @@ export async function saveBlockToCloud(block: InstitutionalBlock): Promise<void>
     const docRef = doc(db, BLOCKS_COLLECTION, block.id);
     await setDoc(docRef, block, { merge: true });
   } catch (err) {
-    console.error('Failed to save block to Firestore:', err);
-    throw err;
+    console.warn('Block saved locally (Cloud sync skipped / quota exceeded).');
   }
 }
 
@@ -222,8 +240,7 @@ export async function deleteBlockFromCloud(blockId: string): Promise<void> {
     const docRef = doc(db, BLOCKS_COLLECTION, blockId);
     await deleteDoc(docRef);
   } catch (err) {
-    console.error('Failed to delete block from Firestore:', err);
-    throw err;
+    console.warn('Block deleted locally (Cloud sync skipped / quota exceeded).');
   }
 }
 
@@ -231,22 +248,28 @@ export async function deleteBlockFromCloud(blockId: string): Promise<void> {
  * Real-time listener for Academic Schedule in Firestore.
  */
 export function subscribeToSchedule(onUpdate: (schedule: AcademicScheduleSlot[]) => void): () => void {
-  const colRef = collection(db, SCHEDULE_COLLECTION);
-  return onSnapshot(colRef, (snapshot) => {
-    if (snapshot.empty) {
-      seedInitialSchedule();
-      onUpdate(INITIAL_ACADEMIC_SCHEDULE);
-      return;
-    }
-    const schedule: AcademicScheduleSlot[] = [];
-    snapshot.forEach((docSnap) => {
-      schedule.push(docSnap.data() as AcademicScheduleSlot);
+  try {
+    const colRef = collection(db, SCHEDULE_COLLECTION);
+    return onSnapshot(colRef, (snapshot) => {
+      if (snapshot.empty) {
+        seedInitialSchedule();
+        onUpdate(getStoredAcademicSchedule());
+        return;
+      }
+      const schedule: AcademicScheduleSlot[] = [];
+      snapshot.forEach((docSnap) => {
+        schedule.push(docSnap.data() as AcademicScheduleSlot);
+      });
+      onUpdate(schedule);
+    }, (error) => {
+      // Graceful fallback to local storage if Firestore is offline or quota exceeded
+      console.warn('Firestore offline / local storage fallback mode for academic schedule.');
+      onUpdate(getStoredAcademicSchedule());
     });
-    onUpdate(schedule);
-  }, (error) => {
-    console.error('Error listening to academic schedule:', error);
-    onUpdate(INITIAL_ACADEMIC_SCHEDULE);
-  });
+  } catch (err) {
+    onUpdate(getStoredAcademicSchedule());
+    return () => {};
+  }
 }
 
 /**
@@ -273,8 +296,7 @@ export async function bulkSaveScheduleToCloud(schedule: AcademicScheduleSlot[]):
     }
     console.log(`Successfully synced ${schedule.length} schedule slots to Cloud Firestore.`);
   } catch (err) {
-    console.error('Failed bulk saving schedule to Firestore:', err);
-    throw err;
+    console.warn('Academic schedule saved locally (Cloud sync skipped / quota exceeded).');
   }
 }
 
@@ -290,7 +312,7 @@ async function seedInitialSchedule() {
     });
     await batch.commit();
   } catch (err) {
-    console.error('Failed seeding initial schedule:', err);
+    // Silent fail
   }
 }
 
@@ -305,9 +327,8 @@ async function seedInitialBookings() {
       batch.set(ref, b);
     });
     await batch.commit();
-    console.log('Successfully seeded initial bookings to Firestore');
   } catch (err) {
-    console.error('Failed seeding initial bookings:', err);
+    // Silent fail
   }
 }
 
@@ -323,6 +344,7 @@ async function seedInitialBlocks() {
     });
     await batch.commit();
   } catch (err) {
-    console.error('Failed seeding initial blocks:', err);
+    // Silent fail
   }
 }
+

@@ -1,79 +1,20 @@
 import { Room, AcademicScheduleSlot, AdHocBooking, InstitutionalBlock } from '../types';
 import { INITIAL_ROOMS, INITIAL_ACADEMIC_SCHEDULE, INITIAL_ADHOC_BOOKINGS, INITIAL_INSTITUTIONAL_BLOCKS } from '../data/initialData';
 
-const ROOMS_KEY = 'kpmbp_rooms_v1';
-const ACADEMIC_SCHEDULE_KEY = 'kpmbp_academic_schedule_v1';
+const ROOMS_KEY = 'kpmbp_rooms_v2';
+const ACADEMIC_SCHEDULE_KEY = 'kpmbp_academic_schedule_v2';
 const ADHOC_BOOKINGS_KEY = 'kpmbp_adhoc_bookings_v1';
 const INSTITUTIONAL_BLOCKS_KEY = 'kpmbp_institutional_blocks_v1';
 
 export function getStoredRooms(): Room[] {
   try {
     const data = localStorage.getItem(ROOMS_KEY);
-    const rooms: Room[] = data ? JSON.parse(data) : INITIAL_ROOMS;
-    // Align all rooms to shortform names and Bilik Kuliah capacity strictly to 28 students
-    const aircondBkNums = [1, 2, 3, 4, 5, 6, 7, 8, 9, 20, 21, 22, 23, 24, 25];
-    const synchronizedRooms = rooms.map(r => {
-      let shortName = r.code;
-      if (r.id === 'DKA') shortName = 'DKA';
-      else if (r.id === 'DKB') shortName = 'DKB';
-      else if (r.id === 'DEWAN_SEMINAR') shortName = 'DEWAN SEMINAR';
-      else if (r.id === 'BILIK_SEMINAR') shortName = 'BILIK SEMINAR';
-      else if (r.id === 'DEWAN_BESAR') shortName = 'DEWAN BESAR';
-      else if (r.category === 'Bilik Kuliah' || r.id.startsWith('BK')) shortName = r.code;
-
-      let hasAircond = false;
-      let level: number | string = r.level;
-      let block = r.block;
-      if (r.id === 'DEWAN_SEMINAR') {
-        block = 'Bangunan Perpustakaan';
-        level = 4;
-        hasAircond = true;
-      } else if (r.id === 'BILIK_SEMINAR') {
-        block = 'Bangunan Perpustakaan';
-        level = 3;
-        hasAircond = true;
-      } else if (r.id === 'DEWAN_BESAR') {
-        block = 'Hadapan Padang KPMBP';
-        level = 1;
-        hasAircond = true;
-      } else if (r.id === 'DKA' || r.id === 'DKB') {
-        block = 'Bangunan Akademik Utama';
-        level = 2;
-        hasAircond = true;
-      } else if (r.category === 'Bilik Kuliah' || r.id.startsWith('BK')) {
-        const match = r.id.match(/\d+/);
-        const num = match ? parseInt(match[0], 10) : 0;
-        hasAircond = aircondBkNums.includes(num);
-        level = num <= 9 ? 1 : num <= 15 ? 2 : 3;
-        block = 'Bangunan Akademik';
-      } else {
-        hasAircond = true;
-        if (r.level === 'G' || r.level === 'g') level = 1;
-        else if (r.level === 1) level = 2;
-        else if (r.level === 2) level = 3;
-      }
-
-      return {
-        ...r,
-        name: shortName,
-        code: shortName,
-        capacity: (r.category === 'Bilik Kuliah' || r.id.startsWith('BK')) ? 28 : r.capacity,
-        block,
-        level,
-        hasAircond,
-        isSmartClassroom: false,
-        facilities: (r.category === 'Bilik Kuliah' || r.id.startsWith('BK'))
-          ? [
-              'Projektor LCD',
-              hasAircond ? 'Pendingin Hawa (Aircond)' : 'Kipas Angin / Pengudaraan',
-              'Papan Putih',
-              'Sistem Bunyi Mikrofon',
-              'Capaian Wi-Fi KPMBP'
-            ]
-          : r.facilities
-      };
-    });
-    return synchronizedRooms;
+    let rooms: Room[] = data ? JSON.parse(data) : INITIAL_ROOMS;
+    if (!rooms || rooms.length !== INITIAL_ROOMS.length) {
+      rooms = INITIAL_ROOMS;
+      localStorage.setItem(ROOMS_KEY, JSON.stringify(INITIAL_ROOMS));
+    }
+    return rooms;
   } catch {
     return INITIAL_ROOMS;
   }

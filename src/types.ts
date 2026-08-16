@@ -1,4 +1,4 @@
-export type RoomCategory = 'Bilik Kuliah' | 'Dewan Kuliah' | 'Ruang Khas';
+export type RoomCategory = 'Bilik Kuliah' | 'Dewan Kuliah' | 'Makmal Komputer' | 'Ruang Khas' | 'Surau';
 
 export interface Room {
   id: string;             // e.g. 'BK01', 'DKA', 'DEWAN_BESAR'

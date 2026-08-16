@@ -44,7 +44,7 @@ export const Header: React.FC<HeaderProps> = ({ activeTab, setActiveTab, pending
     { id: 'matrix' as ActiveTab, label: 'Lihat Ketersediaan', sub: 'Calendar View', icon: CalendarDays },
     { id: 'academic' as ActiveTab, label: 'Jadual Akademik', sub: 'Integrated Timetable', icon: BookOpen },
     { id: 'mybookings' as ActiveTab, label: 'Tempahan Saya', sub: 'Pas QR Akses', icon: QrCode },
-    { id: 'directory' as ActiveTab, label: 'Direktori Ruang', sub: '33 Managed Spaces', icon: SlidersHorizontal },
+    { id: 'directory' as ActiveTab, label: 'Direktori Ruang', sub: '42 Managed Spaces', icon: SlidersHorizontal },
     { id: 'admin' as ActiveTab, label: 'Admin Access', sub: 'Pentadbir Ruang', icon: ShieldCheck, badge: pendingCount },
   ];
 
@@ -63,8 +63,8 @@ export const Header: React.FC<HeaderProps> = ({ activeTab, setActiveTab, pending
             <Building2 className="w-5 h-5 text-white" />
           </div>
           <div className="leading-tight">
-            <h1 className="font-bold text-base tracking-tight flex items-center gap-1.5">
-              <span className="text-white">ROOM</span> <span className="text-blue-400">BOOKING</span>
+            <h1 className="font-bold text-base tracking-tight">
+              <span className="text-white">BOOK</span><span className="text-blue-400">BK</span>
             </h1>
             <p className="text-[10px] text-slate-400 uppercase tracking-widest font-semibold mt-0.5">
               KPMBP v2.5
@@ -118,7 +118,7 @@ export const Header: React.FC<HeaderProps> = ({ activeTab, setActiveTab, pending
                 KPM Bandar Penawar
               </div>
               <div className="text-[11px]">Semester 2 2026/2027</div>
-              <div className="text-[10px] text-blue-400 font-medium">33 Ruang Aktif Diselia</div>
+              <div className="text-[10px] text-blue-400 font-medium">42 Ruang Aktif Diselia</div>
             </div>
           </div>
         </nav>
@@ -135,7 +135,7 @@ export const Header: React.FC<HeaderProps> = ({ activeTab, setActiveTab, pending
           <div className="w-8 h-8 bg-blue-600 rounded-md flex items-center justify-center font-bold text-white">
             <Building2 className="w-4 h-4" />
           </div>
-          <span className="font-bold text-sm tracking-tight"><span className="text-white">ROOM</span> <span className="text-blue-400">BOOKING</span></span>
+          <span className="font-bold text-sm tracking-tight"><span className="text-white">BOOK</span><span className="text-blue-400">BK</span></span>
         </div>
 
         <button
@@ -157,7 +157,7 @@ export const Header: React.FC<HeaderProps> = ({ activeTab, setActiveTab, pending
                     <Building2 className="w-4 h-4" />
                   </div>
                   <div>
-                    <h2 className="font-bold text-sm"><span className="text-white">ROOM</span> <span className="text-blue-400">BOOKING</span></h2>
+                    <h2 className="font-bold text-sm"><span className="text-white">BOOK</span><span className="text-blue-400">BK</span></h2>
                     <p className="text-[10px] text-slate-400">KPMBP SmartHub</p>
                   </div>
                 </div>

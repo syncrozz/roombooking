@@ -66,22 +66,28 @@ export const RoomDirectoryView: React.FC<RoomDirectoryViewProps> = ({
               Direktori KPMBP
             </div>
             <h2 className="text-2xl font-extrabold text-slate-900 tracking-tight">
-              Direktori 33 Ruang Kuliah & Fasiliti
+              Direktori 42 Ruang Kuliah & Fasiliti
             </h2>
             <p className="text-slate-600 text-xs sm:text-sm mt-0.5">
-              Maklumat lengkap 28 Bilik Kuliah, 2 Dewan Kuliah, dan 3 Ruang Khas Kolej Profesional MARA Bandar Penawar.
+              Maklumat lengkap 28 Bilik Kuliah, Smart Classroom, 5 Makmal Komputer, 2 Dewan Kuliah, 4 Ruang Khas, dan 2 Surau Kolej Profesional MARA Bandar Penawar.
             </p>
           </div>
 
-          <div className="flex gap-2 text-xs font-bold">
-            <span className="bg-slate-100 border border-slate-300 text-slate-800 px-3 py-2 rounded-xl">
-              🏫 28 Bilik Kuliah
+          <div className="flex flex-wrap gap-2 text-xs font-bold">
+            <span className="bg-slate-100 border border-slate-300 text-slate-800 px-3 py-1.5 rounded-xl">
+              🏫 28 BK + Smart Class
             </span>
-            <span className="bg-blue-50 border border-blue-200 text-blue-800 px-3 py-2 rounded-xl">
+            <span className="bg-cyan-50 border border-cyan-200 text-cyan-800 px-3 py-1.5 rounded-xl">
+              💻 5 Makmal Komputer
+            </span>
+            <span className="bg-blue-50 border border-blue-200 text-blue-800 px-3 py-1.5 rounded-xl">
               🏛️ 2 Dewan Kuliah
             </span>
-            <span className="bg-amber-50 border border-amber-200 text-amber-800 px-3 py-2 rounded-xl">
-              🎓 3 Ruang Khas
+            <span className="bg-amber-50 border border-amber-200 text-amber-800 px-3 py-1.5 rounded-xl">
+              🎓 4 Ruang Khas
+            </span>
+            <span className="bg-emerald-50 border border-emerald-200 text-emerald-800 px-3 py-1.5 rounded-xl">
+              🕌 2 Surau
             </span>
           </div>
         </div>
@@ -94,10 +100,12 @@ export const RoomDirectoryView: React.FC<RoomDirectoryViewProps> = ({
               onChange={(e) => setCategoryFilter(e.target.value as RoomCategory | 'Semua')}
               className="bg-slate-50 border border-slate-300 rounded-xl px-3.5 py-2 font-medium text-slate-800 outline-none focus:ring-2 focus:ring-emerald-500"
             >
-              <option value="Semua">Kategori: Semua (33 Ruang)</option>
-              <option value="Bilik Kuliah">🏫 Bilik Kuliah (BK01 – BK28)</option>
+              <option value="Semua">Kategori: Semua (42 Ruang)</option>
+              <option value="Bilik Kuliah">🏫 Bilik Kuliah (BK01 – BK28, Smart Classroom)</option>
+              <option value="Makmal Komputer">💻 Makmal Komputer (Alfa, Beta, Sigma, Gamma, Delta)</option>
               <option value="Dewan Kuliah">🏛️ Dewan Kuliah (DKA & DKB)</option>
-              <option value="Ruang Khas">🎓 Ruang Khas (Dewan Seminar, Bilik Seminar, Dewan Besar)</option>
+              <option value="Ruang Khas">🎓 Ruang Khas (Aras 1 Perpustakaan, Bilik Kota Tinggi, Dewan Seminar, Mini Seminar)</option>
+              <option value="Surau">🕌 Surau (Surau 1 & Surau 2)</option>
             </select>
 
             <label className="inline-flex items-center gap-1.5 bg-slate-50 border border-slate-200 px-3.5 py-2 rounded-xl cursor-pointer select-none">

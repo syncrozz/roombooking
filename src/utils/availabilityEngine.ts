@@ -179,6 +179,8 @@ export function findSmartAlternatives(
     { startTime: '09:30', endTime: '10:30' },
     { startTime: '10:30', endTime: '11:30' },
     { startTime: '11:30', endTime: '12:30' },
+    { startTime: '12:30', endTime: '13:30' },
+    { startTime: '13:30', endTime: '14:30' },
     { startTime: '14:30', endTime: '15:30' },
     { startTime: '15:30', endTime: '16:30' }
   ];
