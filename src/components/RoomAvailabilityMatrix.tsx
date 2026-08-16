@@ -214,21 +214,18 @@ export const RoomAvailabilityMatrix: React.FC<RoomAvailabilityMatrixProps> = ({
                   <tr key={room.id} className="hover:bg-slate-50 transition divide-x divide-slate-100">
                     {/* Room Info Sticky Cell */}
                     <td className="py-3 px-4 sticky left-0 z-10 bg-white font-medium shadow-r">
-                      <div className="flex items-center justify-between">
+                      <div className="flex items-center justify-between gap-2">
                         <button
                           onClick={() => onViewRoomDetails(room)}
-                          className="font-bold text-slate-900 hover:text-emerald-600 transition flex items-center gap-1.5 text-left"
+                          className="font-bold text-slate-900 hover:text-emerald-600 transition flex items-center justify-between w-full text-left"
                         >
                           <span>{room.code}</span>
                           {room.hasAircond && (
-                            <span className="text-[10px] bg-cyan-100 text-cyan-800 px-1.5 py-0.2 rounded font-bold border border-cyan-300">
+                            <span className="text-[10px] bg-cyan-100 text-cyan-800 px-1.5 py-0.2 rounded font-bold border border-cyan-300 ml-auto text-right">
                               💠 Aircond
                             </span>
                           )}
                         </button>
-                      </div>
-                      <div className="text-[11px] text-slate-500 font-normal truncate max-w-[140px]">
-                        {room.name}
                       </div>
                       <div className="text-[10px] text-slate-400">
                         {room.block} ({formatLevel(room.level)})
@@ -271,13 +268,13 @@ export const RoomAvailabilityMatrix: React.FC<RoomAvailabilityMatrixProps> = ({
                           {isAcad && (
                             <button
                               onClick={() => setSelectedCellInfo({ room, startTime: slot.start, endTime: slot.end, check })}
-                              className="w-full h-11 rounded-lg bg-rose-100 hover:bg-rose-200 border border-rose-300 text-rose-900 font-semibold transition p-1 text-left flex flex-col justify-between overflow-hidden"
+                              className="w-full h-11 rounded-lg bg-rose-100 hover:bg-rose-200 border border-rose-300 text-rose-900 font-semibold transition p-1 text-center flex flex-col items-center justify-center overflow-hidden"
                               title={check.conflictReason}
                             >
-                              <div className="text-[10px] font-bold truncate text-rose-950">
+                              <div className="text-[10px] font-bold truncate max-w-full text-rose-950">
                                 📚 {check.academicSlot?.className}
                               </div>
-                              <div className="text-[9px] truncate text-rose-800 font-medium">
+                              <div className="text-[9px] truncate max-w-full text-rose-800 font-medium">
                                 {check.academicSlot?.courseCode}
                               </div>
                             </button>
@@ -286,13 +283,13 @@ export const RoomAvailabilityMatrix: React.FC<RoomAvailabilityMatrixProps> = ({
                           {isAdhoc && (
                             <button
                               onClick={() => setSelectedCellInfo({ room, startTime: slot.start, endTime: slot.end, check })}
-                              className="w-full h-11 rounded-lg bg-amber-100 hover:bg-amber-200 border border-amber-300 text-amber-900 font-semibold transition p-1 text-left flex flex-col justify-between overflow-hidden"
+                              className="w-full h-11 rounded-lg bg-amber-100 hover:bg-amber-200 border border-amber-300 text-amber-900 font-semibold transition p-1 text-center flex flex-col items-center justify-center overflow-hidden"
                               title={check.conflictReason}
                             >
-                              <div className="text-[10px] font-bold truncate text-amber-950">
+                              <div className="text-[10px] font-bold truncate max-w-full text-amber-950">
                                 🟨 {check.existingBooking?.applicantName}
                               </div>
-                              <div className="text-[9px] truncate text-amber-800">
+                              <div className="text-[9px] truncate max-w-full text-amber-800">
                                 {check.existingBooking?.purposeCategory}
                               </div>
                             </button>
@@ -301,13 +298,13 @@ export const RoomAvailabilityMatrix: React.FC<RoomAvailabilityMatrixProps> = ({
                           {isBlocked && (
                             <button
                               onClick={() => setSelectedCellInfo({ room, startTime: slot.start, endTime: slot.end, check })}
-                              className="w-full h-11 rounded-lg bg-slate-900 text-white font-semibold transition p-1 text-left flex flex-col justify-between overflow-hidden"
+                              className="w-full h-11 rounded-lg bg-slate-900 text-white font-semibold transition p-1 text-center flex flex-col items-center justify-center overflow-hidden"
                               title={check.conflictReason}
                             >
-                              <div className="text-[10px] font-bold truncate text-amber-300">
+                              <div className="text-[10px] font-bold truncate max-w-full text-amber-300">
                                 ⚫ BLOCKED
                               </div>
-                              <div className="text-[9px] truncate text-slate-300">
+                              <div className="text-[9px] truncate max-w-full text-slate-300">
                                 Program Kolej
                               </div>
                             </button>
