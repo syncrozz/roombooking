@@ -65,44 +65,38 @@ export const DashboardOverview: React.FC<DashboardOverviewProps> = ({
     {
       id: 'search' as ActiveTab,
       label: 'Cari & Tempah',
-      badge: `${totalRooms} Ruang`,
       icon: Search,
-      color: 'text-emerald-600 bg-emerald-50 hover:bg-emerald-100/80 border-emerald-200',
+      color: 'text-emerald-700 bg-emerald-50 hover:bg-emerald-100/80 border-emerald-200/90',
     },
     {
       id: 'matrix' as ActiveTab,
       label: 'Calendar',
-      badge: '10 Slot/Hari',
       icon: CalendarDays,
-      color: 'text-blue-600 bg-blue-50 hover:bg-blue-100/80 border-blue-200',
+      color: 'text-blue-700 bg-blue-50 hover:bg-blue-100/80 border-blue-200/90',
     },
     {
       id: 'academic' as ActiveTab,
       label: 'Locked',
-      badge: `${academicSchedule.length} Kuliah`,
       icon: Lock,
-      color: 'text-amber-600 bg-amber-50 hover:bg-amber-100/80 border-amber-200',
+      color: 'text-amber-700 bg-amber-50 hover:bg-amber-100/80 border-amber-200/90',
     },
     {
       id: 'mybookings' as ActiveTab,
       label: 'My Booking',
-      badge: `${approvedBookings.length} Aktif`,
       icon: QrCode,
-      color: 'text-indigo-600 bg-indigo-50 hover:bg-indigo-100/80 border-indigo-200',
+      color: 'text-indigo-700 bg-indigo-50 hover:bg-indigo-100/80 border-indigo-200/90',
     },
     {
       id: 'directory' as ActiveTab,
       label: 'Direktori',
-      badge: 'Blok A/B/C',
       icon: SlidersHorizontal,
-      color: 'text-purple-600 bg-purple-50 hover:bg-purple-100/80 border-purple-200',
+      color: 'text-purple-700 bg-purple-50 hover:bg-purple-100/80 border-purple-200/90',
     },
     {
       id: 'admin' as ActiveTab,
       label: 'Admin Access',
-      badge: pendingBookings.length > 0 ? `${pendingBookings.length} Menunggu` : 'Terkawal',
       icon: ShieldCheck,
-      color: 'text-amber-700 bg-amber-50 hover:bg-amber-100/80 border-amber-300',
+      color: 'text-rose-700 bg-rose-50 hover:bg-rose-100/80 border-rose-200/90',
     },
   ];
 
@@ -151,7 +145,7 @@ export const DashboardOverview: React.FC<DashboardOverviewProps> = ({
         </div>
       </div>
 
-      {/* 2. Compact Fast-Action Navigation Grid (One row/clean grid) */}
+      {/* 2. Compact Fast-Action Navigation Grid (Harmonized, Clean) */}
       <div className="grid grid-cols-2 sm:grid-cols-3 lg:grid-cols-6 gap-2.5">
         {quickNavItems.map((item) => {
           const Icon = item.icon;
@@ -159,16 +153,15 @@ export const DashboardOverview: React.FC<DashboardOverviewProps> = ({
             <button
               key={item.id}
               onClick={() => onNavigateTab(item.id)}
-              className={`p-3 rounded-xl border transition-all text-left flex flex-col justify-between cursor-pointer hover:shadow-sm hover:-translate-y-0.5 ${item.color}`}
+              className={`p-2.5 sm:p-3 rounded-xl border transition-all text-left flex items-center justify-between cursor-pointer hover:shadow-xs hover:-translate-y-0.5 group ${item.color}`}
             >
-              <div className="flex items-center justify-between mb-2">
-                <Icon className="w-4 h-4" />
-                <span className="text-[10px] font-bold opacity-80">{item.badge}</span>
+              <div className="flex items-center gap-2.5 min-w-0">
+                <div className="w-7 h-7 rounded-lg bg-white/80 shadow-2xs flex items-center justify-center shrink-0">
+                  <Icon className="w-3.5 h-3.5" />
+                </div>
+                <span className="text-xs font-bold truncate">{item.label}</span>
               </div>
-              <div className="text-xs font-bold truncate flex items-center justify-between">
-                <span>{item.label}</span>
-                <ArrowRight className="w-3 h-3 opacity-60 ml-1 shrink-0" />
-              </div>
+              <ArrowRight className="w-3.5 h-3.5 opacity-40 group-hover:opacity-100 group-hover:translate-x-0.5 transition-all shrink-0 ml-1" />
             </button>
           );
         })}
