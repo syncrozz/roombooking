@@ -40,6 +40,7 @@ import {
 import { INITIAL_STAFF_DATA } from './data/staffData';
 
 import { Header, ActiveTab } from './components/Header';
+import { DashboardOverview } from './components/DashboardOverview';
 import { QuickBookingSearch } from './components/QuickBookingSearch';
 import { RoomAvailabilityMatrix } from './components/RoomAvailabilityMatrix';
 import { AcademicScheduleView } from './components/AcademicScheduleView';
@@ -52,7 +53,7 @@ import { QRCodeModal } from './components/QRCodeModal';
 import { Building2, Shield, Heart, Sparkles, CheckCircle2, Lock, X, KeyRound, ShieldCheck, AlertCircle } from 'lucide-react';
 
 export default function App() {
-  const [activeTab, setActiveTab] = useState<ActiveTab>('matrix');
+  const [activeTab, setActiveTab] = useState<ActiveTab>('dashboard');
 
   // Admin PIN verification state
   const [isAdminUnlocked, setIsAdminUnlocked] = useState<boolean>(false);
@@ -350,17 +351,18 @@ export default function App() {
 
   const getTabBreadcrumb = (tab: ActiveTab) => {
     switch (tab) {
+      case 'dashboard': return 'Dashboard & Ringkasan Utama';
       case 'search': return 'Cari & Tempah Ruang';
       case 'matrix': return 'Lihat Ketersediaan Ruang';
       case 'academic': return 'Jadual Akademik Sedia Ada';
       case 'mybookings': return 'Tempahan Saya & Pas QR';
-      case 'directory': return 'Direktori 33 Ruang KPMBP';
+      case 'directory': return 'Direktori 42 Ruang KPMBP';
       case 'admin': return 'Admin Access & Kawalan Pentadbir';
     }
   };
 
   return (
-    <div className="min-h-screen bg-slate-50 text-slate-800 font-sans flex flex-col lg:flex-row selection:bg-blue-600 selection:text-white">
+    <div className="min-h-screen bg-slate-50 text-slate-800 font-sans flex flex-col selection:bg-blue-600 selection:text-white">
       {/* Toast Notification */}
       {toastMessage && (
         <div className="fixed bottom-6 right-6 z-50 bg-slate-900 text-white px-5 py-3 rounded-xl shadow-2xl border border-blue-500 flex items-center gap-3 animate-in slide-in-from-bottom duration-200">
@@ -369,7 +371,7 @@ export default function App() {
         </div>
       )}
 
-      {/* Sidebar Navigation */}
+      {/* Top Horizontal Navigation Header */}
       <Header
         activeTab={activeTab}
         setActiveTab={handleSelectTab}
@@ -378,16 +380,21 @@ export default function App() {
       />
 
       {/* Main Content Workspace */}
-      <div className="flex-1 flex flex-col min-w-0 overflow-x-hidden min-h-screen">
-        {/* Top Header Bar */}
-        <header className="h-16 bg-white border-b border-slate-200 px-6 sm:px-8 flex items-center justify-between sticky top-0 z-30 shadow-xs">
-          <div className="flex items-center gap-2 text-sm">
-            <span className="text-slate-900 font-bold">{getTabBreadcrumb(activeTab)}</span>
-          </div>
-        </header>
-
+      <div className="flex-1 flex flex-col min-w-0">
         {/* View Section */}
-        <main className="flex-1 p-4 sm:p-6 lg:p-8 space-y-6">
+        <main className="flex-1 max-w-7xl w-full mx-auto p-3.5 sm:p-5 lg:p-6 space-y-4">
+          {activeTab === 'dashboard' && (
+            <DashboardOverview
+              rooms={rooms}
+              academicSchedule={academicSchedule}
+              adhocBookings={adhocBookings}
+              institutionalBlocks={institutionalBlocks}
+              staffList={staffUsers}
+              onNavigateTab={handleSelectTab}
+              onOpenBookingModal={handleOpenBookingModal}
+            />
+          )}
+
           {activeTab === 'search' && (
             <QuickBookingSearch
               rooms={rooms}
@@ -456,28 +463,18 @@ export default function App() {
         </main>
 
         {/* Footer */}
-        <footer className="bg-white border-t border-slate-200 py-6 px-6 text-xs text-slate-500 mt-auto">
-          <div className="max-w-7xl mx-auto flex flex-col md:flex-row items-center justify-between gap-4">
-            <div className="flex items-center space-x-3">
-              <div className="w-7 h-7 rounded-md bg-blue-600 flex items-center justify-center text-white font-bold">
-                <Building2 className="w-3.5 h-3.5" />
-              </div>
-              <div>
-                <div className="font-bold text-slate-800 text-xs">KPMBP SmartHub — Room Booking</div>
-                <div className="text-[11px] text-slate-400">Hak Cipta Terpelihara © 2026 Kolej Profesional MARA Bandar Penawar</div>
-              </div>
-            </div>
-
-            <div className="flex flex-wrap items-center gap-3 text-xs text-slate-500">
-              <button onClick={() => setActiveTab('search')} className="hover:text-blue-600 transition">Cari Ruang</button>
-              <span>•</span>
-              <button onClick={() => setActiveTab('matrix')} className="hover:text-blue-600 transition">Calendar View</button>
-              <span>•</span>
-              <button onClick={() => setActiveTab('academic')} className="hover:text-blue-600 transition">Jadual Akademik</button>
-              <span>•</span>
-              <button onClick={() => setActiveTab('directory')} className="hover:text-blue-600 transition">42 Ruang KPMBP</button>
-            </div>
-          </div>
+        <footer className="bg-white border-t border-slate-200 py-6 px-6 text-xs text-slate-500 mt-auto text-center">
+          <p className="text-slate-600">
+            Develop By{' '}
+            <a
+              href="https://sites.google.com/view/khairi-innovation/"
+              target="_blank"
+              rel="noopener noreferrer"
+              className="text-blue-600 hover:text-blue-700 hover:underline font-semibold transition"
+            >
+              Syncrozz
+            </a>
+          </p>
         </footer>
       </div>
 

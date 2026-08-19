@@ -1,8 +1,8 @@
 import { Room, AcademicScheduleSlot, AdHocBooking, InstitutionalBlock } from '../types';
 import { INITIAL_ROOMS, INITIAL_ACADEMIC_SCHEDULE, INITIAL_ADHOC_BOOKINGS, INITIAL_INSTITUTIONAL_BLOCKS } from '../data/initialData';
 
-const ROOMS_KEY = 'kpmbp_rooms_v2';
-const ACADEMIC_SCHEDULE_KEY = 'kpmbp_academic_schedule_v2';
+const ROOMS_KEY = 'kpmbp_rooms_v3';
+const ACADEMIC_SCHEDULE_KEY = 'kpmbp_academic_schedule_v3';
 const ADHOC_BOOKINGS_KEY = 'kpmbp_adhoc_bookings_v1';
 const INSTITUTIONAL_BLOCKS_KEY = 'kpmbp_institutional_blocks_v1';
 

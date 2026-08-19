@@ -187,9 +187,9 @@ export const QuickBookingSearch: React.FC<QuickBookingSearchProps> = ({
               <Clock className="w-4 h-4 text-emerald-600" />
               2. Slot Masa (Mula - Tamat)
             </label>
-            <div className="grid grid-cols-1 gap-2">
-              <div>
-                <label className="block text-[11px] font-medium text-slate-500 mb-0.5">Masa Mula:</label>
+            <div className="grid grid-cols-2 gap-2">
+              <div className="flex items-center gap-2">
+                <label className="text-[11px] font-medium text-slate-500 whitespace-nowrap">Mula:</label>
                 <select
                   value={startTime}
                   onChange={(e) => {
@@ -198,20 +198,21 @@ export const QuickBookingSearch: React.FC<QuickBookingSearchProps> = ({
                   }}
                   className="w-full bg-slate-50 border border-slate-300 rounded-xl px-2.5 py-2.5 text-sm text-slate-900 font-medium focus:ring-2 focus:ring-emerald-500 outline-none"
                 >
-                  <option value="08:30">08:30 AM (08:30)</option>
-                  <option value="09:30">09:30 AM (09:30)</option>
-                  <option value="10:30">10:30 AM (10:30)</option>
-                  <option value="11:30">11:30 AM (11:30)</option>
-                  <option value="12:30">12:30 PM (12:30)</option>
-                  <option value="13:30">01:30 PM (13:30)</option>
-                  <option value="14:30">02:30 PM (14:30)</option>
-                  <option value="15:30">03:30 PM (15:30)</option>
-                  <option value="16:30">04:30 PM (16:30)</option>
+                  <option value="08:30">08:30 AM</option>
+                  <option value="09:30">09:30 AM</option>
+                  <option value="10:30">10:30 AM</option>
+                  <option value="11:30">11:30 AM</option>
+                  <option value="12:30">12:30 PM</option>
+                  <option value="13:30">01:30 PM</option>
+                  <option value="14:30">02:30 PM</option>
+                  <option value="15:30">03:30 PM</option>
+                  <option value="16:30">04:30 PM</option>
+                  <option value="17:30">05:30 PM</option>
                 </select>
               </div>
 
-              <div>
-                <label className="block text-[11px] font-medium text-slate-500 mb-0.5">Masa Tamat:</label>
+              <div className="flex items-center gap-2">
+                <label className="text-[11px] font-medium text-slate-500 whitespace-nowrap">Tamat:</label>
                 <select
                   value={endTime}
                   onChange={(e) => {
@@ -220,15 +221,16 @@ export const QuickBookingSearch: React.FC<QuickBookingSearchProps> = ({
                   }}
                   className="w-full bg-slate-50 border border-slate-300 rounded-xl px-2.5 py-2.5 text-sm text-slate-900 font-medium focus:ring-2 focus:ring-emerald-500 outline-none"
                 >
-                  <option value="09:30">09:30 AM (09:30)</option>
-                  <option value="10:30">10:30 AM (10:30)</option>
-                  <option value="11:30">11:30 AM (11:30)</option>
-                  <option value="12:30">12:30 PM (12:30)</option>
-                  <option value="13:30">01:30 PM (13:30)</option>
-                  <option value="14:30">02:30 PM (14:30)</option>
-                  <option value="15:30">03:30 PM (15:30)</option>
-                  <option value="16:30">04:30 PM (16:30)</option>
-                  <option value="17:30">05:30 PM (17:30)</option>
+                  <option value="09:30">09:30 AM</option>
+                  <option value="10:30">10:30 AM</option>
+                  <option value="11:30">11:30 AM</option>
+                  <option value="12:30">12:30 PM</option>
+                  <option value="13:30">01:30 PM</option>
+                  <option value="14:30">02:30 PM</option>
+                  <option value="15:30">03:30 PM</option>
+                  <option value="16:30">04:30 PM</option>
+                  <option value="17:30">05:30 PM</option>
+                  <option value="18:30">06:30 PM</option>
                 </select>
               </div>
             </div>

@@ -8,6 +8,7 @@ import {
 } from '../types';
 import { formatDateMalay } from '../utils/availabilityEngine';
 import { parseTimetableCSV } from '../utils/timetableCsvParser';
+import { MASTER_TIMETABLE_CSV } from '../data/initialData';
 import { 
   ShieldCheck, 
   Lock, 
@@ -91,19 +92,13 @@ export const AdminManagementView: React.FC<AdminManagementViewProps> = ({
 
   // Download Sample Timetable CSV Template
   const handleDownloadTimetableCSVTemplate = () => {
-    const csvContent = 
-`table_id,hari,slot,masa,cell,merged_range,header_asal,nilai_asal
-Table 1,,,,A1,A1:O1,,"Kolej Profesional MARA Bandar Penawar, Kota Tinggi, Johor"
-Table 1,MON,1,8:30 - 9:30,B3,B3:E3,1 8:30 - 9:30,"LOG 2633\\nDLM 6B\\nSITI RABIAHTUL ADAWIYAH MOHD\\nSA'ADOM CMILT"
-Table 1,MON,11,11:30,G3,G3:J3,11:30,"MGT 1013\\nDLS 1A\\nHAMIZULHAZRIN BIN HASANI"
-Table 2,TUE,1,8:30 - 9:30,B4,B4:D4,1 8:30 - 9:30,"MGT 2513\\nDLM 4F\\nNOOR HAZANIAH BT BAHARIN CMILT"
-Table 3,THU,1,8:30 - 9:30,B6,B6:D6,1 8:30 - 9:30,"LAW 2523\\nDIA 3A\\nNURUL NASIHIN ARIFFIN CMILT"`;
+    const csvContent = MASTER_TIMETABLE_CSV;
 
     const blob = new Blob([csvContent], { type: 'text/csv;charset=utf-8;' });
     const url = URL.createObjectURL(blob);
     const link = document.createElement('a');
     link.setAttribute('href', url);
-    link.setAttribute('download', 'jadual_waktu_kolej_template.csv');
+    link.setAttribute('download', 'jadual_waktu_kolej_master_template.csv');
     document.body.appendChild(link);
     link.click();
     document.body.removeChild(link);
