@@ -24,7 +24,8 @@ import {
   Layers,
   MapPin,
   Laptop,
-  GraduationCap
+  GraduationCap,
+  Lock
 } from 'lucide-react';
 
 interface DashboardOverviewProps {
@@ -70,28 +71,28 @@ export const DashboardOverview: React.FC<DashboardOverviewProps> = ({
     },
     {
       id: 'matrix' as ActiveTab,
-      label: 'Kalendar Ketersediaan',
+      label: 'Calendar',
       badge: '10 Slot/Hari',
       icon: CalendarDays,
       color: 'text-blue-600 bg-blue-50 hover:bg-blue-100/80 border-blue-200',
     },
     {
       id: 'academic' as ActiveTab,
-      label: 'Jadual Kuliah',
+      label: 'Locked',
       badge: `${academicSchedule.length} Kuliah`,
-      icon: BookOpen,
+      icon: Lock,
       color: 'text-amber-600 bg-amber-50 hover:bg-amber-100/80 border-amber-200',
     },
     {
       id: 'mybookings' as ActiveTab,
-      label: 'Tempahan & Pas QR',
+      label: 'My Booking',
       badge: `${approvedBookings.length} Aktif`,
       icon: QrCode,
       color: 'text-indigo-600 bg-indigo-50 hover:bg-indigo-100/80 border-indigo-200',
     },
     {
       id: 'directory' as ActiveTab,
-      label: 'Direktori 42 Ruang',
+      label: 'Direktori',
       badge: 'Blok A/B/C',
       icon: SlidersHorizontal,
       color: 'text-purple-600 bg-purple-50 hover:bg-purple-100/80 border-purple-200',
@@ -256,9 +257,11 @@ export const DashboardOverview: React.FC<DashboardOverviewProps> = ({
                 <div className="space-y-0.5">
                   <div className="flex items-center gap-1.5">
                     <span className="text-xs font-bold text-slate-900">{r.name}</span>
-                    <span className="text-[9px] px-1 py-0.2 rounded bg-slate-200 font-semibold text-slate-700">
-                      {r.code}
-                    </span>
+                    {r.name !== r.code && (
+                      <span className="text-[9px] px-1 py-0.2 rounded bg-slate-200 font-semibold text-slate-700">
+                        {r.code}
+                      </span>
+                    )}
                   </div>
                   <div className="text-[10px] text-slate-500">
                     {r.block} • {r.capacity} pax

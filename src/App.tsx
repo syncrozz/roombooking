@@ -354,8 +354,8 @@ export default function App() {
       case 'dashboard': return 'Dashboard & Ringkasan Utama';
       case 'search': return 'Cari & Tempah Ruang';
       case 'matrix': return 'Lihat Ketersediaan Ruang';
-      case 'academic': return 'Jadual Akademik Sedia Ada';
-      case 'mybookings': return 'Tempahan Saya & Pas QR';
+      case 'academic': return 'Locked (Jadual Rasmi)';
+      case 'mybookings': return 'My Booking & Pas QR';
       case 'directory': return 'Direktori 42 Ruang KPMBP';
       case 'admin': return 'Admin Access & Kawalan Pentadbir';
     }

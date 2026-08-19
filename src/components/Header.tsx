@@ -7,6 +7,7 @@ import {
   Search, 
   CalendarDays, 
   BookOpen, 
+  Lock,
   QrCode, 
   SlidersHorizontal, 
   ShieldCheck, 
@@ -44,10 +45,10 @@ export const Header: React.FC<HeaderProps> = ({ activeTab, setActiveTab, pending
   const mainNavItems = [
     { id: 'dashboard' as ActiveTab, label: 'Dashboard', icon: LayoutDashboard },
     { id: 'search' as ActiveTab, label: 'Cari & Tempah', icon: Search },
-    { id: 'matrix' as ActiveTab, label: 'Lihat Ketersediaan', icon: CalendarDays },
-    { id: 'academic' as ActiveTab, label: 'Jadual Akademik', icon: BookOpen },
-    { id: 'mybookings' as ActiveTab, label: 'Tempahan Saya', icon: QrCode },
-    { id: 'directory' as ActiveTab, label: 'Direktori Ruang', icon: SlidersHorizontal },
+    { id: 'matrix' as ActiveTab, label: 'Calendar', icon: CalendarDays },
+    { id: 'academic' as ActiveTab, label: 'Locked', icon: Lock },
+    { id: 'mybookings' as ActiveTab, label: 'My Booking', icon: QrCode },
+    { id: 'directory' as ActiveTab, label: 'Direktori', icon: SlidersHorizontal },
   ];
 
   const handleTabClick = (tab: ActiveTab) => {
