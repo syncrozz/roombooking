@@ -7,6 +7,17 @@ import {
   DayOfWeek,
   SearchFilterParams 
 } from '../types';
+import {
+  parseTimeMinutes,
+  isTimeRangeNight,
+  ALL_BOOKING_TIME_SLOTS,
+  DAY_TIME_SLOTS,
+  NIGHT_TIME_SLOTS,
+  TimeSlotPeriod,
+  validateBookingTime
+} from './timeSlots';
+
+export { parseTimeMinutes };
 
 export const MALAY_DAYS: DayOfWeek[] = ['Ahad', 'Isnin', 'Selasa', 'Rabu', 'Khamis', 'Jumaat', 'Sabtu'];
 
@@ -16,26 +27,14 @@ export function getMalayDayOfWeek(dateStr: string): DayOfWeek {
   return MALAY_DAYS[d.getDay()];
 }
 
-export function parseTimeMinutes(timeStr: string): number {
-  if (!timeStr) return 0;
-  const parts = timeStr.replace('.', ':').split(':').map(Number);
-  const h = parts[0] || 0;
-  const m = parts[1] || 0;
-  return h * 60 + m;
-}
-
 export function calculateDurationText(startTime: string, endTime: string): string {
   if (!startTime || !endTime) return '';
   
-  let startMin = parseTimeMinutes(startTime);
-  let endMin = parseTimeMinutes(endTime);
+  const startMin = parseTimeMinutes(startTime);
+  const endMin = parseTimeMinutes(endTime);
 
   if (endMin <= startMin) {
-    if (endMin + 720 > startMin) {
-      endMin += 720; // 12 hours = 720 minutes
-    } else {
-      return '0 jam';
-    }
+    return '0 jam';
   }
 
   const diffMin = endMin - startMin;
@@ -70,6 +69,27 @@ export function checkRoomAvailability(
   adhocBookings: AdHocBooking[],
   institutionalBlocks: InstitutionalBlock[]
 ): RoomAvailabilityCheck {
+  // Layer 0: Check Time Range Validation & Night Limit (hard ceiling 23:00)
+  const timeVal = validateBookingTime(startTime, endTime);
+  if (!timeVal.isValid) {
+    return {
+      roomId: room.id,
+      room,
+      status: 'BLOCKED',
+      conflictReason: timeVal.errorMsg || 'Waktu tempahan tidak sah.'
+    };
+  }
+
+  // Layer 0.5: Check Room Night Booking Capability
+  if (isTimeRangeNight(startTime, endTime) && room.allowNightBooking === false) {
+    return {
+      roomId: room.id,
+      room,
+      status: 'BLOCKED',
+      conflictReason: `Ruang ${room.code} (${room.name}) tidak dibuka untuk tempahan waktu malam.`
+    };
+  }
+
   // Layer 3: Check Institutional Block
   const block = institutionalBlocks.find(b => 
     b.roomId === room.id && 
@@ -143,9 +163,10 @@ export function findSmartAlternatives(
   institutionalBlocks: InstitutionalBlock[]
 ): {
   alternativeRooms: RoomAvailabilityCheck[];
-  alternativeSlots: { startTime: string; endTime: string; status: 'AVAILABLE' }[];
+  alternativeSlots: { startTime: string; endTime: string; status: 'AVAILABLE'; period: TimeSlotPeriod }[];
 } {
   const { date, startTime, endTime, minCapacity, category, isAircondOnly, isSmartClassroomOnly } = params;
+  const isNightSearch = isTimeRangeNight(startTime, endTime);
 
   // 1. Find other rooms available at the exact same time slot
   const candidateRooms = rooms.filter(r => {
@@ -154,6 +175,8 @@ export function findSmartAlternatives(
     if (minCapacity > 0 && r.capacity < minCapacity) return false;
     if (isAircondOnly && !r.hasAircond) return false;
     if (isSmartClassroomOnly && !r.hasAircond && !r.isSmartClassroom) return false;
+    // If night search, only include rooms that allow night booking
+    if (isNightSearch && r.allowNightBooking === false) return false;
     return true;
   });
 
@@ -174,37 +197,32 @@ export function findSmartAlternatives(
   });
 
   // 2. Find alternative time slots on the SAME target room if user wants to adjust time
-  const sampleTimeSlots = [
-    { startTime: '08:30', endTime: '09:30' },
-    { startTime: '09:30', endTime: '10:30' },
-    { startTime: '10:30', endTime: '11:30' },
-    { startTime: '11:30', endTime: '12:30' },
-    { startTime: '12:30', endTime: '13:30' },
-    { startTime: '13:30', endTime: '14:30' },
-    { startTime: '14:30', endTime: '15:30' },
-    { startTime: '15:30', endTime: '16:30' }
-  ];
-
+  // Reusable Single Source of Truth: Prioritize night slots if searching night, day slots if searching day
   const targetRoom = rooms.find(r => r.id === targetRoomId);
-  const alternativeSlots: { startTime: string; endTime: string; status: 'AVAILABLE' }[] = [];
+  const alternativeSlots: { startTime: string; endTime: string; status: 'AVAILABLE'; period: TimeSlotPeriod }[] = [];
 
   if (targetRoom) {
-    for (const slot of sampleTimeSlots) {
-      if (slot.startTime === startTime) continue;
+    const candidateSlots = isNightSearch
+      ? [...NIGHT_TIME_SLOTS, ...(targetRoom.allowNightBooking === false ? [] : DAY_TIME_SLOTS)]
+      : [...DAY_TIME_SLOTS, ...(targetRoom.allowNightBooking === false ? [] : NIGHT_TIME_SLOTS)];
+
+    for (const slot of candidateSlots) {
+      if (slot.start === startTime && slot.end === endTime) continue;
       const slotCheck = checkRoomAvailability(
         targetRoom, 
         date, 
-        slot.startTime, 
-        slot.endTime, 
+        slot.start, 
+        slot.end, 
         academicSchedule, 
         adhocBookings, 
         institutionalBlocks
       );
       if (slotCheck.status === 'AVAILABLE') {
         alternativeSlots.push({
-          startTime: slot.startTime,
-          endTime: slot.endTime,
-          status: 'AVAILABLE'
+          startTime: slot.start,
+          endTime: slot.end,
+          status: 'AVAILABLE',
+          period: slot.period
         });
       }
     }

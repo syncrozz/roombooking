@@ -7,8 +7,8 @@ import {
   StaffUser 
 } from '../types';
 import { formatDateMalay } from '../utils/availabilityEngine';
-import { parseTimetableCSV } from '../utils/timetableCsvParser';
-import { MASTER_TIMETABLE_CSV } from '../data/initialData';
+import { parseTimetableCSV, exportTimetableToStandardGridCSV } from '../utils/timetableCsvParser';
+import { MASTER_TIMETABLE_CSV, SAMPLE_LOCKED_SLOTS_CSV, STANDARD_GRID_TEMPLATE_CSV } from '../data/initialData';
 import { 
   ShieldCheck, 
   Lock, 
@@ -31,7 +31,9 @@ import {
   Phone,
   Search,
   Check,
-  BookOpen
+  BookOpen,
+  Sparkles,
+  Layers
 } from 'lucide-react';
 
 interface AdminManagementViewProps {
@@ -46,7 +48,7 @@ interface AdminManagementViewProps {
   onDeleteBlock: (id: string) => void;
   onResetData: () => void;
   onSyncStaffUsers?: (staff: StaffUser[]) => Promise<void>;
-  onSyncAcademicSchedule?: (schedule: AcademicScheduleSlot[]) => Promise<void>;
+  onSyncAcademicSchedule?: (schedule: AcademicScheduleSlot[], mode?: 'merge' | 'replace') => Promise<void> | void;
 }
 
 export const AdminManagementView: React.FC<AdminManagementViewProps> = ({
@@ -81,6 +83,7 @@ export const AdminManagementView: React.FC<AdminManagementViewProps> = ({
   const [scheduleParseErrors, setScheduleParseErrors] = useState<string[]>([]);
   const [isSyncingSchedule, setIsSyncingSchedule] = useState<boolean>(false);
   const [scheduleSyncSuccessMsg, setScheduleSyncSuccessMsg] = useState<string | null>(null);
+  const [scheduleSyncMode, setScheduleSyncMode] = useState<'merge' | 'replace'>('merge');
 
   // Staff CSV Sync State
   const [csvFile, setCsvFile] = useState<File | null>(null);
@@ -90,15 +93,57 @@ export const AdminManagementView: React.FC<AdminManagementViewProps> = ({
   const [syncSuccessMsg, setSyncSuccessMsg] = useState<string | null>(null);
   const [staffSearchTerm, setStaffSearchTerm] = useState<string>('');
 
-  // Download Sample Timetable CSV Template
+  // Download Standard Timetable CSV Template (Format Perkara/Hari yang diselaraskan)
+  const handleDownloadStandardGridTemplate = () => {
+    const csvContent = STANDARD_GRID_TEMPLATE_CSV;
+    const blob = new Blob([csvContent], { type: 'text/csv;charset=utf-8;' });
+    const url = URL.createObjectURL(blob);
+    const link = document.createElement('a');
+    link.setAttribute('href', url);
+    link.setAttribute('download', 'kpmbp_jadual_perkara_hari_template.csv');
+    document.body.appendChild(link);
+    link.click();
+    document.body.removeChild(link);
+  };
+
+  // Download Full Master Timetable CSV (Format FET / Unit Jadual Waktu)
   const handleDownloadTimetableCSVTemplate = () => {
     const csvContent = MASTER_TIMETABLE_CSV;
-
     const blob = new Blob([csvContent], { type: 'text/csv;charset=utf-8;' });
     const url = URL.createObjectURL(blob);
     const link = document.createElement('a');
     link.setAttribute('href', url);
     link.setAttribute('download', 'jadual_waktu_kolej_master_template.csv');
+    document.body.appendChild(link);
+    link.click();
+    document.body.removeChild(link);
+  };
+
+  // One-click loader for official sample: Surau 1 & Surau 2 locked slots (AFIF & NIZAM)
+  const handleLoadSampleSurauData = () => {
+    setScheduleCsvFile(null);
+    setScheduleSyncSuccessMsg(null);
+    const res = parseTimetableCSV(SAMPLE_LOCKED_SLOTS_CSV, rooms);
+    setParsedScheduleSlots(res.slots);
+    setScheduleParseSummary(res.summary);
+    setScheduleParseErrors(res.errors);
+    setScheduleSyncSuccessMsg(
+      `⚡ Data contoh Surau (AFIF & NIZAM) telah dimuatkan! Sebanyak ${res.slots.length} slot merentasi ${res.summary.roomsAffected.join(', ')} sedia untuk disinkronkan dan dikunci.`
+    );
+  };
+
+  // Export current active schedule to standard grid CSV
+  const handleExportCurrentScheduleCSV = () => {
+    if (!academicSchedule || academicSchedule.length === 0) {
+      alert('Tiada slot jadual waktu semasa untuk dieksport.');
+      return;
+    }
+    const csvContent = exportTimetableToStandardGridCSV(academicSchedule, rooms, { includeNightSlots: true });
+    const blob = new Blob([csvContent], { type: 'text/csv;charset=utf-8;' });
+    const url = URL.createObjectURL(blob);
+    const link = document.createElement('a');
+    link.setAttribute('href', url);
+    link.setAttribute('download', `kpmbp_jadual_rasmi_terkini_${new Date().toISOString().slice(0, 10)}.csv`);
     document.body.appendChild(link);
     link.click();
     document.body.removeChild(link);
@@ -131,8 +176,10 @@ export const AdminManagementView: React.FC<AdminManagementViewProps> = ({
     if (onSyncAcademicSchedule) {
       setIsSyncingSchedule(true);
       try {
-        await onSyncAcademicSchedule(parsedScheduleSlots);
-        setScheduleSyncSuccessMsg(`🟢 Berjaya menyinkronkan ${parsedScheduleSlots.length} slot jadual waktu di ${scheduleParseSummary?.roomsAffected.length || 0} bilik/ruang! Ketersediaan automatik terkunci.`);
+        await onSyncAcademicSchedule(parsedScheduleSlots, scheduleSyncMode);
+        setScheduleSyncSuccessMsg(
+          `🟢 Berjaya menyinkronkan & MENGUNCI ${parsedScheduleSlots.length} slot di ${scheduleParseSummary?.roomsAffected.length || 0} bilik/ruang (${scheduleSyncMode === 'merge' ? 'Mod Gabung & Kemas Kini' : 'Mod Ganti Semua'})!`
+        );
         setIsSyncingSchedule(false);
       } catch (err) {
         setIsSyncingSchedule(false);
@@ -354,28 +401,50 @@ ST091,Pengajian Am,Cik Siti Sarah Binti Razak,Pensyarah,013-5558899,siti.sarah@k
 
       {/* SECTION: TIMETABLE CSV UPLOAD & AUTOMATIC ROOM LOCKING */}
       <div className="bg-white rounded-2xl p-6 shadow-md border border-slate-200 space-y-5">
-        <div className="flex flex-col md:flex-row items-start md:items-center justify-between gap-4 border-b border-slate-100 pb-4">
+        <div className="flex flex-col lg:flex-row items-start lg:items-center justify-between gap-4 border-b border-slate-100 pb-4">
           <div>
             <div className="inline-flex items-center gap-1.5 bg-indigo-50 text-indigo-700 border border-indigo-200 px-2.5 py-0.5 rounded-full text-xs font-bold mb-1">
               <BookOpen className="w-3.5 h-3.5" />
-              <span>Unit Jadual Waktu Kolej</span>
+              <span>Unit Jadual Waktu &amp; Penguncian Slot Kolej</span>
             </div>
             <div className="flex items-center gap-2 text-slate-900 font-extrabold text-lg">
               <FileSpreadsheet className="w-5 h-5 text-indigo-600" />
-              <h3>Muat Naik CSV Jadual Waktu Terkini &amp; Kunci (Lock) Bilik Kuliah</h3>
+              <h3>Penyelarasan Data CSV &amp; Ketetapan Slot Terkunci (Locked)</h3>
             </div>
             <p className="text-xs text-slate-500 mt-1">
-              Muat naik fail CSV dari Unit Jadual Waktu Kolej (termasuk format <code>table_id, hari, masa, nilai_asal</code>) untuk mengunci ketersediaan ruang secara automatik.
+              Admin boleh menetapkan dan menyinkronkan slot yang akan dikunci (locked) menggunakan fail CSV mengikut format standard <code>Perkara, Hari, [Slot Masa...]</code>.
             </p>
           </div>
 
-          <button
-            onClick={handleDownloadTimetableCSVTemplate}
-            className="bg-indigo-50 hover:bg-indigo-100 text-indigo-800 border border-indigo-300 text-xs font-bold py-2 px-3.5 rounded-xl transition flex items-center gap-2 shadow-xs shrink-0"
-          >
-            <Download className="w-4 h-4 text-indigo-600" />
-            <span>Muat Turun Template CSV Jadual Waktu</span>
-          </button>
+          {/* Action Buttons */}
+          <div className="flex flex-wrap items-center gap-2 shrink-0">
+            <button
+              onClick={handleLoadSampleSurauData}
+              className="bg-amber-50 hover:bg-amber-100 text-amber-900 border border-amber-300 text-xs font-bold py-2 px-3 rounded-xl transition flex items-center gap-1.5 shadow-xs cursor-pointer"
+              title="Muat data contoh Surau 1 & Surau 2 (AFIF & NIZAM) untuk semakan segera"
+            >
+              <Sparkles className="w-3.5 h-3.5 text-amber-600" />
+              <span>Contoh Surau (AFIF &amp; NIZAM)</span>
+            </button>
+
+            <button
+              onClick={handleDownloadStandardGridTemplate}
+              className="bg-indigo-50 hover:bg-indigo-100 text-indigo-800 border border-indigo-300 text-xs font-bold py-2 px-3 rounded-xl transition flex items-center gap-1.5 shadow-xs cursor-pointer"
+              title="Muat turun templat CSV format standard matriks jadual"
+            >
+              <Download className="w-3.5 h-3.5 text-indigo-600" />
+              <span>Templat Standard (Perkara/Hari)</span>
+            </button>
+
+            <button
+              onClick={handleExportCurrentScheduleCSV}
+              className="bg-emerald-50 hover:bg-emerald-100 text-emerald-800 border border-emerald-300 text-xs font-bold py-2 px-3 rounded-xl transition flex items-center gap-1.5 shadow-xs cursor-pointer"
+              title="Eksport jadual waktu aktif semasa ke fail CSV"
+            >
+              <FileSpreadsheet className="w-3.5 h-3.5 text-emerald-600" />
+              <span>Eksport CSV Semasa</span>
+            </button>
+          </div>
         </div>
 
         {/* Upload Zone & Instructions */}
@@ -383,22 +452,78 @@ ST091,Pengajian Am,Cik Siti Sarah Binti Razak,Pensyarah,013-5558899,siti.sarah@k
           <div className="lg:col-span-1 bg-slate-50 border border-slate-200 rounded-xl p-4 text-xs space-y-3">
             <h4 className="font-bold text-slate-900 flex items-center gap-1.5 text-sm">
               <ShieldCheck className="w-4 h-4 text-indigo-600" />
-              <span>Sokongan Format Fail</span>
+              <span>Ketetapan Susunan CSV (Locked Slots)</span>
             </h4>
             <p className="text-slate-600 leading-relaxed">
-              Sistem menyokong fail eksport terus dari sistem jadual waktu Kolej (FET / Untis / Excel CSV):
+              Format ini bertindak sebagai <em>source of truth</em> rasmi. Admin menyusun baris mengikut ruang dan hari:
             </p>
-            <div className="bg-slate-900 text-indigo-300 p-2.5 rounded-lg font-mono text-[11px] overflow-x-auto border border-slate-800">
-              table_id,hari,slot,masa,cell,merged_range,header_asal,nilai_asal
+            <div className="bg-slate-900 text-indigo-300 p-2.5 rounded-lg font-mono text-[10.5px] overflow-x-auto border border-slate-800 leading-tight">
+              Perkara,Hari,8:30 - 9:30,9:30 - 10:30,...<br />
+              SURAU 1,MON,AFIF,AFIF,,...<br />
+              SURAU 2,MON,NIZAM,NIZAM,,...
             </div>
-            <ul className="list-disc list-inside space-y-1 text-slate-600 text-[11px]">
-              <li><strong>Table 1 - Table 28</strong>: Pemetaan automatik ke BK01 - BK28</li>
-              <li><strong>Table 29 &amp; 30 / Header</strong>: Pemetaan ke DKA, DKB &amp; Ruang Khas</li>
-              <li><strong>Kunci Automatik</strong>: Slot yang diduduki akan dikunci serta-merta dari tempahan ad-hoc</li>
+            <ul className="space-y-1.5 text-slate-600 text-[11px]">
+              <li className="flex items-start gap-1.5">
+                <span className="text-indigo-600 font-bold">•</span>
+                <span><strong>Ruang (Perkara)</strong>: Kod atau nama ruang (cth: <code>SURAU 1</code>, <code>SURAU 2</code>, <code>BK01</code>, <code>DEWAN MAKAN</code>).</span>
+              </li>
+              <li className="flex items-start gap-1.5">
+                <span className="text-indigo-600 font-bold">•</span>
+                <span><strong>Hari</strong>: <code>MON</code>, <code>TUE</code>, <code>WED</code>, <code>THU</code>, <code>FRI</code> atau ejaan Bahasa Melayu.</span>
+              </li>
+              <li className="flex items-start gap-1.5">
+                <span className="text-rose-600 font-bold">•</span>
+                <span><strong>Slot Bernilai (Locked)</strong>: Sebarang nama (cth: <code>AFIF</code>, <code>NIZAM</code>, atau subjek) akan <strong>mengunci slot</strong> secara automatik dari tempahan umum.</span>
+              </li>
+              <li className="flex items-start gap-1.5">
+                <span className="text-emerald-600 font-bold">•</span>
+                <span><strong>Slot Kosong (Available)</strong>: Biarkan sel kosong untuk membiarkan slot dibuka untuk tempahan ad-hoc.</span>
+              </li>
             </ul>
+
+            <div className="pt-2 border-t border-slate-200 flex items-center justify-between">
+              <button
+                onClick={handleDownloadTimetableCSVTemplate}
+                className="text-[11px] text-slate-500 hover:text-indigo-600 underline cursor-pointer"
+              >
+                Muat turun templat format penuh FET/Unit Jadual
+              </button>
+            </div>
           </div>
 
           <div className="lg:col-span-2 space-y-4">
+            {/* Sync Mode Selection */}
+            <div className="bg-slate-50 border border-slate-200 rounded-xl p-3 text-xs flex flex-col sm:flex-row sm:items-center justify-between gap-3">
+              <span className="font-bold text-slate-700 flex items-center gap-1.5">
+                <Layers className="w-4 h-4 text-indigo-600" />
+                Mod Penyelarasan (Sync Mode):
+              </span>
+              <div className="flex items-center gap-3">
+                <label className="flex items-center gap-1.5 cursor-pointer">
+                  <input
+                    type="radio"
+                    name="scheduleSyncMode"
+                    value="merge"
+                    checked={scheduleSyncMode === 'merge'}
+                    onChange={() => setScheduleSyncMode('merge')}
+                    className="text-indigo-600 focus:ring-indigo-500"
+                  />
+                  <span className="text-slate-800 font-medium">Gabung &amp; Kemas Kini Bilik Terlibat (Disyorkan)</span>
+                </label>
+                <label className="flex items-center gap-1.5 cursor-pointer">
+                  <input
+                    type="radio"
+                    name="scheduleSyncMode"
+                    value="replace"
+                    checked={scheduleSyncMode === 'replace'}
+                    onChange={() => setScheduleSyncMode('replace')}
+                    className="text-indigo-600 focus:ring-indigo-500"
+                  />
+                  <span className="text-slate-800 font-medium">Gantikan Semua</span>
+                </label>
+              </div>
+            </div>
+
             <div className="border-2 border-dashed border-indigo-200 hover:border-indigo-500 bg-indigo-50/20 hover:bg-indigo-50/50 rounded-2xl p-6 text-center transition cursor-pointer relative">
               <input
                 type="file"
@@ -411,7 +536,7 @@ ST091,Pengajian Am,Cik Siti Sarah Binti Razak,Pensyarah,013-5558899,siti.sarah@k
                 {scheduleCsvFile ? `Fail dipilih: ${scheduleCsvFile.name}` : 'Pilih atau Tarik Fail CSV Jadual Waktu di Sini'}
               </div>
               <p className="text-xs text-slate-500 mt-1">
-                Sokong fail CSV jadual waktu kolej terkini
+                Menyokong fail templat grid terkunci (Perkara/Hari) serta fail CSV rasmi Unit Jadual Waktu
               </p>
             </div>
 
@@ -431,7 +556,7 @@ ST091,Pengajian Am,Cik Siti Sarah Binti Razak,Pensyarah,013-5558899,siti.sarah@k
             {/* Sync Success Message */}
             {scheduleSyncSuccessMsg && (
               <div className="bg-emerald-50 border border-emerald-300 rounded-xl p-3 text-xs font-bold text-emerald-800 flex items-center gap-2">
-                <Check className="w-4 h-4 text-emerald-600" />
+                <Check className="w-4 h-4 text-emerald-600 shrink-0" />
                 <span>{scheduleSyncSuccessMsg}</span>
               </div>
             )}
@@ -443,7 +568,7 @@ ST091,Pengajian Am,Cik Siti Sarah Binti Razak,Pensyarah,013-5558899,siti.sarah@k
                   <div className="text-xs">
                     <span className="font-bold text-indigo-950 block">Ringkasan Imbasan Jadual Waktu:</span>
                     <span className="text-indigo-800">
-                      {scheduleParseSummary?.validSlotsCount} slot akademik dikesan merentasi <strong>{scheduleParseSummary?.roomsAffected.length} bilik/ruang</strong>.
+                      {scheduleParseSummary?.validSlotsCount} slot terkunci dikesan merentasi <strong>{scheduleParseSummary?.roomsAffected.join(', ')}</strong> ({scheduleParseSummary?.roomsAffected.length} ruang).
                     </span>
                   </div>
 
@@ -807,6 +932,46 @@ ST091,Pengajian Am,Cik Siti Sarah Binti Razak,Pensyarah,013-5558899,siti.sarah@k
                   placeholder="17:00"
                 />
               </div>
+            </div>
+
+            {/* Quick Session Presets */}
+            <div className="flex flex-wrap items-center gap-1.5 pt-1">
+              <span className="text-[10px] text-slate-400 font-semibold">Pilihan Pantas:</span>
+              <button
+                type="button"
+                onClick={() => { setBlockStartTime('08:00'); setBlockEndTime('17:00'); }}
+                className="text-[10px] bg-amber-50 hover:bg-amber-100 text-amber-900 border border-amber-200 px-2 py-0.5 rounded font-medium transition"
+              >
+                ☀️ Siang (08:00–17:00)
+              </button>
+              <button
+                type="button"
+                onClick={() => { setBlockStartTime('20:00'); setBlockEndTime('23:00'); }}
+                className="text-[10px] bg-indigo-50 hover:bg-indigo-100 text-indigo-900 border border-indigo-200 px-2 py-0.5 rounded font-medium transition"
+              >
+                🌙 Malam Penuh (20:00–23:00)
+              </button>
+              <button
+                type="button"
+                onClick={() => { setBlockStartTime('20:00'); setBlockEndTime('21:00'); }}
+                className="text-[10px] bg-slate-100 hover:bg-slate-200 text-slate-700 px-1.5 py-0.5 rounded transition"
+              >
+                20:00–21:00
+              </button>
+              <button
+                type="button"
+                onClick={() => { setBlockStartTime('21:00'); setBlockEndTime('22:00'); }}
+                className="text-[10px] bg-slate-100 hover:bg-slate-200 text-slate-700 px-1.5 py-0.5 rounded transition"
+              >
+                21:00–22:00
+              </button>
+              <button
+                type="button"
+                onClick={() => { setBlockStartTime('22:00'); setBlockEndTime('23:00'); }}
+                className="text-[10px] bg-slate-100 hover:bg-slate-200 text-slate-700 px-1.5 py-0.5 rounded transition"
+              >
+                22:00–23:00
+              </button>
             </div>
 
             <div>

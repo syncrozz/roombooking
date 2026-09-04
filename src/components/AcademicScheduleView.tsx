@@ -1,6 +1,7 @@
 import React, { useState } from 'react';
 import { AcademicScheduleSlot, Room, DayOfWeek } from '../types';
 import { MALAY_DAYS } from '../utils/availabilityEngine';
+import { exportTimetableToStandardGridCSV } from '../utils/timetableCsvParser';
 import { 
   BookOpen, 
   Search, 
@@ -11,7 +12,8 @@ import {
   Plus, 
   Tag, 
   Filter,
-  CheckCircle2
+  CheckCircle2,
+  Download
 } from 'lucide-react';
 
 interface AcademicScheduleViewProps {
@@ -28,6 +30,18 @@ export const AcademicScheduleView: React.FC<AcademicScheduleViewProps> = ({
   const [selectedDay, setSelectedDay] = useState<DayOfWeek | 'Semua'>('Khamis');
   const [searchQuery, setSearchQuery] = useState<string>('');
   const [roomFilter, setRoomFilter] = useState<string>('Semua');
+
+  const handleExportCSV = () => {
+    const csvContent = exportTimetableToStandardGridCSV(schedule, rooms, { includeNightSlots: true });
+    const blob = new Blob([csvContent], { type: 'text/csv;charset=utf-8;' });
+    const url = URL.createObjectURL(blob);
+    const link = document.createElement('a');
+    link.setAttribute('href', url);
+    link.setAttribute('download', `jadual_akademik_rasmi_${new Date().toISOString().slice(0, 10)}.csv`);
+    document.body.appendChild(link);
+    link.click();
+    document.body.removeChild(link);
+  };
 
   // Filter schedule slots
   const filteredSlots = schedule.filter(slot => {
@@ -64,9 +78,19 @@ export const AcademicScheduleView: React.FC<AcademicScheduleViewProps> = ({
             </p>
           </div>
 
-          <div className="bg-blue-900 text-white p-3 rounded-xl text-center min-w-[160px] shadow-sm">
-            <div className="text-[11px] text-blue-200 font-medium">Jumlah Slot Waktu Rasmi</div>
-            <div className="text-xl font-bold text-blue-300 mt-0.5">{schedule.length} Slot</div>
+          <div className="flex items-center gap-2">
+            <button
+              onClick={handleExportCSV}
+              className="bg-white hover:bg-slate-50 text-slate-700 border border-slate-300 text-xs font-bold py-2.5 px-3.5 rounded-xl transition flex items-center gap-2 shadow-xs cursor-pointer h-full"
+              title="Eksport jadual akademik ke fail CSV format standard (Perkara/Hari)"
+            >
+              <Download className="w-4 h-4 text-blue-600" />
+              <span>Eksport CSV</span>
+            </button>
+            <div className="bg-blue-900 text-white p-3 rounded-xl text-center min-w-[150px] shadow-sm">
+              <div className="text-[11px] text-blue-200 font-medium">Jumlah Slot Waktu Rasmi</div>
+              <div className="text-xl font-bold text-blue-300 mt-0.5">{schedule.length} Slot</div>
+            </div>
           </div>
         </div>
 

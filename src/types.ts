@@ -11,6 +11,7 @@ export interface Room {
   facilities: string[];   // e.g. ['Papan Pintar (Smartboard)', 'Projektor LCD', 'Pendingin Hawa', 'Sistem Audio']
   hasAircond?: boolean;
   isSmartClassroom?: boolean;
+  allowNightBooking?: boolean; // Default true (dibenarkan tempahan malam 20:00 - 23:00)
   imageUrl?: string;
   notes?: string;
 }

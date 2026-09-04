@@ -12,7 +12,8 @@ import {
   Wifi, 
   Volume2, 
   ArrowRight,
-  Info
+  Info,
+  Moon
 } from 'lucide-react';
 
 interface RoomDirectoryViewProps {
@@ -142,11 +143,20 @@ export const RoomDirectoryView: React.FC<RoomDirectoryViewProps> = ({
             <div className="space-y-3">
               {/* Card Header */}
               <div className="flex items-center justify-between border-b border-slate-100 pb-3">
-                <div className="flex items-center gap-2">
+                <div className="flex items-center gap-1.5 flex-wrap">
                   <span className="font-extrabold text-lg text-slate-900">{room.code}</span>
                   {room.hasAircond && isTargetVenue(room) && (
                     <span className="bg-cyan-100 text-cyan-900 border border-cyan-300 text-[10px] font-bold px-2 py-0.5 rounded-full flex items-center gap-1">
                       💠 Aircond
+                    </span>
+                  )}
+                  {room.allowNightBooking !== false ? (
+                    <span className="bg-indigo-50 text-indigo-800 border border-indigo-200 text-[10px] font-medium px-2 py-0.5 rounded-full flex items-center gap-1" title="Menyokong tempahan waktu malam sehingga 23:00">
+                      <Moon className="w-2.5 h-2.5 text-indigo-500" /> Malam
+                    </span>
+                  ) : (
+                    <span className="bg-slate-100 text-slate-500 border border-slate-200 text-[10px] font-medium px-2 py-0.5 rounded-full">
+                      Siang Sahaja
                     </span>
                   )}
                 </div>
@@ -227,10 +237,23 @@ export const RoomDirectoryView: React.FC<RoomDirectoryViewProps> = ({
             </div>
 
             <div className="space-y-3 text-sm text-slate-700">
-              <div className="bg-slate-50 p-3.5 rounded-xl border border-slate-200 text-xs">
+              <div className="bg-slate-50 p-3.5 rounded-xl border border-slate-200 text-xs space-y-2">
                 <div>
                   <span className="text-slate-400 block font-medium">Lokasi Ruang:</span>
                   <strong className="text-slate-900">{selectedRoomModal.block} ({formatLevel(selectedRoomModal.level)}) • {selectedRoomModal.category}</strong>
+                </div>
+                <div className="pt-2 border-t border-slate-200 flex items-center justify-between">
+                  <span className="text-slate-500 font-medium">Status Operasi Waktu Malam:</span>
+                  {selectedRoomModal.allowNightBooking !== false ? (
+                    <span className="bg-indigo-100 text-indigo-900 border border-indigo-200 px-2 py-0.5 rounded font-bold text-[11px] flex items-center gap-1">
+                      <Moon className="w-3 h-3 text-indigo-600" />
+                      Dibuka (20:00 – 23:00)
+                    </span>
+                  ) : (
+                    <span className="bg-slate-200 text-slate-700 px-2 py-0.5 rounded font-semibold text-[11px]">
+                      Tutup Waktu Malam (Siang Sahaja)
+                    </span>
+                  )}
                 </div>
               </div>
 

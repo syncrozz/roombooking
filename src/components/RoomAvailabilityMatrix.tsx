@@ -13,6 +13,13 @@ import {
   getMalayDayOfWeek,
   calculateDurationText
 } from '../utils/availabilityEngine';
+import {
+  ALL_BOOKING_TIME_SLOTS,
+  DAY_TIME_SLOTS,
+  NIGHT_TIME_SLOTS,
+  TimeSlot,
+  isTimeRangeNight
+} from '../utils/timeSlots';
 import { formatLevel } from '../utils/storage';
 import { 
   Calendar, 
@@ -23,7 +30,9 @@ import {
   XCircle, 
   Clock, 
   Building,
-  Sparkles
+  Sparkles,
+  Moon,
+  Sun
 } from 'lucide-react';
 
 interface RoomAvailabilityMatrixProps {
@@ -34,17 +43,6 @@ interface RoomAvailabilityMatrixProps {
   onOpenBookingModal: (room: Room, date: string, startTime: string, endTime: string, purpose: PurposeCategory) => void;
   onViewRoomDetails: (room: Room) => void;
 }
-
-const TIME_SLOTS = [
-  { start: '08:30', end: '09:30', label: '08:30 - 09:30' },
-  { start: '09:30', end: '10:30', label: '09:30 - 10:30' },
-  { start: '10:30', end: '11:30', label: '10:30 - 11:30' },
-  { start: '11:30', end: '12:30', label: '11:30 - 12:30' },
-  { start: '12:30', end: '13:30', label: '12:30 - 13:30' },
-  { start: '13:30', end: '14:30', label: '13:30 - 14:30' },
-  { start: '14:30', end: '15:30', label: '14:30 - 15:30' },
-  { start: '15:30', end: '16:30', label: '15:30 - 16:30' }
-];
 
 export const RoomAvailabilityMatrix: React.FC<RoomAvailabilityMatrixProps> = ({
   rooms,
@@ -65,6 +63,7 @@ export const RoomAvailabilityMatrix: React.FC<RoomAvailabilityMatrixProps> = ({
 
   const [selectedDate, setSelectedDate] = useState<string>(getTodayFormatted);
   const [categoryFilter, setCategoryFilter] = useState<RoomCategory | 'Semua'>('Semua');
+  const [periodFilter, setPeriodFilter] = useState<'ALL' | 'DAY' | 'NIGHT'>('ALL');
   const [searchQuery, setSearchQuery] = useState<string>('');
   const [isAircondOnly, setIsAircondOnly] = useState<boolean>(false);
   const [selectedCellInfo, setSelectedCellInfo] = useState<{
@@ -94,6 +93,12 @@ export const RoomAvailabilityMatrix: React.FC<RoomAvailabilityMatrixProps> = ({
     }
     return true;
   });
+
+  const activeSlots = periodFilter === 'ALL' 
+    ? ALL_BOOKING_TIME_SLOTS 
+    : periodFilter === 'DAY' 
+      ? DAY_TIME_SLOTS 
+      : NIGHT_TIME_SLOTS;
 
   return (
     <div className="space-y-6">
@@ -168,26 +173,74 @@ export const RoomAvailabilityMatrix: React.FC<RoomAvailabilityMatrixProps> = ({
               <span className="font-semibold text-slate-700">⭐ Aircond Sahaja</span>
             </label>
           </div>
+
+          {/* Session View Filter Toggle */}
+          <div className="flex items-center gap-1 bg-slate-100 p-1 rounded-xl border border-slate-200">
+            <button
+              onClick={() => setPeriodFilter('ALL')}
+              className={`px-3 py-1 rounded-lg font-bold transition flex items-center gap-1.5 ${
+                periodFilter === 'ALL'
+                  ? 'bg-white text-slate-900 shadow-2xs'
+                  : 'text-slate-600 hover:text-slate-900'
+              }`}
+            >
+              <Building className="w-3.5 h-3.5 text-emerald-600" />
+              <span>Semua ({ALL_BOOKING_TIME_SLOTS.length})</span>
+            </button>
+            <button
+              onClick={() => setPeriodFilter('DAY')}
+              className={`px-3 py-1 rounded-lg font-bold transition flex items-center gap-1.5 ${
+                periodFilter === 'DAY'
+                  ? 'bg-amber-100 text-amber-950 shadow-2xs border border-amber-300'
+                  : 'text-slate-600 hover:text-amber-800'
+              }`}
+            >
+              <Sun className="w-3.5 h-3.5 text-amber-600" />
+              <span>☀️ Siang ({DAY_TIME_SLOTS.length})</span>
+            </button>
+            <button
+              onClick={() => setPeriodFilter('NIGHT')}
+              className={`px-3 py-1 rounded-lg font-bold transition flex items-center gap-1.5 ${
+                periodFilter === 'NIGHT'
+                  ? 'bg-indigo-900 text-white shadow-2xs'
+                  : 'text-slate-600 hover:text-indigo-800'
+              }`}
+            >
+              <Moon className="w-3.5 h-3.5 text-indigo-400" />
+              <span>🌙 Malam ({NIGHT_TIME_SLOTS.length})</span>
+            </button>
+          </div>
         </div>
 
         {/* Status Legend Bar */}
-        <div className="mt-4 pt-3 border-t border-slate-100 flex flex-wrap items-center gap-4 text-xs">
-          <span className="font-bold text-slate-700">Petunjuk Status:</span>
-          <div className="flex items-center gap-1.5">
-            <span className="w-3.5 h-3.5 rounded bg-emerald-500 border border-emerald-600 inline-block"></span>
-            <span className="text-slate-700 font-medium">🟢 Available (Boleh Ditempah)</span>
+        <div className="mt-4 pt-3 border-t border-slate-100 flex flex-wrap items-center justify-between gap-3 text-xs">
+          <div className="flex flex-wrap items-center gap-3">
+            <span className="font-bold text-slate-700">Petunjuk Status:</span>
+            <div className="flex items-center gap-1.5">
+              <span className="w-3.5 h-3.5 rounded bg-emerald-500 border border-emerald-600 inline-block"></span>
+              <span className="text-slate-700 font-medium">🟢 Kosong (Boleh Ditempah)</span>
+            </div>
+            <div className="flex items-center gap-1.5">
+              <span className="w-3.5 h-3.5 rounded bg-rose-500 border border-rose-600 inline-block"></span>
+              <span className="text-slate-700 font-medium">🔴 Jadual Akademik</span>
+            </div>
+            <div className="flex items-center gap-1.5">
+              <span className="w-3.5 h-3.5 rounded bg-amber-400 border border-amber-500 inline-block"></span>
+              <span className="text-slate-700 font-medium">🟨 Tempahan / Pending</span>
+            </div>
+            <div className="flex items-center gap-1.5">
+              <span className="w-3.5 h-3.5 rounded bg-slate-900 border border-slate-950 inline-block"></span>
+              <span className="text-slate-700 font-medium">⚫ Blocked Institusi</span>
+            </div>
           </div>
-          <div className="flex items-center gap-1.5">
-            <span className="w-3.5 h-3.5 rounded bg-rose-500 border border-rose-600 inline-block"></span>
-            <span className="text-slate-700 font-medium">🔴 Occupied (Jadual Akademik)</span>
-          </div>
-          <div className="flex items-center gap-1.5">
-            <span className="w-3.5 h-3.5 rounded bg-amber-400 border border-amber-500 inline-block"></span>
-            <span className="text-slate-700 font-medium">🟨 Tempahan Ad-Hoc / Pending</span>
-          </div>
-          <div className="flex items-center gap-1.5">
-            <span className="w-3.5 h-3.5 rounded bg-slate-900 border border-slate-950 inline-block"></span>
-            <span className="text-slate-700 font-medium">⚫ Blocked Institusi</span>
+
+          <div className="flex items-center gap-2 text-[11px] text-slate-500">
+            <span className="inline-flex items-center gap-1 bg-amber-50 text-amber-800 px-2 py-0.5 rounded border border-amber-200">
+              ☀️ Sesi Siang: 08:30 – 16:30
+            </span>
+            <span className="inline-flex items-center gap-1 bg-indigo-50 text-indigo-800 px-2 py-0.5 rounded border border-indigo-200 font-semibold">
+              🌙 Sesi Malam: 20:00 – 23:00 (Maksimum 23:00)
+            </span>
           </div>
         </div>
       </div>
@@ -197,16 +250,55 @@ export const RoomAvailabilityMatrix: React.FC<RoomAvailabilityMatrixProps> = ({
         <div className="overflow-x-auto">
           <table className="w-full text-left border-collapse">
             <thead>
-              <tr className="bg-slate-50 text-slate-700 text-xs uppercase tracking-wider border-b border-slate-200 divide-x divide-slate-200">
-                <th className="py-3 px-4 font-bold sticky left-0 z-20 bg-slate-50 min-w-[160px]">
-                  Ruang Kuliah
-                </th>
-                {TIME_SLOTS.map(slot => (
-                  <th key={slot.label} className="py-3 px-3 font-bold text-center min-w-[120px]">
-                    <div className="text-slate-800">{slot.start}</div>
+              {periodFilter === 'ALL' ? (
+                <>
+                  <tr className="border-b border-slate-200">
+                    <th rowSpan={2} className="py-3 px-4 font-bold sticky left-0 z-20 bg-slate-100 text-slate-800 text-xs uppercase tracking-wider min-w-[160px] border-r border-slate-200">
+                      Ruang Kuliah
+                    </th>
+                    <th colSpan={DAY_TIME_SLOTS.length} className="py-2 px-3 font-bold text-center bg-amber-50 text-amber-900 border-r border-slate-200 text-xs tracking-wider">
+                      ☀️ WAKTU SIANG (08:30 – 16:30)
+                    </th>
+                    <th colSpan={NIGHT_TIME_SLOTS.length} className="py-2 px-3 font-bold text-center bg-indigo-900 text-indigo-100 text-xs tracking-wider">
+                      🌙 WAKTU MALAM (20:00 – 23:00)
+                    </th>
+                  </tr>
+                  <tr className="bg-slate-50 text-slate-700 text-xs border-b border-slate-200 divide-x divide-slate-200">
+                    {DAY_TIME_SLOTS.map(slot => (
+                      <th key={slot.id} className="py-2 px-2 font-bold text-center min-w-[105px] bg-amber-50/40">
+                        <div className="text-slate-800 font-mono text-[11px]">{slot.start}</div>
+                      </th>
+                    ))}
+                    {NIGHT_TIME_SLOTS.map(slot => (
+                      <th key={slot.id} className="py-2 px-2 font-bold text-center min-w-[105px] bg-indigo-950 text-indigo-100">
+                        <div className="text-indigo-200 font-mono text-[11px] flex items-center justify-center gap-1">
+                          <Moon className="w-2.5 h-2.5 text-indigo-300" />
+                          <span>{slot.start}</span>
+                        </div>
+                      </th>
+                    ))}
+                  </tr>
+                </>
+              ) : (
+                <tr className="bg-slate-50 text-slate-700 text-xs uppercase tracking-wider border-b border-slate-200 divide-x divide-slate-200">
+                  <th className="py-3 px-4 font-bold sticky left-0 z-20 bg-slate-50 min-w-[160px]">
+                    Ruang Kuliah
                   </th>
-                ))}
-              </tr>
+                  {activeSlots.map(slot => (
+                    <th 
+                      key={slot.id} 
+                      className={`py-3 px-3 font-bold text-center min-w-[115px] ${
+                        slot.period === 'NIGHT' ? 'bg-indigo-900 text-indigo-100' : 'bg-slate-50 text-slate-800'
+                      }`}
+                    >
+                      <div className="flex items-center justify-center gap-1 font-mono">
+                        {slot.period === 'NIGHT' && <Moon className="w-3 h-3 text-indigo-300" />}
+                        <span>{slot.start} – {slot.end}</span>
+                      </div>
+                    </th>
+                  ))}
+                </tr>
+              )}
             </thead>
             <tbody className="divide-y divide-slate-200 text-xs">
               {filteredRooms.map(room => {
@@ -233,7 +325,22 @@ export const RoomAvailabilityMatrix: React.FC<RoomAvailabilityMatrixProps> = ({
                     </td>
 
                     {/* Time Slots */}
-                    {TIME_SLOTS.map(slot => {
+                    {activeSlots.map(slot => {
+                      // Check if room disallows night booking for night slots
+                      if (slot.period === 'NIGHT' && room.allowNightBooking === false) {
+                        return (
+                          <td key={slot.id} className="p-1.5 text-center bg-slate-50/50">
+                            <div 
+                              className="w-full h-11 rounded-lg bg-slate-100 border border-dashed border-slate-200 text-slate-400 text-[10px] font-medium flex flex-col items-center justify-center cursor-not-allowed"
+                              title={`Ruang ${room.code} tidak dibuka untuk tempahan waktu malam.`}
+                            >
+                              <span className="text-slate-500 font-semibold">Tutup Malam</span>
+                              <span className="text-[9px] text-slate-400">Khas Siang</span>
+                            </div>
+                          </td>
+                        );
+                      }
+
                       const check = checkRoomAvailability(
                         room, 
                         selectedDate, 
@@ -250,15 +357,23 @@ export const RoomAvailabilityMatrix: React.FC<RoomAvailabilityMatrixProps> = ({
                       const isBlocked = check.status === 'BLOCKED';
 
                       return (
-                        <td key={slot.label} className="p-1.5 text-center">
+                        <td key={slot.id} className={`p-1.5 text-center ${slot.period === 'NIGHT' ? 'bg-indigo-50/20' : ''}`}>
                           {isAvail && (
                             <button
                               onClick={() => onOpenBookingModal(room, selectedDate, slot.start, slot.end, 'Penggunaan Pensyarah')}
-                              className="w-full h-11 rounded-lg bg-emerald-50 hover:bg-emerald-500 hover:text-white border border-emerald-300/80 text-emerald-800 font-bold transition flex flex-col items-center justify-center p-1 group shadow-xs"
+                              className={`w-full h-11 rounded-lg border font-bold transition flex flex-col items-center justify-center p-1 group shadow-2xs ${
+                                slot.period === 'NIGHT'
+                                  ? 'bg-indigo-50/80 hover:bg-indigo-600 hover:text-white border-indigo-200 text-indigo-900'
+                                  : 'bg-emerald-50 hover:bg-emerald-500 hover:text-white border-emerald-300/80 text-emerald-800'
+                              }`}
                               title={`Klik untuk Tempah ${room.code} (${slot.label})`}
                             >
                               <span className="text-[11px] flex items-center gap-1">
-                                <CheckCircle2 className="w-3 h-3 text-emerald-600 group-hover:text-white" />
+                                {slot.period === 'NIGHT' ? (
+                                  <Moon className="w-3 h-3 text-indigo-600 group-hover:text-white" />
+                                ) : (
+                                  <CheckCircle2 className="w-3 h-3 text-emerald-600 group-hover:text-white" />
+                                )}
                                 Kosong
                               </span>
                               <span className="text-[9px] opacity-80 font-normal group-hover:text-white">Tempah +</span>

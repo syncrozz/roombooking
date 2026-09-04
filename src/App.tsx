@@ -324,13 +324,23 @@ export default function App() {
     }
   };
 
-  // Academic schedule sync
-  const handleSyncAcademicSchedule = async (newSchedule: AcademicScheduleSlot[]) => {
-    setAcademicSchedule(newSchedule);
-    saveStoredAcademicSchedule(newSchedule);
+  // Academic schedule sync (Supports Merge and Replace mode)
+  const handleSyncAcademicSchedule = async (newSchedule: AcademicScheduleSlot[], mode: 'replace' | 'merge' = 'merge') => {
+    let finalSchedule: AcademicScheduleSlot[];
+
+    if (mode === 'merge') {
+      const affectedRooms = new Set(newSchedule.map(s => s.roomId.toUpperCase()));
+      const untouchedSlots = academicSchedule.filter(s => !affectedRooms.has(s.roomId.toUpperCase()));
+      finalSchedule = [...untouchedSlots, ...newSchedule];
+    } else {
+      finalSchedule = newSchedule;
+    }
+
+    setAcademicSchedule(finalSchedule);
+    saveStoredAcademicSchedule(finalSchedule);
     try {
-      await bulkSaveScheduleToCloud(newSchedule);
-      showToast(`🟢 ${newSchedule.length} slot jadual waktu berjaya disinkronkan & MENGLOCK bilik!`);
+      await bulkSaveScheduleToCloud(finalSchedule);
+      showToast(`🟢 ${newSchedule.length} slot jadual berjaya disinkronkan & MENGLOCK bilik (${mode === 'merge' ? 'Gabung & kemas kini bilik terlibat' : 'Ganti semua'})!`);
     } catch (err) {
       console.error('Error syncing academic schedule:', err);
       showToast(`🟡 Slot jadual disimpan secara tempatan.`);

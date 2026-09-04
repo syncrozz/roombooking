@@ -16,6 +16,12 @@ import {
   getMalayDayOfWeek,
   calculateDurationText
 } from '../utils/availabilityEngine';
+import {
+  BOOKING_START_OPTIONS,
+  BOOKING_END_OPTIONS,
+  validateBookingTime,
+  isTimeRangeNight
+} from '../utils/timeSlots';
 import { formatLevel, isTargetVenue } from '../utils/storage';
 import { 
   Search, 
@@ -33,7 +39,9 @@ import {
   Building,
   Check,
   ChevronRight,
-  X
+  X,
+  Moon,
+  Sun
 } from 'lucide-react';
 
 interface QuickBookingSearchProps {
@@ -183,31 +191,56 @@ export const QuickBookingSearch: React.FC<QuickBookingSearchProps> = ({
 
           {/* 2. Masa (Mula & Tamat) */}
           <div className="space-y-1.5">
-            <label className="text-xs font-bold text-slate-700 uppercase tracking-wider flex items-center gap-1.5">
-              <Clock className="w-4 h-4 text-emerald-600" />
-              2. Slot Masa (Mula - Tamat)
-            </label>
+            <div className="flex items-center justify-between">
+              <label className="text-xs font-bold text-slate-700 uppercase tracking-wider flex items-center gap-1.5">
+                <Clock className="w-4 h-4 text-emerald-600" />
+                2. Slot Masa (Mula - Tamat)
+              </label>
+              {isTimeRangeNight(startTime, endTime) ? (
+                <span className="inline-flex items-center gap-1 text-[11px] font-semibold bg-indigo-50 text-indigo-700 border border-indigo-200 px-2 py-0.5 rounded-md">
+                  <Moon className="w-3 h-3 text-indigo-600" />
+                  Sesi Malam (Had: 23:00)
+                </span>
+              ) : (
+                <span className="inline-flex items-center gap-1 text-[11px] font-medium text-amber-700 bg-amber-50 border border-amber-200 px-2 py-0.5 rounded-md">
+                  <Sun className="w-3 h-3 text-amber-600" />
+                  Sesi Siang
+                </span>
+              )}
+            </div>
+
             <div className="grid grid-cols-2 gap-2">
               <div className="flex items-center gap-2">
                 <label className="text-[11px] font-medium text-slate-500 whitespace-nowrap">Mula:</label>
                 <select
                   value={startTime}
                   onChange={(e) => {
-                    setStartTime(e.target.value);
+                    const newStart = e.target.value;
+                    setStartTime(newStart);
+                    // If end time is currently earlier or equal, auto adjust to 1 hour later
+                    const [h, m] = newStart.split(':').map(Number);
+                    const currentEndParts = endTime.split(':').map(Number);
+                    const startTotal = h * 60 + m;
+                    const endTotal = currentEndParts[0] * 60 + currentEndParts[1];
+                    if (endTotal <= startTotal) {
+                      const nextHour = Math.min(23, h + 1);
+                      const adjustedEnd = `${String(nextHour).padStart(2, '0')}:${String(m).padStart(2, '0')}`;
+                      setEndTime(adjustedEnd);
+                    }
                     setHasSearched(true);
                   }}
                   className="w-full bg-slate-50 border border-slate-300 rounded-xl px-2.5 py-2.5 text-sm text-slate-900 font-medium focus:ring-2 focus:ring-emerald-500 outline-none"
                 >
-                  <option value="08:30">08:30 AM</option>
-                  <option value="09:30">09:30 AM</option>
-                  <option value="10:30">10:30 AM</option>
-                  <option value="11:30">11:30 AM</option>
-                  <option value="12:30">12:30 PM</option>
-                  <option value="13:30">01:30 PM</option>
-                  <option value="14:30">02:30 PM</option>
-                  <option value="15:30">03:30 PM</option>
-                  <option value="16:30">04:30 PM</option>
-                  <option value="17:30">05:30 PM</option>
+                  <optgroup label="☀️ Waktu Siang (Pagi & Petang)">
+                    {BOOKING_START_OPTIONS.filter(o => o.period === 'DAY').map(o => (
+                      <option key={o.value} value={o.value}>{o.label}</option>
+                    ))}
+                  </optgroup>
+                  <optgroup label="🌙 Waktu Malam (8:00 PM - 10:00 PM)">
+                    {BOOKING_START_OPTIONS.filter(o => o.period === 'NIGHT').map(o => (
+                      <option key={o.value} value={o.value}>{o.label}</option>
+                    ))}
+                  </optgroup>
                 </select>
               </div>
 
@@ -221,22 +254,89 @@ export const QuickBookingSearch: React.FC<QuickBookingSearchProps> = ({
                   }}
                   className="w-full bg-slate-50 border border-slate-300 rounded-xl px-2.5 py-2.5 text-sm text-slate-900 font-medium focus:ring-2 focus:ring-emerald-500 outline-none"
                 >
-                  <option value="09:30">09:30 AM</option>
-                  <option value="10:30">10:30 AM</option>
-                  <option value="11:30">11:30 AM</option>
-                  <option value="12:30">12:30 PM</option>
-                  <option value="13:30">01:30 PM</option>
-                  <option value="14:30">02:30 PM</option>
-                  <option value="15:30">03:30 PM</option>
-                  <option value="16:30">04:30 PM</option>
-                  <option value="17:30">05:30 PM</option>
-                  <option value="18:30">06:30 PM</option>
+                  <optgroup label="☀️ Waktu Siang">
+                    {BOOKING_END_OPTIONS.filter(o => o.period === 'DAY').map(o => (
+                      <option key={o.value} value={o.value}>{o.label}</option>
+                    ))}
+                  </optgroup>
+                  <optgroup label="🌙 Waktu Malam (Maksimum 11:00 PM)">
+                    {BOOKING_END_OPTIONS.filter(o => o.period === 'NIGHT').map(o => (
+                      <option key={o.value} value={o.value}>{o.label}</option>
+                    ))}
+                  </optgroup>
                 </select>
               </div>
             </div>
-            <span className="text-[11px] text-slate-500 block">
-              Tempoh: <strong className="text-emerald-700 font-bold">{calculateDurationText(startTime, endTime)}</strong> ({startTime} - {endTime})
-            </span>
+
+            {/* Quick Slot Selection Buttons */}
+            <div className="flex flex-wrap items-center gap-1.5 pt-1">
+              <span className="text-[10px] text-slate-400 font-medium mr-0.5">Pantas:</span>
+              <button
+                type="button"
+                onClick={() => { setStartTime('08:30'); setEndTime('09:30'); setHasSearched(true); }}
+                className={`px-2 py-0.5 rounded text-[11px] font-medium border transition ${startTime === '08:30' && endTime === '09:30' ? 'bg-emerald-100 text-emerald-800 border-emerald-300' : 'bg-slate-100 hover:bg-slate-200 text-slate-700 border-slate-200'}`}
+              >
+                08:30–09:30
+              </button>
+              <button
+                type="button"
+                onClick={() => { setStartTime('11:30'); setEndTime('12:30'); setHasSearched(true); }}
+                className={`px-2 py-0.5 rounded text-[11px] font-medium border transition ${startTime === '11:30' && endTime === '12:30' ? 'bg-emerald-100 text-emerald-800 border-emerald-300' : 'bg-slate-100 hover:bg-slate-200 text-slate-700 border-slate-200'}`}
+              >
+                11:30–12:30
+              </button>
+              <button
+                type="button"
+                onClick={() => { setStartTime('14:30'); setEndTime('15:30'); setHasSearched(true); }}
+                className={`px-2 py-0.5 rounded text-[11px] font-medium border transition ${startTime === '14:30' && endTime === '15:30' ? 'bg-emerald-100 text-emerald-800 border-emerald-300' : 'bg-slate-100 hover:bg-slate-200 text-slate-700 border-slate-200'}`}
+              >
+                14:30–15:30
+              </button>
+              <button
+                type="button"
+                onClick={() => { setStartTime('20:00'); setEndTime('21:00'); setHasSearched(true); }}
+                className={`px-2 py-0.5 rounded text-[11px] font-medium border transition flex items-center gap-1 ${startTime === '20:00' && endTime === '21:00' ? 'bg-indigo-100 text-indigo-800 border-indigo-300 font-semibold' : 'bg-indigo-50/70 hover:bg-indigo-100 text-indigo-700 border-indigo-200'}`}
+              >
+                <Moon className="w-2.5 h-2.5" /> 20:00–21:00
+              </button>
+              <button
+                type="button"
+                onClick={() => { setStartTime('21:00'); setEndTime('22:00'); setHasSearched(true); }}
+                className={`px-2 py-0.5 rounded text-[11px] font-medium border transition flex items-center gap-1 ${startTime === '21:00' && endTime === '22:00' ? 'bg-indigo-100 text-indigo-800 border-indigo-300 font-semibold' : 'bg-indigo-50/70 hover:bg-indigo-100 text-indigo-700 border-indigo-200'}`}
+              >
+                <Moon className="w-2.5 h-2.5" /> 21:00–22:00
+              </button>
+              <button
+                type="button"
+                onClick={() => { setStartTime('22:00'); setEndTime('23:00'); setHasSearched(true); }}
+                className={`px-2 py-0.5 rounded text-[11px] font-medium border transition flex items-center gap-1 ${startTime === '22:00' && endTime === '23:00' ? 'bg-indigo-100 text-indigo-800 border-indigo-300 font-semibold' : 'bg-indigo-50/70 hover:bg-indigo-100 text-indigo-700 border-indigo-200'}`}
+              >
+                <Moon className="w-2.5 h-2.5" /> 22:00–23:00
+              </button>
+            </div>
+
+            {/* Validation Message or Duration Info */}
+            {(() => {
+              const timeValidation = validateBookingTime(startTime, endTime);
+              if (!timeValidation.isValid) {
+                return (
+                  <div className="text-xs text-red-600 bg-red-50 border border-red-200 rounded-lg p-2 flex items-center gap-1.5 mt-1 font-medium">
+                    <AlertTriangle className="w-3.5 h-3.5 shrink-0 text-red-500" />
+                    <span>{timeValidation.errorMsg}</span>
+                  </div>
+                );
+              }
+              return (
+                <span className="text-[11px] text-slate-500 block">
+                  Tempoh: <strong className="text-emerald-700 font-bold">{calculateDurationText(startTime, endTime)}</strong> ({startTime} – {endTime})
+                  {isTimeRangeNight(startTime, endTime) && (
+                    <span className="text-indigo-600 font-semibold ml-1.5">
+                      • Waktu malam maksimum: 23:00
+                    </span>
+                  )}
+                </span>
+              );
+            })()}
           </div>
 
           {/* 3. Pilihan Ruang Specifik / Semua */}
@@ -511,11 +611,14 @@ export const QuickBookingSearch: React.FC<QuickBookingSearchProps> = ({
                               setStartTime(slot.startTime);
                               setEndTime(slot.endTime);
                             }}
-                            className="bg-slate-800 hover:bg-slate-700 border border-slate-600 text-emerald-300 px-3 py-1.5 rounded-lg text-xs font-semibold transition flex items-center gap-1"
+                            className="bg-slate-800 hover:bg-slate-700 border border-slate-600 text-emerald-300 px-3 py-1.5 rounded-lg text-xs font-semibold transition flex items-center gap-1.5"
                           >
                             <Clock className="w-3 h-3" />
                             <span>{slot.startTime} – {slot.endTime}</span>
-                            <span className="text-[10px] bg-emerald-950 text-emerald-400 px-1 rounded ml-1">KOSONG</span>
+                            <span className="text-[10px] bg-slate-900 text-slate-300 px-1.5 py-0.2 rounded border border-slate-700">
+                              {slot.period === 'NIGHT' ? '🌙 Malam' : '☀️ Siang'}
+                            </span>
+                            <span className="text-[10px] bg-emerald-950 text-emerald-400 font-bold px-1 rounded ml-1">KOSONG</span>
                           </button>
                         ))}
                       </div>

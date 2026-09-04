@@ -1,6 +1,7 @@
 import React, { useState, useEffect } from 'react';
 import { Room, PurposeCategory, AdHocBooking, StaffUser } from '../types';
 import { formatDateMalay, getMalayDayOfWeek, calculateDurationText } from '../utils/availabilityEngine';
+import { validateBookingTime, isTimeRangeNight } from '../utils/timeSlots';
 import { 
   getStoredUserProfiles, 
   getStoredActiveUser, 
@@ -27,7 +28,9 @@ import {
   AlertCircle,
   Zap,
   KeyRound,
-  ShieldCheck
+  ShieldCheck,
+  Moon,
+  Sun
 } from 'lucide-react';
 
 interface BookingModalProps {
@@ -105,9 +108,23 @@ export const BookingModal: React.FC<BookingModalProps> = ({
     }
   };
 
+  const isNightBooking = isTimeRangeNight(startTime, endTime);
+
   const handleSubmit = (e: React.FormEvent) => {
     e.preventDefault();
     setVerificationError(null);
+
+    // Validate booking time with centralized SES v4.4 engine
+    const timeValidation = validateBookingTime(startTime, endTime);
+    if (!timeValidation.isValid) {
+      setVerificationError(timeValidation.errorMsg || 'Masa tempahan tidak sah.');
+      return;
+    }
+
+    if (isNightBooking && room.allowNightBooking === false) {
+      setVerificationError(`Ruang ${room.code} tidak dibenarkan untuk tempahan waktu malam.`);
+      return;
+    }
 
     // Verify combination of Email and 4-digit Passcode in Firebase CSV staff database
     const verifyResult = verifyStaffCredentialsLocally(applicantEmail, passcode, staffList);
@@ -194,10 +211,29 @@ export const BookingModal: React.FC<BookingModalProps> = ({
         </div>
 
         {/* Selected Slot Summary Card */}
-        <div className="bg-slate-900 text-white rounded-xl p-3.5 space-y-2 text-xs">
+        <div className={`rounded-xl p-3.5 space-y-2 text-xs border ${
+          isNightBooking 
+            ? 'bg-slate-900 border-indigo-500/50 text-white' 
+            : 'bg-slate-900 border-slate-800 text-white'
+        }`}>
           <div className="flex items-center justify-between">
             <span className="text-blue-400 font-bold flex items-center gap-1">
               <Sparkles className="w-3.5 h-3.5" /> Ruang Disahkan Available
+            </span>
+            <span className={`text-[10px] font-bold px-2 py-0.5 rounded-full flex items-center gap-1 ${
+              isNightBooking
+                ? 'bg-indigo-950 text-indigo-300 border border-indigo-700'
+                : 'bg-amber-950 text-amber-300 border border-amber-700'
+            }`}>
+              {isNightBooking ? (
+                <>
+                  <Moon className="w-2.5 h-2.5" /> Sesi Malam (20:00 – 23:00)
+                </>
+              ) : (
+                <>
+                  <Sun className="w-2.5 h-2.5" /> Sesi Siang (08:30 – 16:30)
+                </>
+              )}
             </span>
           </div>
 
@@ -208,9 +244,18 @@ export const BookingModal: React.FC<BookingModalProps> = ({
             </div>
             <div>
               <span className="text-slate-400 block text-[10px]">Masa Tempahan:</span>
-              <strong className="text-blue-300">{startTime} – {endTime} ({calculateDurationText(startTime, endTime)})</strong>
+              <strong className={isNightBooking ? "text-indigo-300" : "text-blue-300"}>
+                {startTime} – {endTime} ({calculateDurationText(startTime, endTime)})
+              </strong>
             </div>
           </div>
+
+          {isNightBooking && (
+            <div className="pt-1.5 border-t border-slate-800/80 text-[10px] text-indigo-200/90 flex items-center gap-1.5">
+              <Moon className="w-3 h-3 text-indigo-400 shrink-0" />
+              <span>Peringatan Waktu Malam: Maksimum sehingga 23:00. Sila pastikan suis lampu &amp; pendingin hawa ditutup selepas sesi tamat.</span>
+            </div>
+          )}
         </div>
 
         {/* Auto-Suggestion Pills from Stored Profiles */}
