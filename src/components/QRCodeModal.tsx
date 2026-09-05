@@ -35,6 +35,8 @@ export const QRCodeModal: React.FC<QRCodeModalProps> = ({ booking, onClose }) =>
     return () => window.removeEventListener('keydown', handleKeyDown);
   }, [onClose]);
 
+  if (!booking) return null;
+
   const handleCopyText = async () => {
     try {
       const text = formatWhatsAppMessage(booking);

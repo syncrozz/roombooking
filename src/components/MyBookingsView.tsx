@@ -89,11 +89,13 @@ export const MyBookingsView: React.FC<MyBookingsViewProps> = ({
     }
 
     // Ensure email matches booking email (or is authorised staff)
+    const bookingEmail = targetCancelBooking.applicantEmail || '';
     if (
-      verifyResult.staff.email.toLowerCase() !== targetCancelBooking.applicantEmail.toLowerCase() &&
+      bookingEmail &&
+      verifyResult.staff.email.toLowerCase() !== bookingEmail.toLowerCase() &&
       !verifyResult.staff.role.toLowerCase().includes('pentadbir')
     ) {
-      setCancelErrorMsg(`Hanya ${targetCancelBooking.applicantEmail} sahaja dibenarkan membatalkan tempahan ini.`);
+      setCancelErrorMsg(`Hanya ${bookingEmail} sahaja dibenarkan membatalkan tempahan ini.`);
       return;
     }
 
@@ -339,8 +341,8 @@ export const MyBookingsView: React.FC<MyBookingsViewProps> = ({
         ) : (
           <div className="col-span-full bg-white rounded-2xl p-12 text-center text-slate-500 border border-slate-200">
             <QrCode className="w-12 h-12 mx-auto text-slate-300 mb-3" />
-            <p className="font-bold text-base text-slate-700">Tiada Rekod Tempahan Ad-Hoc</p>
-            <p className="text-xs text-slate-500 mt-1">Anda belum membuat sebarang tempahan ad-hoc atau tiada keputusan bagi tapisan carian.</p>
+            <p className="font-bold text-base text-slate-700">Tiada data tempahan lagi.</p>
+            <p className="text-xs text-slate-500 mt-1">Data akan dipaparkan sebaik sahaja pengguna membuat tempahan ad-hoc ke dalam sistem.</p>
           </div>
         )}
       </div>
@@ -366,7 +368,7 @@ export const MyBookingsView: React.FC<MyBookingsViewProps> = ({
               <div><strong>ID Tempahan:</strong> <span className="font-mono font-bold text-slate-900">{targetCancelBooking.id}</span></div>
               <div><strong>Ruang:</strong> {targetCancelBooking.roomName}</div>
               <div><strong>Tarikh & Masa:</strong> {targetCancelBooking.date} ({targetCancelBooking.startTime} - {targetCancelBooking.endTime})</div>
-              <div><strong>Pemohon Rasmi:</strong> {targetCancelBooking.applicantName} ({targetCancelBooking.applicantEmail})</div>
+              <div><strong>Pemohon Rasmi:</strong> {targetCancelBooking.applicantName} {targetCancelBooking.applicantEmail ? `(${targetCancelBooking.applicantEmail})` : ''}</div>
             </div>
 
             <p className="text-xs text-slate-600">

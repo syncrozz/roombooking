@@ -116,7 +116,7 @@ export const RoomDirectoryView: React.FC<RoomDirectoryViewProps> = ({
                 onChange={(e) => setIsAircondOnly(e.target.checked)}
                 className="rounded text-emerald-600 focus:ring-emerald-500"
               />
-              <span className="font-semibold text-slate-700">⭐ Aircond Sahaja</span>
+              <span className="font-semibold text-slate-700">💠 Aircond Sahaja</span>
             </label>
           </div>
 

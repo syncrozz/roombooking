@@ -2,6 +2,7 @@ import React, { useState, useEffect } from 'react';
 import { 
   getStoredActiveUser, 
   saveActiveUser, 
+  clearActiveUser,
   UserProfileHistory 
 } from '../utils/storage';
 import { StaffUser } from '../types';
@@ -16,33 +17,48 @@ import {
   KeyRound, 
   AlertTriangle,
   Database,
-  Sparkles
+  Sparkles,
+  Lock,
+  LogOut
 } from 'lucide-react';
 
 interface LoginUserCardProps {
   onProfileChange?: (profile: UserProfileHistory) => void;
   staffList?: StaffUser[];
   compact?: boolean;
+  isAdmin?: boolean;
 }
 
 export const LoginUserCard: React.FC<LoginUserCardProps> = ({ 
   onProfileChange, 
   staffList = INITIAL_STAFF_DATA,
-  compact = false 
+  compact = false,
+  isAdmin = false
 }) => {
-  const [activeUser, setActiveUser] = useState<UserProfileHistory>(getStoredActiveUser());
-  const [isEditing, setIsEditing] = useState<boolean>(false);
+  const initialUser = getStoredActiveUser();
+  const [activeUser, setActiveUser] = useState<UserProfileHistory | null>(initialUser);
+  const [isEditing, setIsEditing] = useState<boolean>(!initialUser);
 
   // Verification Form states
-  const [emailInput, setEmailInput] = useState<string>(activeUser.applicantEmail || 'khaikerr@gmail.com');
+  const [emailInput, setEmailInput] = useState<string>(initialUser?.applicantEmail || 'khaikerr@gmail.com');
   const [passcodeInput, setPasscodeInput] = useState<string>('3756');
   const [errorMsg, setErrorMsg] = useState<string | null>(null);
   const [saveSuccessMsg, setSaveSuccessMsg] = useState<string | null>(null);
 
+  // Admin access states
+  const [adminUnlocked, setAdminUnlocked] = useState<boolean>(false);
+  const [showAdminPinPrompt, setShowAdminPinPrompt] = useState<boolean>(false);
+  const [adminPinInput, setAdminPinInput] = useState<string>('');
+  const [adminPinError, setAdminPinError] = useState<string | null>(null);
+
   useEffect(() => {
     const user = getStoredActiveUser();
     setActiveUser(user);
-    if (user.applicantEmail) setEmailInput(user.applicantEmail);
+    if (user?.applicantEmail) {
+      setEmailInput(user.applicantEmail);
+    } else {
+      setIsEditing(true);
+    }
   }, []);
 
   const handleQuickSelectStaff = (st: StaffUser) => {
@@ -87,6 +103,24 @@ export const LoginUserCard: React.FC<LoginUserCardProps> = ({
     }, 4500);
   };
 
+  const handleLogout = () => {
+    clearActiveUser();
+    setActiveUser(null);
+    setIsEditing(true);
+    setEmailInput('');
+    setPasscodeInput('');
+    setErrorMsg(null);
+    setSaveSuccessMsg('Berjaya log keluar. Kembali ke paparan lalai (default view).');
+
+    if (onProfileChange) {
+      onProfileChange(null as any);
+    }
+
+    setTimeout(() => {
+      setSaveSuccessMsg(null);
+    }, 3500);
+  };
+
   // Helper for user initials
   const getInitials = (name: string) => {
     if (!name) return 'U';
@@ -100,15 +134,33 @@ export const LoginUserCard: React.FC<LoginUserCardProps> = ({
   return (
     <div className="w-full bg-slate-900 border border-slate-700/80 rounded-xl overflow-hidden shadow-xl transition-all">
       {/* Header Banner */}
-      <div className="px-3.5 py-2.5 bg-slate-950 border-b border-slate-800">
-        <div className="flex items-center justify-end">
-          <button
-            type="button"
-            onClick={() => setIsEditing(!isEditing)}
-            className="text-[10px] font-semibold text-blue-400 hover:text-blue-300 flex items-center gap-1 bg-slate-800 hover:bg-slate-700 px-2 py-0.5 rounded-md border border-slate-700 transition"
-          >
-            {isEditing ? 'Batal' : 'Tukar Akaun / Passcode'}
-          </button>
+      <div className="px-3.5 py-2 bg-slate-950 border-b border-slate-800">
+        <div className="flex items-center justify-between">
+          <span className="text-[11px] font-bold text-slate-300 flex items-center gap-1.5">
+            <UserCheck className="w-3.5 h-3.5 text-blue-400" />
+            <span>{activeUser ? 'Akaun Staf Aktif' : 'Log Masuk Staf'}</span>
+          </span>
+          <div className="flex items-center gap-1.5">
+            {activeUser && (
+              <button
+                type="button"
+                id="btn-header-logout"
+                onClick={handleLogout}
+                className="text-[10px] font-bold text-white bg-orange-500 hover:bg-orange-600 active:bg-orange-700 px-2 py-0.5 rounded-md flex items-center gap-1 shadow-sm transition"
+                title="Log keluar dan kembali ke paparan lalai"
+              >
+                <LogOut className="w-3 h-3" />
+                <span>Log Keluar</span>
+              </button>
+            )}
+            <button
+              type="button"
+              onClick={() => setIsEditing(!isEditing)}
+              className="text-[10px] font-semibold text-blue-400 hover:text-blue-300 flex items-center gap-1 bg-slate-800 hover:bg-slate-700 px-2 py-0.5 rounded-md border border-slate-700 transition"
+            >
+              {isEditing ? (activeUser ? 'Tutup' : 'Batal') : 'Tukar Akaun'}
+            </button>
+          </div>
         </div>
       </div>
 
@@ -120,7 +172,7 @@ export const LoginUserCard: React.FC<LoginUserCardProps> = ({
       )}
 
       {/* Mode 1: Logged In Display Mode */}
-      {!isEditing && (
+      {!isEditing && activeUser ? (
         <div className="p-3.5 space-y-2.5">
           <div className="flex items-center gap-3">
             <div className="w-10 h-10 rounded-xl bg-gradient-to-br from-blue-600 to-indigo-700 flex items-center justify-center font-bold text-white text-sm shadow-md shadow-blue-900/40 shrink-0">
@@ -153,40 +205,132 @@ export const LoginUserCard: React.FC<LoginUserCardProps> = ({
               E-mel & Passcode Sah
             </span>
           </div>
+
+          {/* Action button to log out and return to default view */}
+          <div className="pt-2 border-t border-slate-800">
+            <button
+              type="button"
+              id="btn-logout-orange"
+              onClick={handleLogout}
+              className="w-full py-2 px-3 bg-orange-500 hover:bg-orange-600 active:bg-orange-700 text-white rounded-lg text-xs font-bold flex items-center justify-center gap-2 shadow-md shadow-orange-950/40 transition"
+              title="Log keluar dan kembali ke paparan lalai"
+            >
+              <LogOut className="w-3.5 h-3.5" />
+              <span>Log Keluar (Default View)</span>
+            </button>
+          </div>
         </div>
-      )}
+      ) : null}
 
       {/* Mode 2: Verification Login Form */}
-      {isEditing && (
+      {(isEditing || !activeUser) && (
         <form onSubmit={handleVerifyAndLogin} className="p-3.5 space-y-3 bg-slate-950/60">
           
-          {/* Quick-fill dropdown for testing staff accounts */}
-          <div>
-            <label className="block text-[10px] font-bold text-slate-400 mb-1 flex items-center gap-1">
-              <Sparkles className="w-3 h-3 text-amber-400" />
-              <span>Ujian Akaun Staf (Pilih untuk Auto-Isi):</span>
-            </label>
-            <select
-              onChange={(e) => {
-                const found = staffList.find(s => s.id === e.target.value);
-                if (found) handleQuickSelectStaff(found);
-              }}
-              defaultValue=""
-              className="w-full bg-slate-800 border border-slate-700 rounded-lg px-2.5 py-1.5 text-xs text-slate-200 outline-none focus:border-blue-500"
-            >
-              <option value="" disabled>-- Pilih Staf CSV KPMBP --</option>
-              {staffList.slice(0, 20).map((st) => (
-                <option key={st.id} value={st.id}>
-                  {st.name.split(' ')[0]} ({st.email || 'tanpa emel'}) - Passcode: {st.passcode}
-                </option>
-              ))}
-            </select>
-          </div>
+          {/* Quick-fill dropdown for testing staff accounts - Accessible only by Admin */}
+          {(isAdmin || adminUnlocked) ? (
+            <div className="bg-amber-950/30 border border-amber-500/40 rounded-lg p-2 space-y-1.5 animate-in fade-in duration-150">
+              <div className="flex items-center justify-between">
+                <label className="block text-[10px] font-bold text-amber-300 flex items-center gap-1">
+                  <ShieldCheck className="w-3.5 h-3.5 text-amber-400" />
+                  <span>Akses Pentadbir: Ujian Akaun Staf</span>
+                </label>
+                {!isAdmin && (
+                  <button
+                    type="button"
+                    onClick={() => setAdminUnlocked(false)}
+                    className="text-[9px] text-slate-400 hover:text-slate-200"
+                  >
+                    Kunci Semula
+                  </button>
+                )}
+              </div>
+              <select
+                onChange={(e) => {
+                  const found = staffList.find(s => s.id === e.target.value);
+                  if (found) handleQuickSelectStaff(found);
+                }}
+                defaultValue=""
+                className="w-full bg-slate-800 border border-slate-700 rounded-lg px-2.5 py-1.5 text-xs text-slate-200 outline-none focus:border-amber-500"
+              >
+                <option value="" disabled>-- Pilih Staf CSV KPMBP --</option>
+                {staffList.slice(0, 30).map((st) => (
+                  <option key={st.id} value={st.id}>
+                    {st.name.split(' ')[0]} ({st.email || 'tanpa emel'}) - Passcode: {st.passcode}
+                  </option>
+                ))}
+              </select>
+            </div>
+          ) : (
+            <div className="flex justify-end">
+              <button
+                type="button"
+                onClick={() => setShowAdminPinPrompt(!showAdminPinPrompt)}
+                className="text-[10px] text-slate-500 hover:text-amber-400/80 flex items-center gap-1 transition select-none"
+                title="Akses Ujian Staf khusus untuk Pentadbir Sahaja"
+              >
+                <Lock className="w-2.5 h-2.5" />
+                <span>Akses Ujian (Admin Sahaja)</span>
+              </button>
+            </div>
+          )}
+
+          {showAdminPinPrompt && !(isAdmin || adminUnlocked) && (
+            <div className="bg-slate-900 border border-amber-500/40 rounded-lg p-2.5 space-y-2 animate-in fade-in duration-150">
+              <div className="flex items-center justify-between">
+                <span className="text-[10px] font-bold text-amber-300 flex items-center gap-1">
+                  <Lock className="w-3 h-3 text-amber-400" />
+                  Masukkan PIN Pentadbir:
+                </span>
+                <button
+                  type="button"
+                  onClick={() => {
+                    setShowAdminPinPrompt(false);
+                    setAdminPinError(null);
+                    setAdminPinInput('');
+                  }}
+                  className="text-slate-400 hover:text-slate-200 text-xs"
+                >
+                  ✕
+                </button>
+              </div>
+              <div className="flex gap-1.5">
+                <input
+                  type="password"
+                  maxLength={4}
+                  placeholder="PIN Admin"
+                  value={adminPinInput}
+                  onChange={(e) => {
+                    setAdminPinInput(e.target.value);
+                    setAdminPinError(null);
+                  }}
+                  className="flex-1 bg-slate-800 border border-slate-700 rounded px-2 py-1 text-xs text-white font-mono outline-none focus:border-amber-500"
+                />
+                <button
+                  type="button"
+                  onClick={() => {
+                    if (adminPinInput.trim() === '5313') {
+                      setAdminUnlocked(true);
+                      setShowAdminPinPrompt(false);
+                      setAdminPinInput('');
+                      setAdminPinError(null);
+                    } else {
+                      setAdminPinError('PIN Tidak Sah');
+                    }
+                  }}
+                  className="px-2.5 py-1 bg-amber-600 hover:bg-amber-500 text-white text-[11px] font-bold rounded"
+                >
+                  Buka
+                </button>
+              </div>
+              {adminPinError && (
+                <span className="text-[10px] text-rose-400 font-semibold block">{adminPinError}</span>
+              )}
+            </div>
+          )}
 
           <div>
-            <label className="block text-[11px] font-bold text-slate-300 mb-1 flex items-center justify-between">
-              <span>E-mel Pengguna (CSV Firebase):</span>
-              <span className="text-[10px] text-blue-400 font-normal">cth: khaikerr@gmail.com</span>
+            <label className="block text-[11px] font-bold text-slate-300 mb-1">
+              Email Berdaftar:
             </label>
             <div className="relative">
               <Mail className="w-3.5 h-3.5 text-slate-400 absolute left-2.5 top-2.5" />
@@ -202,9 +346,8 @@ export const LoginUserCard: React.FC<LoginUserCardProps> = ({
           </div>
 
           <div>
-            <label className="block text-[11px] font-bold text-slate-300 mb-1 flex items-center justify-between">
-              <span>Passcode (4 Digit Terakhir No. Telefon):</span>
-              <span className="text-[10px] text-amber-400 font-semibold">cth: 3756</span>
+            <label className="block text-[11px] font-bold text-slate-300 mb-1">
+              Passcode (4 Digit Terakhir No. Telefon):
             </label>
             <div className="relative">
               <KeyRound className="w-3.5 h-3.5 text-slate-400 absolute left-2.5 top-2.5" />
@@ -219,7 +362,7 @@ export const LoginUserCard: React.FC<LoginUserCardProps> = ({
               />
             </div>
             <p className="text-[10px] text-slate-400 mt-1">
-              * E-mel dan passcode 4-digit telefon mestilah berpadanan dengan pangkalan data CSV KPMBP dalam Firebase.
+              * Email dan passcode 4-digit Pin mestilah sepadan dengan pangkalan data CSV Platform
             </p>
           </div>
 
@@ -243,6 +386,21 @@ export const LoginUserCard: React.FC<LoginUserCardProps> = ({
             <UserCheck className="w-3.5 h-3.5" />
             Sah & Log Masuk Staf
           </button>
+
+          {activeUser && (
+            <div className="pt-2 border-t border-slate-800 flex items-center justify-between">
+              <span className="text-[10px] text-slate-400">Log keluar pengguna semasa:</span>
+              <button
+                type="button"
+                id="btn-form-logout-orange"
+                onClick={handleLogout}
+                className="px-2.5 py-1 bg-orange-500 hover:bg-orange-600 active:bg-orange-700 text-white text-[10px] font-bold rounded flex items-center gap-1 shadow transition"
+              >
+                <LogOut className="w-3 h-3" />
+                <span>Log Keluar</span>
+              </button>
+            </div>
+          )}
         </form>
       )}
     </div>

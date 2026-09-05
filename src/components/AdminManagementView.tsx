@@ -9,6 +9,7 @@ import {
 import { formatDateMalay } from '../utils/availabilityEngine';
 import { parseTimetableCSV, exportTimetableToStandardGridCSV } from '../utils/timetableCsvParser';
 import { MASTER_TIMETABLE_CSV, SAMPLE_LOCKED_SLOTS_CSV, STANDARD_GRID_TEMPLATE_CSV } from '../data/initialData';
+import { CloudSyncModal } from './CloudSyncModal';
 import { 
   ShieldCheck, 
   Lock, 
@@ -33,7 +34,9 @@ import {
   Check,
   BookOpen,
   Sparkles,
-  Layers
+  Layers,
+  Cloud,
+  LogOut
 } from 'lucide-react';
 
 interface AdminManagementViewProps {
@@ -49,6 +52,8 @@ interface AdminManagementViewProps {
   onResetData: () => void;
   onSyncStaffUsers?: (staff: StaffUser[]) => Promise<void>;
   onSyncAcademicSchedule?: (schedule: AcademicScheduleSlot[], mode?: 'merge' | 'replace') => Promise<void> | void;
+  onClearAcademicSchedule?: () => Promise<void> | void;
+  onLogoutAdmin?: () => void;
 }
 
 export const AdminManagementView: React.FC<AdminManagementViewProps> = ({
@@ -63,7 +68,9 @@ export const AdminManagementView: React.FC<AdminManagementViewProps> = ({
   onDeleteBlock,
   onResetData,
   onSyncStaffUsers,
-  onSyncAcademicSchedule
+  onSyncAcademicSchedule,
+  onClearAcademicSchedule,
+  onLogoutAdmin
 }) => {
   const pendingBookings = bookings.filter(b => b.status === 'PENDING');
 
@@ -83,7 +90,10 @@ export const AdminManagementView: React.FC<AdminManagementViewProps> = ({
   const [scheduleParseErrors, setScheduleParseErrors] = useState<string[]>([]);
   const [isSyncingSchedule, setIsSyncingSchedule] = useState<boolean>(false);
   const [scheduleSyncSuccessMsg, setScheduleSyncSuccessMsg] = useState<string | null>(null);
-  const [scheduleSyncMode, setScheduleSyncMode] = useState<'merge' | 'replace'>('merge');
+  const [scheduleSyncMode, setScheduleSyncMode] = useState<'merge' | 'replace'>('replace');
+  const [showClearScheduleModal, setShowClearScheduleModal] = useState<boolean>(false);
+  const [isClearingSchedule, setIsClearingSchedule] = useState<boolean>(false);
+  const [showConfirmTotalOverwriteModal, setShowConfirmTotalOverwriteModal] = useState<boolean>(false);
 
   // Staff CSV Sync State
   const [csvFile, setCsvFile] = useState<File | null>(null);
@@ -92,6 +102,7 @@ export const AdminManagementView: React.FC<AdminManagementViewProps> = ({
   const [isSyncing, setIsSyncing] = useState<boolean>(false);
   const [syncSuccessMsg, setSyncSuccessMsg] = useState<string | null>(null);
   const [staffSearchTerm, setStaffSearchTerm] = useState<string>('');
+  const [showCloudSyncModal, setShowCloudSyncModal] = useState<boolean>(false);
 
   // Download Standard Timetable CSV Template (Format Perkara/Hari yang diselaraskan)
   const handleDownloadStandardGridTemplate = () => {
@@ -167,26 +178,64 @@ export const AdminManagementView: React.FC<AdminManagementViewProps> = ({
     reader.readAsText(file);
   };
 
-  const handleExecuteScheduleSync = async () => {
+  const handleTriggerScheduleSync = () => {
     if (parsedScheduleSlots.length === 0) {
       alert('Tiada slot jadual waktu CSV yang sah untuk disinkronkan.');
       return;
     }
 
+    if (scheduleSyncMode === 'replace') {
+      setShowConfirmTotalOverwriteModal(true);
+    } else {
+      executeActualSync('merge');
+    }
+  };
+
+  const executeActualSync = async (mode: 'merge' | 'replace') => {
     if (onSyncAcademicSchedule) {
       setIsSyncingSchedule(true);
       try {
-        await onSyncAcademicSchedule(parsedScheduleSlots, scheduleSyncMode);
-        setScheduleSyncSuccessMsg(
-          `🟢 Berjaya menyinkronkan & MENGUNCI ${parsedScheduleSlots.length} slot di ${scheduleParseSummary?.roomsAffected.length || 0} bilik/ruang (${scheduleSyncMode === 'merge' ? 'Mod Gabung & Kemas Kini' : 'Mod Ganti Semua'})!`
-        );
-        setIsSyncingSchedule(false);
+        await onSyncAcademicSchedule(parsedScheduleSlots, mode);
+        setShowConfirmTotalOverwriteModal(false);
+        if (mode === 'replace') {
+          setScheduleSyncSuccessMsg(
+            `🟢 Berjaya membersihkan jadual terdahulu dan MENGUNCI ${parsedScheduleSlots.length} slot baharu merentasi ${scheduleParseSummary?.roomsAffected.length || 0} ruang (Mod Ganti Sepenuhnya)!`
+          );
+        } else {
+          setScheduleSyncSuccessMsg(
+            `🟢 Berjaya menggabungkan dan mengemas kini ${parsedScheduleSlots.length} slot di ${scheduleParseSummary?.roomsAffected.length || 0} ruang!`
+          );
+        }
       } catch (err) {
-        setIsSyncingSchedule(false);
         alert('Gagal menyinkronkan data jadual waktu.');
+      } finally {
+        setIsSyncingSchedule(false);
       }
     } else {
+      setShowConfirmTotalOverwriteModal(false);
       setScheduleSyncSuccessMsg(`🟢 Berjaya memproses ${parsedScheduleSlots.length} slot jadual secara tempatan!`);
+    }
+  };
+
+  const handleExecuteClearSchedule = async () => {
+    if (!onClearAcademicSchedule) {
+      alert('Fungsi pembersihan jadual tidak tersedia.');
+      return;
+    }
+    setIsClearingSchedule(true);
+    try {
+      await onClearAcademicSchedule();
+      setShowClearScheduleModal(false);
+      setParsedScheduleSlots([]);
+      setScheduleCsvFile(null);
+      setScheduleParseSummary(null);
+      setScheduleSyncSuccessMsg(
+        `🟢 Semua data jadual akademik telah berjaya dibersihkan sepenuhnya (0 slot aktif). Semua bilik kini berstatus kosong dan sedia ditempah secara ad-hoc.`
+      );
+    } catch (err) {
+      alert('Ralat semasa membersihkan data jadual akademik.');
+    } finally {
+      setIsClearingSchedule(false);
     }
   };
 
@@ -364,18 +413,57 @@ ST091,Pengajian Am,Cik Siti Sarah Binti Razak,Pensyarah,013-5558899,siti.sarah@k
             </p>
           </div>
 
-          <button
-            onClick={() => {
-              if (confirm('Adakah anda pasti mahu menetapkan semula (reset) semua data ke nilai asal KPMBP?')) {
-                onResetData();
-                alert('Sistem telah ditetapkan semula ke data asal.');
-              }
-            }}
-            className="bg-slate-800 hover:bg-slate-700 text-slate-300 hover:text-white border border-slate-700 text-xs font-semibold py-2 px-3.5 rounded-xl transition flex items-center gap-2"
-          >
-            <RotateCcw className="w-3.5 h-3.5 text-amber-400" />
-            <span>Reset Data Asal</span>
-          </button>
+          <div className="flex flex-wrap items-center gap-2">
+            <button
+              onClick={() => setShowCloudSyncModal(true)}
+              className="bg-blue-900/80 hover:bg-blue-800 text-blue-100 border border-blue-700/80 text-xs font-semibold py-2 px-3.5 rounded-xl transition flex items-center gap-2 cursor-pointer shadow-xs"
+              title="Status Firebase Cloud Firestore Multi-Device"
+            >
+              <span className="relative flex h-2 w-2">
+                <span className="animate-ping absolute inline-flex h-full w-full rounded-full bg-emerald-400 opacity-75"></span>
+                <span className="relative inline-flex rounded-full h-2 w-2 bg-emerald-500"></span>
+              </span>
+              <Cloud className="w-3.5 h-3.5 text-blue-300" />
+              <span>Status Cloud Sync</span>
+            </button>
+
+            {onLogoutAdmin && (
+              <button
+                id="btn-admin-panel-logout"
+                onClick={onLogoutAdmin}
+                className="bg-amber-500 hover:bg-amber-400 active:bg-amber-600 text-slate-950 font-bold border border-amber-400 text-xs py-2 px-3.5 rounded-xl transition flex items-center gap-2 cursor-pointer shadow-md shadow-amber-950/20"
+                title="Log keluar dari mod admin dan kembali ke paparan utama"
+              >
+                <LogOut className="w-3.5 h-3.5 text-slate-950" />
+                <span>Log Keluar Admin</span>
+              </button>
+            )}
+
+            <button
+              onClick={() => {
+                if (confirm('Adakah anda pasti mahu menetapkan semula (reset) semua data ke nilai asal KPMBP (Zero Demo Data)?')) {
+                  onResetData();
+                }
+              }}
+              className="bg-slate-800 hover:bg-slate-700 text-slate-300 hover:text-white border border-slate-700 text-xs font-semibold py-2 px-3.5 rounded-xl transition flex items-center gap-2 cursor-pointer"
+            >
+              <RotateCcw className="w-3.5 h-3.5 text-amber-400" />
+              <span>Reset Data Asal</span>
+            </button>
+
+            <button
+              onClick={() => {
+                if (confirm('Adakah anda pasti mahu membersihkan sebarang sisa data demo daripada peranti dan pangkalan data Cloud?')) {
+                  onResetData();
+                }
+              }}
+              className="bg-rose-950/40 hover:bg-rose-900/60 text-rose-300 hover:text-rose-100 border border-rose-800/80 text-xs font-semibold py-2 px-3.5 rounded-xl transition flex items-center gap-2 cursor-pointer"
+              title="Pembersihan sifar data demo"
+            >
+              <ShieldCheck className="w-3.5 h-3.5 text-rose-400" />
+              <span>Sahkan Sifar Data Demo</span>
+            </button>
+          </div>
         </div>
 
         {/* Quick Stats */}
@@ -444,6 +532,16 @@ ST091,Pengajian Am,Cik Siti Sarah Binti Razak,Pensyarah,013-5558899,siti.sarah@k
               <FileSpreadsheet className="w-3.5 h-3.5 text-emerald-600" />
               <span>Eksport CSV Semasa</span>
             </button>
+
+            <button
+              onClick={() => setShowClearScheduleModal(true)}
+              disabled={academicSchedule.length === 0}
+              className="bg-rose-50 hover:bg-rose-100 disabled:opacity-40 disabled:cursor-not-allowed text-rose-800 border border-rose-300 text-xs font-bold py-2 px-3 rounded-xl transition flex items-center gap-1.5 shadow-xs cursor-pointer"
+              title="Kosongkan dan padamkan semua rekod jadual kuliah sedia ada dari sistem"
+            >
+              <Trash2 className="w-3.5 h-3.5 text-rose-600" />
+              <span>Kosongkan Semua ({academicSchedule.length} Slot)</span>
+            </button>
           </div>
         </div>
 
@@ -492,35 +590,92 @@ ST091,Pengajian Am,Cik Siti Sarah Binti Razak,Pensyarah,013-5558899,siti.sarah@k
           </div>
 
           <div className="lg:col-span-2 space-y-4">
-            {/* Sync Mode Selection */}
-            <div className="bg-slate-50 border border-slate-200 rounded-xl p-3 text-xs flex flex-col sm:flex-row sm:items-center justify-between gap-3">
-              <span className="font-bold text-slate-700 flex items-center gap-1.5">
-                <Layers className="w-4 h-4 text-indigo-600" />
-                Mod Penyelarasan (Sync Mode):
-              </span>
-              <div className="flex items-center gap-3">
-                <label className="flex items-center gap-1.5 cursor-pointer">
-                  <input
-                    type="radio"
-                    name="scheduleSyncMode"
-                    value="merge"
-                    checked={scheduleSyncMode === 'merge'}
-                    onChange={() => setScheduleSyncMode('merge')}
-                    className="text-indigo-600 focus:ring-indigo-500"
-                  />
-                  <span className="text-slate-800 font-medium">Gabung &amp; Kemas Kini Bilik Terlibat (Disyorkan)</span>
-                </label>
-                <label className="flex items-center gap-1.5 cursor-pointer">
-                  <input
-                    type="radio"
-                    name="scheduleSyncMode"
-                    value="replace"
-                    checked={scheduleSyncMode === 'replace'}
-                    onChange={() => setScheduleSyncMode('replace')}
-                    className="text-indigo-600 focus:ring-indigo-500"
-                  />
-                  <span className="text-slate-800 font-medium">Gantikan Semua</span>
-                </label>
+            {/* Sync Mode Selection Cards */}
+            <div className="space-y-2">
+              <div className="text-xs font-bold text-slate-700 flex flex-col sm:flex-row sm:items-center justify-between gap-1">
+                <span className="flex items-center gap-1.5">
+                  <Layers className="w-4 h-4 text-indigo-600" />
+                  Pilihan Mod Penyelarasan Jadual Waktu:
+                </span>
+                <span className="text-[11px] font-normal text-slate-500">
+                  Jadual aktif semasa di sistem: <strong className="text-indigo-900 font-bold">{academicSchedule.length} slot</strong>
+                </span>
+              </div>
+
+              <div className="grid grid-cols-1 sm:grid-cols-2 gap-3">
+                {/* Option 1: Total Overwrite */}
+                <div 
+                  onClick={() => setScheduleSyncMode('replace')}
+                  className={`p-3.5 rounded-xl border-2 cursor-pointer transition flex flex-col justify-between gap-2.5 ${
+                    scheduleSyncMode === 'replace'
+                      ? 'bg-amber-50/80 border-amber-500 shadow-sm ring-2 ring-amber-400/20'
+                      : 'bg-slate-50 border-slate-200 hover:border-slate-300'
+                  }`}
+                >
+                  <div className="flex items-start justify-between gap-2">
+                    <div className="flex items-center gap-2">
+                      <input
+                        type="radio"
+                        name="scheduleSyncMode"
+                        value="replace"
+                        checked={scheduleSyncMode === 'replace'}
+                        onChange={() => setScheduleSyncMode('replace')}
+                        className="text-amber-600 focus:ring-amber-500 mt-0.5"
+                      />
+                      <div>
+                        <span className="font-extrabold text-slate-900 text-xs block leading-tight">
+                          Ganti Sepenuhnya (Total Overwrite)
+                        </span>
+                        <span className="text-[10px] text-amber-700 font-bold uppercase tracking-wide">
+                          Bersihkan Lama &amp; Ganti Baharu
+                        </span>
+                      </div>
+                    </div>
+                    <span className="px-2 py-0.5 rounded text-[10px] font-bold bg-amber-200 text-amber-900 shrink-0">
+                      Disyorkan
+                    </span>
+                  </div>
+                  <p className="text-[11px] text-slate-600 leading-relaxed pl-5">
+                    Memadamkan kesemua <strong>{academicSchedule.length} slot sedia ada</strong> secara bersih dari Cloud Firestore dan menggantikannya 100% dengan fail jadual baharu ini (Sesuai semester baharu).
+                  </p>
+                </div>
+
+                {/* Option 2: Merge Mode */}
+                <div 
+                  onClick={() => setScheduleSyncMode('merge')}
+                  className={`p-3.5 rounded-xl border-2 cursor-pointer transition flex flex-col justify-between gap-2.5 ${
+                    scheduleSyncMode === 'merge'
+                      ? 'bg-indigo-50/80 border-indigo-500 shadow-sm ring-2 ring-indigo-400/20'
+                      : 'bg-slate-50 border-slate-200 hover:border-slate-300'
+                  }`}
+                >
+                  <div className="flex items-start justify-between gap-2">
+                    <div className="flex items-center gap-2">
+                      <input
+                        type="radio"
+                        name="scheduleSyncMode"
+                        value="merge"
+                        checked={scheduleSyncMode === 'merge'}
+                        onChange={() => setScheduleSyncMode('merge')}
+                        className="text-indigo-600 focus:ring-indigo-500 mt-0.5"
+                      />
+                      <div>
+                        <span className="font-extrabold text-slate-900 text-xs block leading-tight">
+                          Gabung &amp; Kemas Kini (Merge)
+                        </span>
+                        <span className="text-[10px] text-indigo-700 font-bold uppercase tracking-wide">
+                          Kemas Kini Bilik Terlibat Sahaja
+                        </span>
+                      </div>
+                    </div>
+                    <span className="px-2 py-0.5 rounded text-[10px] font-bold bg-indigo-100 text-indigo-800 shrink-0">
+                      Kemas Kini Terhad
+                    </span>
+                  </div>
+                  <p className="text-[11px] text-slate-600 leading-relaxed pl-5">
+                    Hanya mengemas kini bilik-bilik yang disenaraikan dalam fail CSV ini. Bilik-bilik lain yang tidak terdapat dalam fail dikekalkan.
+                  </p>
+                </div>
               </div>
             </div>
 
@@ -555,30 +710,52 @@ ST091,Pengajian Am,Cik Siti Sarah Binti Razak,Pensyarah,013-5558899,siti.sarah@k
 
             {/* Sync Success Message */}
             {scheduleSyncSuccessMsg && (
-              <div className="bg-emerald-50 border border-emerald-300 rounded-xl p-3 text-xs font-bold text-emerald-800 flex items-center gap-2">
-                <Check className="w-4 h-4 text-emerald-600 shrink-0" />
-                <span>{scheduleSyncSuccessMsg}</span>
+              <div className="bg-emerald-50 border border-emerald-300 rounded-xl p-3.5 text-xs font-bold text-emerald-800 flex items-start gap-2.5 shadow-xs">
+                <Check className="w-4 h-4 text-emerald-600 shrink-0 mt-0.5" />
+                <span className="leading-relaxed">{scheduleSyncSuccessMsg}</span>
               </div>
             )}
 
             {/* Parsed Schedule Summary & Table Preview */}
             {parsedScheduleSlots.length > 0 && (
               <div className="space-y-3 pt-2">
-                <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-2 bg-indigo-50 p-3 rounded-xl border border-indigo-100">
+                {scheduleSyncMode === 'replace' && (
+                  <div className="bg-amber-50 border border-amber-300 rounded-xl p-3 text-xs text-amber-950 flex items-start gap-2.5">
+                    <AlertTriangle className="w-4 h-4 text-amber-600 shrink-0 mt-0.5" />
+                    <div>
+                      <strong className="block font-bold">Pengesanan Mod Ganti Sepenuhnya (Clean Overwrite):</strong>
+                      <span className="text-[11px] text-amber-900 leading-relaxed block mt-0.5">
+                        Sistem akan <strong>membersihkan kesemua {academicSchedule.length} slot lama</strong> dan menggantikannya dengan <strong>{parsedScheduleSlots.length} slot baharu</strong> di Cloud Firestore.
+                      </span>
+                    </div>
+                  </div>
+                )}
+
+                <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-3 bg-indigo-50/80 p-3.5 rounded-xl border border-indigo-200">
                   <div className="text-xs">
-                    <span className="font-bold text-indigo-950 block">Ringkasan Imbasan Jadual Waktu:</span>
-                    <span className="text-indigo-800">
-                      {scheduleParseSummary?.validSlotsCount} slot terkunci dikesan merentasi <strong>{scheduleParseSummary?.roomsAffected.join(', ')}</strong> ({scheduleParseSummary?.roomsAffected.length} ruang).
+                    <span className="font-bold text-indigo-950 block text-sm">Ringkasan Imbasan Jadual Waktu:</span>
+                    <span className="text-indigo-800 text-[11px] mt-0.5 block">
+                      <strong>{scheduleParseSummary?.validSlotsCount} slot terkunci</strong> dikesan merentasi <strong>{scheduleParseSummary?.roomsAffected.join(', ')}</strong> ({scheduleParseSummary?.roomsAffected.length} ruang).
                     </span>
                   </div>
 
                   <button
-                    onClick={handleExecuteScheduleSync}
+                    onClick={handleTriggerScheduleSync}
                     disabled={isSyncingSchedule}
-                    className="bg-indigo-600 hover:bg-indigo-700 disabled:bg-slate-400 text-white font-bold py-2 px-4 rounded-xl text-xs transition flex items-center justify-center gap-2 shadow-md shrink-0 active:scale-95 cursor-pointer"
+                    className={`font-bold py-2.5 px-4 rounded-xl text-xs transition flex items-center justify-center gap-2 shadow-md shrink-0 active:scale-95 cursor-pointer text-white ${
+                      scheduleSyncMode === 'replace'
+                        ? 'bg-amber-600 hover:bg-amber-700 shadow-amber-600/30'
+                        : 'bg-indigo-600 hover:bg-indigo-700 shadow-indigo-600/30'
+                    }`}
                   >
                     <RefreshCw className={`w-4 h-4 ${isSyncingSchedule ? 'animate-spin' : ''}`} />
-                    <span>{isSyncingSchedule ? 'Menyinkronkan...' : `SINKRONISASI & KUNCI ${parsedScheduleSlots.length} SLOT`}</span>
+                    <span>
+                      {isSyncingSchedule 
+                        ? 'Sedang Memproses...' 
+                        : scheduleSyncMode === 'replace' 
+                          ? `GANTIKAN SEMUA (${parsedScheduleSlots.length} SLOT)` 
+                          : `GABUNGKAN ${parsedScheduleSlots.length} SLOT`}
+                    </span>
                   </button>
                 </div>
 
@@ -600,7 +777,7 @@ ST091,Pengajian Am,Cik Siti Sarah Binti Razak,Pensyarah,013-5558899,siti.sarah@k
                           <td className="p-2 font-bold text-indigo-700">{slot.roomId}</td>
                           <td className="p-2 font-medium">{slot.dayOfWeek}</td>
                           <td className="p-2 text-slate-600 font-mono text-[11px]">{slot.startTime} - {slot.endTime}</td>
-                          <td className="p-2 font-bold">{slot.courseCode}</td>
+                          <td className="p-2 font-bold">{slot.courseCode === 'TERKUNCI' ? 'LOCKED' : slot.courseCode}</td>
                           <td className="p-2 text-slate-700">{slot.className}</td>
                           <td className="p-2 text-slate-600 truncate max-w-[150px]">{slot.lecturerName}</td>
                         </tr>
@@ -857,8 +1034,10 @@ ST091,Pengajian Am,Cik Siti Sarah Binti Razak,Pensyarah,013-5558899,siti.sarah@k
               ))}
             </div>
           ) : (
-            <div className="p-8 text-center text-slate-500 text-xs italic bg-slate-50 rounded-xl border border-dashed border-slate-300">
-              Tiada permohonan yang sedang menunggu kelulusan pada masa ini.
+            <div className="p-8 text-center text-slate-500 text-xs bg-slate-50 rounded-xl border border-dashed border-slate-300 space-y-1">
+              <CheckCircle2 className="w-8 h-8 text-slate-300 mx-auto mb-1.5" />
+              <p className="font-bold text-slate-700">Tiada permohonan menunggu kelulusan lagi.</p>
+              <p className="text-slate-400">Sebarang permohonan baharu yang memerlukan kelulusan pentadbir akan dipaparkan di sini secara automatik.</p>
             </div>
           )}
         </div>
@@ -1015,38 +1194,165 @@ ST091,Pengajian Am,Cik Siti Sarah Binti Razak,Pensyarah,013-5558899,siti.sarah@k
           <span>Senarai Block Institusi Aktif ({institutionalBlocks.length})</span>
         </h3>
 
-        <div className="grid grid-cols-1 md:grid-cols-2 gap-3 text-xs">
-          {institutionalBlocks.map(blk => {
-            const r = rooms.find(rm => rm.id === blk.roomId);
+        {institutionalBlocks.length > 0 ? (
+          <div className="grid grid-cols-1 md:grid-cols-2 gap-3 text-xs">
+            {institutionalBlocks.map(blk => {
+              const r = rooms.find(rm => rm.id === blk.roomId);
 
-            return (
-              <div key={blk.id} className="bg-slate-900 text-white p-4 rounded-xl border border-slate-800 flex items-start justify-between gap-3">
-                <div className="space-y-1">
-                  <div className="flex items-center gap-2">
-                    <span className="font-bold text-emerald-400 bg-slate-800 px-2 py-0.5 rounded border border-slate-700">
-                      {r ? (r.code === r.name ? r.name : `${r.code} (${r.name})`) : blk.roomId}
-                    </span>
-                    <span className="text-slate-400 font-medium">{formatDateMalay(blk.date)}</span>
+              return (
+                <div key={blk.id} className="bg-slate-900 text-white p-4 rounded-xl border border-slate-800 flex items-start justify-between gap-3">
+                  <div className="space-y-1">
+                    <div className="flex items-center gap-2">
+                      <span className="font-bold text-emerald-400 bg-slate-800 px-2 py-0.5 rounded border border-slate-700">
+                        {r ? (r.code === r.name ? r.name : `${r.code} (${r.name})`) : blk.roomId}
+                      </span>
+                      <span className="text-slate-400 font-medium">{formatDateMalay(blk.date)}</span>
+                    </div>
+
+                    <h4 className="font-bold text-slate-100 text-sm mt-1">{blk.title}</h4>
+                    <div className="text-slate-400 text-[11px]">
+                      Jam: {blk.startTime} – {blk.endTime} • Oleh: {blk.createdBy}
+                    </div>
                   </div>
 
-                  <h4 className="font-bold text-slate-100 text-sm mt-1">{blk.title}</h4>
-                  <div className="text-slate-400 text-[11px]">
-                    Jam: {blk.startTime} – {blk.endTime} • Oleh: {blk.createdBy}
-                  </div>
+                  <button
+                    onClick={() => onDeleteBlock(blk.id)}
+                    className="text-slate-400 hover:text-rose-400 p-1 transition cursor-pointer"
+                    title="Padam Block Ruang"
+                  >
+                    <Trash2 className="w-4 h-4" />
+                  </button>
                 </div>
-
-                <button
-                  onClick={() => onDeleteBlock(blk.id)}
-                  className="text-slate-400 hover:text-rose-400 p-1 transition"
-                  title="Padam Block Ruang"
-                >
-                  <Trash2 className="w-4 h-4" />
-                </button>
-              </div>
-            );
-          })}
-        </div>
+              );
+            })}
+          </div>
+        ) : (
+          <div className="p-8 text-center text-slate-500 text-xs bg-slate-50 rounded-xl border border-dashed border-slate-200 space-y-1">
+            <Lock className="w-8 h-8 text-slate-300 mx-auto mb-1.5" />
+            <p className="font-bold text-slate-700 text-sm">Tiada data sekatan bilik lagi.</p>
+            <p className="text-slate-500 text-xs">Semua 42 ruang dibuka mengikut ketersediaan jadual akademik tanpa sebarang sekatan institusi.</p>
+          </div>
+        )}
       </div>
+
+      {/* Cloud Sync Status & Multi-Device Details Modal */}
+      <CloudSyncModal 
+        isOpen={showCloudSyncModal} 
+        onClose={() => setShowCloudSyncModal(false)} 
+      />
+
+      {/* CONFIRMATION MODAL: CLEAR ALL ACADEMIC SCHEDULE */}
+      {showClearScheduleModal && (
+        <div className="fixed inset-0 bg-black/60 backdrop-blur-xs flex items-center justify-center p-4 z-50">
+          <div className="bg-white rounded-2xl max-w-md w-full p-6 shadow-2xl border border-slate-200 space-y-4 animate-in fade-in zoom-in-95 duration-150">
+            <div className="w-12 h-12 rounded-full bg-rose-100 flex items-center justify-center text-rose-600 mb-1">
+              <Trash2 className="w-6 h-6" />
+            </div>
+
+            <div className="space-y-1.5">
+              <h3 className="text-lg font-bold text-slate-900">Kosongkan Keseluruhan Jadual Waktu?</h3>
+              <p className="text-xs text-slate-600 leading-relaxed">
+                Tindakan ini akan memadamkan secara kekal kesemua <strong className="text-rose-600 font-bold">{academicSchedule.length} slot</strong> jadual waktu kuliah sedia ada dari sistem dan pangkalan data awan Cloud Firestore.
+              </p>
+            </div>
+
+            <div className="bg-rose-50 border border-rose-200 rounded-xl p-3 text-xs text-rose-900 space-y-1">
+              <span className="font-bold block flex items-center gap-1">
+                <AlertTriangle className="w-3.5 h-3.5 text-rose-600 shrink-0" />
+                Kesan Pembersihan:
+              </span>
+              <ul className="list-disc list-inside space-y-0.5 text-[11px] text-rose-800">
+                <li>Semua bilik akan dibuka tanpa sebarang slot kuliah terkunci (0 slot).</li>
+                <li>Staf boleh menempah bilik secara bebas pada mana-mana slot.</li>
+                <li>Anda boleh memuat naik jadual baharu pada bila-bila masa melalui fail CSV.</li>
+              </ul>
+            </div>
+
+            <div className="flex items-center justify-end gap-2 pt-2 border-t border-slate-100">
+              <button
+                type="button"
+                onClick={() => setShowClearScheduleModal(false)}
+                disabled={isClearingSchedule}
+                className="px-4 py-2 rounded-xl text-xs font-semibold text-slate-600 hover:bg-slate-100 transition cursor-pointer"
+              >
+                Batal
+              </button>
+              <button
+                type="button"
+                onClick={handleExecuteClearSchedule}
+                disabled={isClearingSchedule}
+                className="px-4 py-2 rounded-xl text-xs font-bold text-white bg-rose-600 hover:bg-rose-700 transition flex items-center gap-2 shadow-md shadow-rose-600/20 cursor-pointer disabled:opacity-50"
+              >
+                <Trash2 className="w-4 h-4" />
+                <span>{isClearingSchedule ? 'Sedang Memadamkan...' : `Ya, Kosongkan Semua (${academicSchedule.length} Slot)`}</span>
+              </button>
+            </div>
+          </div>
+        </div>
+      )}
+
+      {/* CONFIRMATION MODAL: TOTAL OVERWRITE (REPLACE MODE) */}
+      {showConfirmTotalOverwriteModal && (
+        <div className="fixed inset-0 bg-black/60 backdrop-blur-xs flex items-center justify-center p-4 z-50">
+          <div className="bg-white rounded-2xl max-w-lg w-full p-6 shadow-2xl border border-slate-200 space-y-4 animate-in fade-in zoom-in-95 duration-150">
+            <div className="flex items-center gap-3">
+              <div className="w-12 h-12 rounded-full bg-amber-100 flex items-center justify-center text-amber-600 shrink-0">
+                <RefreshCw className="w-6 h-6" />
+              </div>
+              <div>
+                <h3 className="text-lg font-bold text-slate-900">Pengesahan Ganti Sepenuhnya (Total Overwrite)</h3>
+                <span className="text-xs text-amber-700 font-medium">Pembersihan Bersih Semula Pangkalan Data Jadual</span>
+              </div>
+            </div>
+
+            <p className="text-xs text-slate-600 leading-relaxed">
+              Anda memilih <strong>Mod Ganti Sepenuhnya</strong>. Sistem akan membersihkan kesemua slot terdahulu di Cloud Firestore dan menggantikannya secara total dengan kandungan fail CSV baharu ini.
+            </p>
+
+            {/* Comparison Box */}
+            <div className="grid grid-cols-2 gap-2 text-xs">
+              <div className="bg-rose-50 border border-rose-200 rounded-xl p-3">
+                <span className="text-[10px] uppercase font-bold text-rose-600 block">Jadual Lama Dipadamkan</span>
+                <strong className="text-lg font-extrabold text-rose-900">{academicSchedule.length} Slot</strong>
+                <p className="text-[10px] text-rose-700 mt-1">Dibersihkan dari Firestore &amp; memori</p>
+              </div>
+
+              <div className="bg-emerald-50 border border-emerald-200 rounded-xl p-3">
+                <span className="text-[10px] uppercase font-bold text-emerald-600 block">Jadual Baharu Dimasukkan</span>
+                <strong className="text-lg font-extrabold text-emerald-900">{parsedScheduleSlots.length} Slot</strong>
+                <p className="text-[10px] text-emerald-700 mt-1">{scheduleParseSummary?.roomsAffected.length} ruang bilik terlibat</p>
+              </div>
+            </div>
+
+            <div className="bg-slate-50 border border-slate-200 rounded-xl p-3 text-[11px] text-slate-600 space-y-1">
+              <span className="font-bold text-slate-800 block">Ruang Terlibat dalam CSV Baharu:</span>
+              <p className="font-mono text-slate-700 break-words">
+                {scheduleParseSummary?.roomsAffected.join(', ') || 'Tiada'}
+              </p>
+            </div>
+
+            <div className="flex items-center justify-end gap-2 pt-2 border-t border-slate-100">
+              <button
+                type="button"
+                onClick={() => setShowConfirmTotalOverwriteModal(false)}
+                disabled={isSyncingSchedule}
+                className="px-4 py-2 rounded-xl text-xs font-semibold text-slate-600 hover:bg-slate-100 transition cursor-pointer"
+              >
+                Batal
+              </button>
+              <button
+                type="button"
+                onClick={() => executeActualSync('replace')}
+                disabled={isSyncingSchedule}
+                className="px-4 py-2 rounded-xl text-xs font-bold text-white bg-amber-600 hover:bg-amber-700 transition flex items-center gap-2 shadow-md shadow-amber-600/20 cursor-pointer disabled:opacity-50"
+              >
+                <RefreshCw className={`w-4 h-4 ${isSyncingSchedule ? 'animate-spin' : ''}`} />
+                <span>{isSyncingSchedule ? 'Sedang Menggantikan...' : `Sahkan & Gantikan (${parsedScheduleSlots.length} Slot)`}</span>
+              </button>
+            </div>
+          </div>
+        </div>
+      )}
     </div>
   );
 };

@@ -433,90 +433,11 @@ import { parseTimetableCSV } from '../utils/timetableCsvParser';
 export const INITIAL_ACADEMIC_SCHEDULE: AcademicScheduleSlot[] = parseTimetableCSV(MASTER_TIMETABLE_CSV, INITIAL_ROOMS).slots;
 
 
-// Sample Initial Ad-Hoc Bookings
-export const INITIAL_ADHOC_BOOKINGS: AdHocBooking[] = [
-  {
-    id: 'BK-2026-000101',
-    roomId: 'BK04',
-    roomName: 'Bilik Kuliah 04',
-    date: '2026-08-06',
-    startTime: '11:30',
-    endTime: '12:30',
-    applicantName: 'Pn. Tahira binti Mohamed',
-    applicantEmail: 'tahira@bpenawar.kpm.edu.my',
-    applicantPhone: '019-8765432',
-    applicantRole: 'Pensyarah Kanan',
-    department: 'Jabatan Sains Komputer',
-    purposeCategory: 'Penggunaan Pensyarah',
-    title: 'Penggunaan Smart Classroom untuk Sesi Amali Coding',
-    paxCount: 28,
-    notes: 'Memerlukan Smartboard dan akses rangkaian Wi-Fi pantas',
-    status: 'CONFIRMED',
-    createdAt: '2026-08-01T09:15:00Z'
-  },
-  {
-    id: 'BK-2026-000102',
-    roomId: 'BILIK_SEMINAR',
-    roomName: 'Bilik Seminar Eksekutif',
-    date: '2026-08-06',
-    startTime: '14:00',
-    endTime: '16:00',
-    applicantName: 'Dr. Faridah binti Hassan',
-    applicantEmail: 'faridah@bpenawar.kpm.edu.my',
-    applicantPhone: '013-4567890',
-    applicantRole: 'Ketua Jabatan',
-    department: 'Jabatan Perniagaan',
-    purposeCategory: 'Mesyuarat',
-    title: 'Mesyuarat Semakan Kurikulum Semester 1',
-    paxCount: 18,
-    notes: 'Mesyuarat bersama ahli jawatankuasa akademik',
-    status: 'CONFIRMED',
-    createdAt: '2026-08-02T11:20:00Z'
-  },
-  {
-    id: 'BK-2026-000103',
-    roomId: 'BK12',
-    roomName: 'Bilik Kuliah 12',
-    date: '2026-08-06',
-    startTime: '14:30',
-    endTime: '16:30',
-    applicantName: 'En. Hafiz bin Ramli',
-    applicantEmail: 'hafiz@bpenawar.kpm.edu.my',
-    applicantPhone: '017-3216549',
-    applicantRole: 'Penasihat Kelab IT',
-    department: 'Kelab Mahasiswa IT KPMBP',
-    purposeCategory: 'Aktiviti Pelajar',
-    title: 'Latihan Pertandingan Hackathon KPMBP',
-    paxCount: 25,
-    notes: 'Aktiviti persediaan persatuan pelajar',
-    status: 'PENDING',
-    createdAt: '2026-08-04T15:00:00Z'
-  }
-];
+// Operational Pilot Environment: Zero Demo Bookings (Real Activity Only)
+export const INITIAL_ADHOC_BOOKINGS: AdHocBooking[] = [];
 
-// Sample Institutional Blocks
-export const INITIAL_INSTITUTIONAL_BLOCKS: InstitutionalBlock[] = [
-  {
-    id: 'BLK-001',
-    roomId: 'DEWAN_BESAR',
-    date: '2026-08-10',
-    startTime: '08:00',
-    endTime: '17:00',
-    title: 'Program Minggu Mesra Siswa (MMS) KPMBP 2026',
-    reason: 'Aktiviti Kolej & Perhimpunan Rasmi Pelajar Baharu',
-    createdBy: 'Unit Hal Ehwal Pelajar (HEP)'
-  },
-  {
-    id: 'BLK-002',
-    roomId: 'DKB',
-    date: '2026-08-12',
-    startTime: '08:00',
-    endTime: '13:00',
-    title: 'Ujian MPU Kemahiran Insaniah Pusat',
-    reason: 'Peperiksaan Selaras Kolej',
-    createdBy: 'Unit Peperiksaan & Penilaian'
-  }
-];
+// Operational Pilot Environment: Zero Demo Institutional Blocks (Real Admin Locks Only)
+export const INITIAL_INSTITUTIONAL_BLOCKS: InstitutionalBlock[] = [];
 
 // Official Standard Sample CSV for Locking Slots (Admin Sync Specification)
 export const SAMPLE_LOCKED_SLOTS_CSV = `Perkara,Hari,"1

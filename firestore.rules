@@ -16,5 +16,8 @@ service cloud.firestore {
     match /staff_users/{staffId} {
       allow read, write: if true;
     }
+    match /test/{testId} {
+      allow read, write: if true;
+    }
   }
 }

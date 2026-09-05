@@ -150,19 +150,24 @@ export function parseCellAcademicDetails(rawContent: string): {
   const upper = text.toUpperCase();
   if (upper === 'LOCKED' || upper === 'DIKUNCI' || upper === 'TERKUNCI' || upper === 'LOCK' || upper === 'BLOCK') {
     return {
-      courseCode: 'TERKUNCI',
+      courseCode: 'LOCKED',
       courseName: 'Slot Terkunci Pentadbir',
       className: 'Ketetapan Pentadbiran',
       lecturerName: 'Pentadbir KPMBP'
     };
   }
 
-  // Fallback: Lecturer name, Staff name, or Custom Activity (e.g. "AFIF", "NIZAM", "USTAZ AFIF", "AFIF BIN MAMAT")
+  // Fallback: Lecturer name, Staff name, or Custom Activity (e.g. "IBRAHIM", "AFIF", "NIZAM")
+  const cleanName = text.trim();
+  const formattedName = /^[A-Z]{3,}$/.test(cleanName)
+    ? cleanName.charAt(0) + cleanName.slice(1).toLowerCase()
+    : cleanName;
+
   return {
-    courseCode: 'TERKUNCI',
-    courseName: `Slot Terkunci: ${text}`,
-    className: 'Pengajian / Aktiviti',
-    lecturerName: text
+    courseCode: 'LOCKED',
+    courseName: `Slot Terkunci: ${formattedName}`,
+    className: formattedName,
+    lecturerName: formattedName
   };
 }
 
@@ -366,7 +371,7 @@ export function parseTimetableCSV(csvText: string, existingRooms: Room[]): Parse
           courseName: parsedDetails.courseName,
           className: parsedDetails.className,
           lecturerName: parsedDetails.lecturerName,
-          department: parsedDetails.courseCode === 'TERKUNCI' ? 'Unit Pengurusan Ruang & Jadual KPMBP' : 'Jabatan Akademik KPMBP'
+          department: (parsedDetails.courseCode === 'LOCKED' || parsedDetails.courseCode === 'TERKUNCI') ? 'Unit Pengurusan Ruang & Jadual KPMBP' : 'Jabatan Akademik KPMBP'
         });
 
         affectedRoomIds.add(roomId);
@@ -617,7 +622,7 @@ export function exportTimetableToStandardGridCSV(
           let val = '';
           if (matched.lecturerName && matched.lecturerName !== 'Pensyarah KPMBP') {
             val = matched.lecturerName;
-          } else if (matched.courseCode && matched.courseCode !== 'AKADEMIK' && matched.courseCode !== 'TERKUNCI') {
+          } else if (matched.courseCode && matched.courseCode !== 'AKADEMIK' && matched.courseCode !== 'LOCKED' && matched.courseCode !== 'TERKUNCI') {
             val = `${matched.courseCode} ${matched.className || ''}`.trim();
           } else {
             val = matched.courseName || 'LOCKED';

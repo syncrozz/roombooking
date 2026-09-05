@@ -49,17 +49,18 @@ export const DashboardOverview: React.FC<DashboardOverviewProps> = ({
 }) => {
   const todayStr = new Date().toISOString().split('T')[0];
   
-  // Stats
+  // Real Database Stats (No mock or hardcoded numbers)
   const totalRooms = rooms.length;
-  const approvedBookings = adhocBookings.filter(b => b.status === 'Approved');
-  const pendingBookings = adhocBookings.filter(b => b.status === 'Pending');
-  const todayBookings = adhocBookings.filter(b => b.date === todayStr && b.status === 'Approved');
+  const confirmedBookings = adhocBookings.filter(b => b.status === 'CONFIRMED');
+  const pendingBookings = adhocBookings.filter(b => b.status === 'PENDING');
+  const todayBookings = adhocBookings.filter(b => b.date === todayStr && b.status === 'CONFIRMED');
+  const totalStaff = staffList.length;
   
-  // Room category distribution
+  // Room category distribution dynamically from database
   const lectureRoomsCount = rooms.filter(r => r.category === 'Bilik Kuliah').length;
   const labsCount = rooms.filter(r => r.category === 'Makmal Komputer').length;
-  const hallsCount = rooms.filter(r => r.category === 'Dewan & Auditorium' || r.category === 'Bilik Mesyuarat').length;
-  const studioCount = rooms.filter(r => r.category === 'Studio & Bengkel').length;
+  const hallsCount = rooms.filter(r => r.category === 'Dewan Kuliah').length;
+  const specialCount = rooms.filter(r => r.category === 'Ruang Khas' || r.category === 'Surau').length;
 
   const quickNavItems = [
     {
@@ -119,7 +120,7 @@ export const DashboardOverview: React.FC<DashboardOverviewProps> = ({
               </span>
             </div>
             <p className="text-xs text-slate-400">
-              42 ruang terurus merangkumi Bilik Kuliah, Makmal Komputer, Dewan & Studio.
+              {totalRooms} ruang rasmi terurus (Bilik Kuliah, Makmal Komputer, Dewan &amp; Ruang Khas).
             </p>
           </div>
         </div>
@@ -131,16 +132,16 @@ export const DashboardOverview: React.FC<DashboardOverviewProps> = ({
             <div className="text-[10px] text-slate-400 uppercase font-semibold mt-0.5">Ruang</div>
           </div>
           <div className="text-center px-2 border-r border-slate-700">
-            <div className="text-sm sm:text-base font-bold text-emerald-400 leading-none">{approvedBookings.length}</div>
-            <div className="text-[10px] text-slate-400 uppercase font-semibold mt-0.5">Tempahan</div>
+            <div className="text-sm sm:text-base font-bold text-emerald-400 leading-none">{confirmedBookings.length}</div>
+            <div className="text-[10px] text-slate-400 uppercase font-semibold mt-0.5">Disahkan</div>
           </div>
           <div className="text-center px-2 border-r border-slate-700">
             <div className="text-sm sm:text-base font-bold text-amber-400 leading-none">{academicSchedule.length}</div>
             <div className="text-[10px] text-slate-400 uppercase font-semibold mt-0.5">Kuliah</div>
           </div>
           <div className="text-center px-2">
-            <div className="text-sm sm:text-base font-bold text-blue-400 leading-none">{staffList.length}</div>
-            <div className="text-[10px] text-slate-400 uppercase font-semibold mt-0.5">Staf</div>
+            <div className="text-sm sm:text-base font-bold text-blue-400 leading-none">{totalStaff}</div>
+            <div className="text-[10px] text-slate-400 uppercase font-semibold mt-0.5">Staf Rasmi</div>
           </div>
         </div>
       </div>
@@ -205,7 +206,7 @@ export const DashboardOverview: React.FC<DashboardOverviewProps> = ({
             <div className="p-2.5 rounded-lg bg-slate-50 border border-slate-100 flex items-center justify-between">
               <div className="flex items-center gap-2">
                 <Layers className="w-3.5 h-3.5 text-purple-600" />
-                <span className="font-medium text-slate-700">Dewan & Mesyuarat</span>
+                <span className="font-medium text-slate-700">Dewan Kuliah</span>
               </div>
               <span className="font-bold text-slate-900">{hallsCount} unit</span>
             </div>
@@ -213,16 +214,16 @@ export const DashboardOverview: React.FC<DashboardOverviewProps> = ({
             <div className="p-2.5 rounded-lg bg-slate-50 border border-slate-100 flex items-center justify-between">
               <div className="flex items-center gap-2">
                 <Sparkles className="w-3.5 h-3.5 text-amber-600" />
-                <span className="font-medium text-slate-700">Studio & Bengkel</span>
+                <span className="font-medium text-slate-700">Ruang Khas &amp; Surau</span>
               </div>
-              <span className="font-bold text-slate-900">{studioCount} unit</span>
+              <span className="font-bold text-slate-900">{specialCount} unit</span>
             </div>
           </div>
 
           {/* Quick Notice */}
           <div className="p-2.5 rounded-lg bg-blue-50/70 border border-blue-100 flex items-start gap-2 text-[11px] text-blue-800">
             <CheckCircle2 className="w-3.5 h-3.5 text-blue-600 mt-0.5 shrink-0" />
-            <span>Sistem mengesan pertembungan jadual kuliah rasmi & tempahan secara automatik.</span>
+            <span>Sistem mengesan pertembungan jadual kuliah rasmi &amp; tempahan secara automatik.</span>
           </div>
         </div>
 
@@ -262,7 +263,7 @@ export const DashboardOverview: React.FC<DashboardOverviewProps> = ({
                 </div>
 
                 <button
-                  onClick={() => onOpenBookingModal(r, todayStr, '08:30', '10:30', 'Kelas / Kuliah Gantian')}
+                  onClick={() => onOpenBookingModal(r, todayStr, '08:30', '10:30', 'Penggunaan Pensyarah')}
                   className="px-2.5 py-1 bg-blue-600 hover:bg-blue-700 text-white rounded text-[11px] font-bold transition shadow-2xs"
                 >
                   Tempah
@@ -282,6 +283,54 @@ export const DashboardOverview: React.FC<DashboardOverviewProps> = ({
           </div>
         </div>
 
+      </div>
+
+      {/* 4. Real Operational Booking Records & Empty State */}
+      <div className="bg-white rounded-xl p-4 sm:p-5 border border-slate-200 shadow-xs space-y-3">
+        <div className="flex items-center justify-between pb-2 border-b border-slate-100">
+          <div className="flex items-center gap-2">
+            <CalendarDays className="w-4 h-4 text-slate-800" />
+            <h2 className="text-xs font-bold text-slate-900 uppercase tracking-wider">Aktiviti &amp; Status Tempahan Semasa</h2>
+          </div>
+          <span className="text-[11px] font-mono font-bold text-slate-600 bg-slate-100 px-2 py-0.5 rounded border border-slate-200">
+            {adhocBookings.length} Rekod
+          </span>
+        </div>
+
+        {adhocBookings.length > 0 ? (
+          <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-3">
+            {adhocBookings.slice(0, 6).map((b) => (
+              <div key={b.id} className="p-3 rounded-lg border border-slate-200 bg-slate-50 space-y-2 text-xs">
+                <div className="flex items-center justify-between">
+                  <span className="font-mono font-bold bg-slate-900 text-emerald-400 px-2 py-0.5 rounded text-[10px]">
+                    {b.id}
+                  </span>
+                  <span className={`text-[10px] font-bold px-2 py-0.5 rounded-full ${
+                    b.status === 'CONFIRMED' ? 'bg-emerald-100 text-emerald-800' :
+                    b.status === 'PENDING' ? 'bg-amber-100 text-amber-800' : 'bg-rose-100 text-rose-800'
+                  }`}>
+                    {b.status}
+                  </span>
+                </div>
+                <div className="font-bold text-slate-900">{b.roomName}</div>
+                <div className="text-slate-600 text-[11px]">
+                  {b.date} • {b.startTime} - {b.endTime}
+                </div>
+                <div className="text-slate-500 text-[10px] truncate">
+                  Pemohon: {b.applicantName} ({b.department})
+                </div>
+              </div>
+            ))}
+          </div>
+        ) : (
+          <div className="py-8 px-4 text-center bg-slate-50 border border-dashed border-slate-200 rounded-xl space-y-1">
+            <CalendarDays className="w-8 h-8 text-slate-300 mx-auto mb-1.5" />
+            <p className="font-bold text-slate-700 text-sm">Tiada data tempahan lagi.</p>
+            <p className="text-slate-500 text-xs max-w-md mx-auto">
+              Data akan dipaparkan secara automatik sebaik sahaja staf mula membuat tempahan ad-hoc ke dalam sistem.
+            </p>
+          </div>
+        )}
       </div>
 
     </div>

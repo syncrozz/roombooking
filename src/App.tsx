@@ -21,6 +21,7 @@ import {
   getStoredInstitutionalBlocks, 
   saveStoredInstitutionalBlocks, 
   resetToDefaults, 
+  purgeAllDemoDataLocal,
   generateBookingId,
   saveUserProfile
 } from './utils/storage';
@@ -32,10 +33,12 @@ import {
   seedInitialStaffUsers,
   bulkSaveStaffUsersToCloud,
   bulkSaveScheduleToCloud,
+  clearAllScheduleFromCloud,
   saveBookingToCloud, 
   deleteBookingFromCloud, 
   saveBlockToCloud, 
-  deleteBlockFromCloud 
+  deleteBlockFromCloud,
+  cleanObsoleteDemoRecordsFromCloud
 } from './lib/firebase';
 import { INITIAL_STAFF_DATA } from './data/staffData';
 
@@ -49,11 +52,13 @@ import { RoomDirectoryView } from './components/RoomDirectoryView';
 import { AdminManagementView } from './components/AdminManagementView';
 import { BookingModal } from './components/BookingModal';
 import { QRCodeModal } from './components/QRCodeModal';
+import { SupportModal } from './components/SupportModal';
 
 import { Building2, Shield, Heart, Sparkles, CheckCircle2, Lock, X, KeyRound, ShieldCheck, AlertCircle } from 'lucide-react';
 
 export default function App() {
   const [activeTab, setActiveTab] = useState<ActiveTab>('dashboard');
+  const [isSupportOpen, setIsSupportOpen] = useState<boolean>(false);
 
   // Admin PIN verification state
   const [isAdminUnlocked, setIsAdminUnlocked] = useState<boolean>(false);
@@ -83,6 +88,15 @@ export default function App() {
     } else {
       setAdminPinError('PIN / Passcode Keselamatan Pentadbir Tidak Sah.');
     }
+  };
+
+  const handleLogoutAdmin = () => {
+    setIsAdminUnlocked(false);
+    setActiveTab('dashboard');
+    setShowAdminPinModal(false);
+    setAdminPinInput('');
+    setAdminPinError(null);
+    showToast('🔒 Sesi Admin telah dilog keluar. Akses Pentadbir dikunci semula.');
   };
 
   // State loaded from local storage persistence
@@ -126,11 +140,13 @@ export default function App() {
   useEffect(() => {
     setRooms(getStoredRooms());
     setAcademicSchedule(getStoredAcademicSchedule());
+    setAdhocBookings(getStoredAdHocBookings());
+    setInstitutionalBlocks(getStoredInstitutionalBlocks());
 
-    // Seed initial staff users to Firebase Firestore if empty
-    seedInitialStaffUsers();
+    // Clean any obsolete demo records from Cloud Firestore (Strict Zero Demo Data)
+    cleanObsoleteDemoRecordsFromCloud().catch(() => {});
 
-    // Subscribe to Firestore staff users
+    // Subscribe to Firestore staff users (seeds automatically if Firestore is empty)
     const unsubStaff = subscribeToStaffUsers((cloudStaff) => {
       if (cloudStaff && cloudStaff.length > 0) {
         setStaffUsers(cloudStaff);
@@ -185,6 +201,22 @@ export default function App() {
   const handleSubmitBooking = async (
     data: Omit<AdHocBooking, 'id' | 'status' | 'createdAt'>
   ) => {
+    // Data Integrity: Check for duplicate submissions and exact overlap
+    const isOverlapping = adhocBookings.some(
+      b => b.roomId === data.roomId &&
+           b.date === data.date &&
+           b.status !== 'REJECTED' &&
+           b.status !== 'CANCELLED' &&
+           ((data.startTime >= b.startTime && data.startTime < b.endTime) ||
+            (data.endTime > b.startTime && data.endTime <= b.endTime) ||
+            (data.startTime <= b.startTime && data.endTime >= b.endTime))
+    );
+
+    if (isOverlapping) {
+      showToast(`⚠️ Ralat: Ruang tersebut telah mempunyai tempahan disahkan pada waktu berkenaan!`);
+      return;
+    }
+
     const newId = generateBookingId();
     const newBooking: AdHocBooking = {
       ...data,
@@ -333,28 +365,48 @@ export default function App() {
       const untouchedSlots = academicSchedule.filter(s => !affectedRooms.has(s.roomId.toUpperCase()));
       finalSchedule = [...untouchedSlots, ...newSchedule];
     } else {
+      // Total replace: completely overwrite existing schedule
       finalSchedule = newSchedule;
     }
 
     setAcademicSchedule(finalSchedule);
     saveStoredAcademicSchedule(finalSchedule);
     try {
-      await bulkSaveScheduleToCloud(finalSchedule);
-      showToast(`🟢 ${newSchedule.length} slot jadual berjaya disinkronkan & MENGLOCK bilik (${mode === 'merge' ? 'Gabung & kemas kini bilik terlibat' : 'Ganti semua'})!`);
+      await bulkSaveScheduleToCloud(finalSchedule, mode);
+      if (mode === 'replace') {
+        showToast(`🟢 Jadual lama dibersihkan dan digantikan secara TOTAL dengan ${newSchedule.length} slot baharu!`);
+      } else {
+        showToast(`🟢 ${newSchedule.length} slot jadual berjaya disinkronkan & bilik berkaitan dikunci (Mod Gabung)!`);
+      }
     } catch (err) {
       console.error('Error syncing academic schedule:', err);
       showToast(`🟡 Slot jadual disimpan secara tempatan.`);
     }
   };
 
-  // Reset to defaults
-  const handleResetData = () => {
+  // Clear / Purge all academic schedule slots
+  const handleClearAcademicSchedule = async () => {
+    setAcademicSchedule([]);
+    saveStoredAcademicSchedule([]);
+    try {
+      await clearAllScheduleFromCloud();
+      showToast(`🟢 Semua data jadual akademik telah dibersihkan sepenuhnya (0 slot aktif).`);
+    } catch (err) {
+      console.error('Error clearing schedule from cloud:', err);
+      showToast(`🟢 Data jadual dibersihkan secara tempatan.`);
+    }
+  };
+
+  // Reset to defaults (Strict Zero Demo Data)
+  const handleResetData = async () => {
     resetToDefaults();
+    purgeAllDemoDataLocal();
+    await cleanObsoleteDemoRecordsFromCloud();
     setRooms(getStoredRooms());
     setAcademicSchedule(getStoredAcademicSchedule());
-    setAdhocBookings(getStoredAdHocBookings());
-    setInstitutionalBlocks(getStoredInstitutionalBlocks());
-    showToast(`Data sistem telah ditetapkan semula.`);
+    setAdhocBookings([]);
+    setInstitutionalBlocks([]);
+    showToast(`🟢 Data sistem ditetapkan ke Master Data rasmi (Sifar Data Demo).`);
   };
 
   const pendingCount = adhocBookings.filter(b => b.status === 'PENDING').length;
@@ -387,6 +439,8 @@ export default function App() {
         setActiveTab={handleSelectTab}
         pendingCount={pendingCount}
         staffList={staffUsers}
+        isAdmin={isAdminUnlocked}
+        onLogoutAdmin={handleLogoutAdmin}
       />
 
       {/* Main Content Workspace */}
@@ -468,25 +522,64 @@ export default function App() {
               onResetData={handleResetData}
               onSyncStaffUsers={handleSyncStaffUsers}
               onSyncAcademicSchedule={handleSyncAcademicSchedule}
+              onClearAcademicSchedule={handleClearAcademicSchedule}
+              onLogoutAdmin={handleLogoutAdmin}
             />
           )}
         </main>
 
         {/* Footer */}
-        <footer className="bg-white border-t border-slate-200 py-6 px-6 text-xs text-slate-500 mt-auto text-center">
-          <p className="text-slate-600">
-            Develop By{' '}
-            <a
-              href="https://sites.google.com/view/khairi-innovation/"
-              target="_blank"
-              rel="noopener noreferrer"
-              className="text-blue-600 hover:text-blue-700 hover:underline font-semibold transition"
-            >
-              Syncrozz
-            </a>
-          </p>
+        <footer className="bg-slate-900 border-t border-slate-800 py-4 px-6 text-xs text-slate-400 mt-auto">
+          <div className="max-w-7xl mx-auto flex flex-col sm:flex-row items-center justify-between gap-3 text-center sm:text-left">
+            <div className="flex items-center gap-2">
+              <p className="text-slate-400 text-xs">
+                Developed by{' '}
+                <a
+                  href="https://www.syncrozz.com/"
+                  target="_blank"
+                  rel="noopener noreferrer"
+                  className="text-blue-400 hover:text-blue-300 hover:underline font-semibold transition"
+                >
+                  Syncrozz
+                </a>
+              </p>
+              <a
+                href="https://wa.me/60145313756"
+                target="_blank"
+                rel="noopener noreferrer"
+                className="inline-flex items-center opacity-90 hover:opacity-100 hover:scale-105 transition-all"
+                title="Hubungi melalui WhatsApp"
+                aria-label="WhatsApp Syncrozz"
+              >
+                <img
+                  src="https://raw.githubusercontent.com/syncrozz/syncrozz-assets/main/logo/MAIN/Logo%20Whatapp%20v2.png"
+                  alt="WhatsApp"
+                  className="w-5 h-5 object-contain block"
+                  referrerPolicy="no-referrer"
+                />
+              </a>
+            </div>
+            <div>
+              <button
+                type="button"
+                id="footer-support-cta"
+                onClick={() => setIsSupportOpen(true)}
+                className="inline-flex items-center gap-1.5 px-3 py-1 rounded-full bg-white/[0.04] border border-white/5 hover:border-white/10 text-white/50 hover:text-white/80 text-[11px] font-normal transition cursor-pointer"
+                title="Support ❤️"
+              >
+                <span>Support</span>
+                <span className="text-rose-400/60 text-[11px]">❤️</span>
+              </button>
+            </div>
+          </div>
         </footer>
       </div>
+
+      {/* Support Experience Popup Modal */}
+      <SupportModal
+        isOpen={isSupportOpen}
+        onClose={() => setIsSupportOpen(false)}
+      />
 
       {/* Booking Dialog Modal */}
       {bookingModalInfo && (

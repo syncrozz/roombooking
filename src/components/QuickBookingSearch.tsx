@@ -152,7 +152,7 @@ export const QuickBookingSearch: React.FC<QuickBookingSearchProps> = ({
               Cari & Tempah Ruang Kuliah
             </h2>
             <p className="text-slate-300 text-sm mt-1 max-w-2xl">
-              Sistem akan secara automatik menyemak gabungan <span className="text-amber-300 font-semibold">Jadual Akademik Rasmi</span>, <span className="text-emerald-300 font-semibold">Tempahan Ad-Hoc</span>, dan <span className="text-indigo-300 font-semibold">Program Institusi</span> untuk mengelakkan pertembungan.
+              Sistem secara automatik menyemak <span className="text-amber-300 font-semibold">Jadual Akademik Rasmi</span>, <span className="text-emerald-300 font-semibold">Tempahan Ad-Hoc</span>, dan <span className="text-indigo-300 font-semibold">Program Institusi</span> bagi mengelakkan Clash.
             </p>
           </div>
 
@@ -354,41 +354,13 @@ export const QuickBookingSearch: React.FC<QuickBookingSearchProps> = ({
               className="w-full bg-slate-50 border border-slate-300 rounded-xl px-3 py-2.5 text-sm text-slate-900 font-medium focus:ring-2 focus:ring-emerald-500 outline-none"
             >
               <option value="ALL">🔍 SEMUA {rooms.length || 42} RUANG (Cari Automatik)</option>
-              <optgroup label="🏫 Bilik Kuliah (BK01 - BK28 & Smart Classroom)">
-                {rooms.filter(r => r.category === 'Bilik Kuliah').map(r => (
+              {[...rooms]
+                .sort((a, b) => a.code.localeCompare(b.code, undefined, { numeric: true, sensitivity: 'base' }))
+                .map((r) => (
                   <option key={r.id} value={r.id}>
-                    {r.code} {r.isSmartClassroom ? '✨ Smart' : ''} {r.hasAircond ? '⭐ Aircond' : ''}
+                    {r.code} {r.isSmartClassroom ? '✨ Smart' : ''} {r.hasAircond ? '💠 Aircond' : ''}
                   </option>
                 ))}
-              </optgroup>
-              <optgroup label="💻 Makmal Komputer">
-                {rooms.filter(r => r.category === 'Makmal Komputer').map(r => (
-                  <option key={r.id} value={r.id}>
-                    {r.code}
-                  </option>
-                ))}
-              </optgroup>
-              <optgroup label="🏛️ Dewan Kuliah">
-                {rooms.filter(r => r.category === 'Dewan Kuliah').map(r => (
-                  <option key={r.id} value={r.id}>
-                    {r.code}
-                  </option>
-                ))}
-              </optgroup>
-              <optgroup label="🎓 Ruang Khas & Bilik Mesyuarat">
-                {rooms.filter(r => r.category === 'Ruang Khas').map(r => (
-                  <option key={r.id} value={r.id}>
-                    {r.code}
-                  </option>
-                ))}
-              </optgroup>
-              <optgroup label="🕌 Surau">
-                {rooms.filter(r => r.category === 'Surau').map(r => (
-                  <option key={r.id} value={r.id}>
-                    {r.code}
-                  </option>
-                ))}
-              </optgroup>
             </select>
             <span className="text-[11px] text-slate-500 block">
               {rooms.length || 42} ruang dalam Direktori KPMBP
@@ -420,7 +392,7 @@ export const QuickBookingSearch: React.FC<QuickBookingSearchProps> = ({
                   onChange={(e) => setIsAircondOnly(e.target.checked)}
                   className="rounded text-emerald-600 focus:ring-emerald-500 w-3.5 h-3.5"
                 />
-                <span className="font-semibold text-slate-800">⭐ Aircond Sahaja</span>
+                <span className="font-semibold text-slate-800">💠 Aircond Sahaja</span>
               </label>
             </div>
           </div>

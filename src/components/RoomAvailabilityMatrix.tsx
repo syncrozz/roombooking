@@ -170,7 +170,7 @@ export const RoomAvailabilityMatrix: React.FC<RoomAvailabilityMatrixProps> = ({
                 onChange={(e) => setIsAircondOnly(e.target.checked)}
                 className="rounded text-emerald-600 focus:ring-emerald-500"
               />
-              <span className="font-semibold text-slate-700">⭐ Aircond Sahaja</span>
+              <span className="font-semibold text-slate-700">💠 Aircond Sahaja</span>
             </label>
           </div>
 
@@ -212,37 +212,37 @@ export const RoomAvailabilityMatrix: React.FC<RoomAvailabilityMatrixProps> = ({
           </div>
         </div>
 
-        {/* Status Legend Bar */}
-        <div className="mt-4 pt-3 border-t border-slate-100 flex flex-wrap items-center justify-between gap-3 text-xs">
-          <div className="flex flex-wrap items-center gap-3">
-            <span className="font-bold text-slate-700">Petunjuk Status:</span>
-            <div className="flex items-center gap-1.5">
-              <span className="w-3.5 h-3.5 rounded bg-emerald-500 border border-emerald-600 inline-block"></span>
-              <span className="text-slate-700 font-medium">🟢 Kosong (Boleh Ditempah)</span>
+          {/* Status Legend Bar */}
+          <div className="mt-4 pt-3 border-t border-slate-100 flex flex-wrap items-center justify-between gap-3 text-xs">
+            <div className="flex flex-wrap items-center gap-3">
+              <span className="font-bold text-slate-700">Petunjuk Status:</span>
+              <div className="flex items-center gap-1.5">
+                <span className="hidden w-3.5 h-3.5 rounded bg-emerald-500 border border-emerald-600"></span>
+                <span className="text-slate-700 font-medium">🟢 Kosong (Boleh Ditempah)</span>
+              </div>
+              <div className="flex items-center gap-1.5" title="Jadual kuliah semester rasmi kolej (Bukan tempahan ad-hoc & bukan demo data)">
+                <span className="hidden w-3.5 h-3.5 rounded bg-rose-500 border border-rose-600"></span>
+                <span className="text-slate-700 font-medium">🔴 Jadual Kuliah Rasmi (Semester)</span>
+              </div>
+              <div className="flex items-center gap-1.5">
+                <span className="hidden w-3.5 h-3.5 rounded bg-amber-400 border border-amber-500"></span>
+                <span className="text-slate-700 font-medium">🟨 Tempahan Ad-Hoc Staf</span>
+              </div>
+              <div className="flex items-center gap-1.5">
+                <span className="hidden w-3.5 h-3.5 rounded bg-slate-900 border border-slate-950"></span>
+                <span className="text-slate-700 font-medium">⚫ Sekatan Institusi</span>
+              </div>
             </div>
-            <div className="flex items-center gap-1.5">
-              <span className="w-3.5 h-3.5 rounded bg-rose-500 border border-rose-600 inline-block"></span>
-              <span className="text-slate-700 font-medium">🔴 Jadual Akademik</span>
-            </div>
-            <div className="flex items-center gap-1.5">
-              <span className="w-3.5 h-3.5 rounded bg-amber-400 border border-amber-500 inline-block"></span>
-              <span className="text-slate-700 font-medium">🟨 Tempahan / Pending</span>
-            </div>
-            <div className="flex items-center gap-1.5">
-              <span className="w-3.5 h-3.5 rounded bg-slate-900 border border-slate-950 inline-block"></span>
-              <span className="text-slate-700 font-medium">⚫ Blocked Institusi</span>
-            </div>
-          </div>
 
-          <div className="flex items-center gap-2 text-[11px] text-slate-500">
-            <span className="inline-flex items-center gap-1 bg-amber-50 text-amber-800 px-2 py-0.5 rounded border border-amber-200">
-              ☀️ Sesi Siang: 08:30 – 16:30
-            </span>
-            <span className="inline-flex items-center gap-1 bg-indigo-50 text-indigo-800 px-2 py-0.5 rounded border border-indigo-200 font-semibold">
-              🌙 Sesi Malam: 20:00 – 23:00 (Maksimum 23:00)
-            </span>
+            <div className="flex items-center gap-2 text-[11px] text-slate-500">
+              <span className="inline-flex items-center gap-1 bg-amber-50 text-amber-800 px-2 py-0.5 rounded border border-amber-200">
+                ☀️ Sesi Siang: 08:30 – 16:30
+              </span>
+              <span className="inline-flex items-center gap-1 bg-indigo-50 text-indigo-800 px-2 py-0.5 rounded border border-indigo-200 font-semibold">
+                🌙 Sesi Malam: 20:00 – 23:00 (Maksimum 23:00)
+              </span>
+            </div>
           </div>
-        </div>
       </div>
 
       {/* MATRIX TABLE CONTAINER */}
@@ -319,7 +319,8 @@ export const RoomAvailabilityMatrix: React.FC<RoomAvailabilityMatrixProps> = ({
                           )}
                         </button>
                       </div>
-                      <div className="text-[10px] text-slate-400">
+                      {/* Disembunyikan / dipadam dari paparan atas permintaan pengguna */}
+                      <div className="hidden text-[10px] text-slate-400">
                         {room.block} ({formatLevel(room.level)})
                       </div>
                     </td>
@@ -380,20 +381,44 @@ export const RoomAvailabilityMatrix: React.FC<RoomAvailabilityMatrixProps> = ({
                             </button>
                           )}
 
-                          {isAcad && (
-                            <button
-                              onClick={() => setSelectedCellInfo({ room, startTime: slot.start, endTime: slot.end, check })}
-                              className="w-full h-11 rounded-lg bg-rose-100 hover:bg-rose-200 border border-rose-300 text-rose-900 font-semibold transition p-1 text-center flex flex-col items-center justify-center overflow-hidden"
-                              title={check.conflictReason}
-                            >
-                              <div className="text-[10px] font-bold truncate max-w-full text-rose-950">
-                                📚 {check.academicSlot?.className}
-                              </div>
-                              <div className="text-[9px] truncate max-w-full text-rose-800 font-medium">
-                                {check.academicSlot?.courseCode}
-                              </div>
-                            </button>
-                          )}
+                          {isAcad && (() => {
+                            const acadSlot = check.academicSlot;
+                            let displayClassName = acadSlot?.className || 'Slot Terkunci';
+
+                            // If generic or wrapped with Pensyarah (...), extract only the lecturer name
+                            if (
+                              displayClassName === 'Pengajian / Aktiviti' ||
+                              displayClassName.startsWith('Pensyarah (') ||
+                              displayClassName === 'TERKUNCI'
+                            ) {
+                              if (acadSlot?.lecturerName) {
+                                displayClassName = acadSlot.lecturerName;
+                              } else if (displayClassName.startsWith('Pensyarah (') && displayClassName.endsWith(')')) {
+                                displayClassName = displayClassName.slice(11, -1).trim();
+                              }
+                            }
+
+                            // Format single-word all-caps name (e.g. IBRAHIM -> Ibrahim)
+                            if (/^[A-Z]{3,}$/.test(displayClassName)) {
+                              displayClassName = displayClassName.charAt(0) + displayClassName.slice(1).toLowerCase();
+                            }
+
+                            return (
+                              <button
+                                onClick={() => setSelectedCellInfo({ room, startTime: slot.start, endTime: slot.end, check })}
+                                className="w-full h-11 rounded-lg bg-rose-50 hover:bg-rose-100 border border-rose-300 text-rose-900 font-semibold transition p-1 text-center flex flex-col items-center justify-center overflow-hidden group shadow-2xs active:scale-[0.98]"
+                                title={`Jadual Kuliah Semester Rasmi KPMBP (Bukan Tempahan Ad-hoc): ${displayClassName} - ${acadSlot?.courseCode === 'TERKUNCI' ? 'LOCKED' : acadSlot?.courseCode} (${acadSlot?.lecturerName || displayClassName})`}
+                              >
+                                <div className="flex items-center justify-center gap-1 w-full text-[9px] font-bold text-rose-700 tracking-tight">
+                                  <span className="w-1.5 h-1.5 rounded-full bg-rose-500 shrink-0"></span>
+                                  <span className="truncate max-w-[95px]">{displayClassName}</span>
+                                </div>
+                                <div className="text-[10px] truncate max-w-full text-rose-950 font-extrabold">
+                                  {acadSlot?.courseCode === 'TERKUNCI' ? 'LOCKED' : acadSlot?.courseCode}
+                                </div>
+                              </button>
+                            );
+                          })()}
 
                           {isAdhoc && (
                             <button
@@ -462,15 +487,78 @@ export const RoomAvailabilityMatrix: React.FC<RoomAvailabilityMatrixProps> = ({
                 <strong className="text-slate-900">Masa:</strong> {selectedCellInfo.startTime} – {selectedCellInfo.endTime} ({calculateDurationText(selectedCellInfo.startTime, selectedCellInfo.endTime)}) • {formatDateMalay(selectedDate)}
               </div>
 
-              <div className="p-3 bg-slate-50 border border-slate-200 rounded-xl space-y-2">
-                <div className="font-bold text-slate-900 flex items-center gap-1.5">
-                  <Info className="w-4 h-4 text-emerald-600" />
-                  Status Occupancy Engine:
+              {selectedCellInfo.check.status === 'OCCUPIED_ACADEMIC' && (
+                <div className="p-3.5 bg-rose-50 border border-rose-200 rounded-xl space-y-2">
+                  <div className="flex items-center gap-2">
+                    <span className="px-2 py-0.5 rounded bg-rose-200 text-rose-900 text-[10px] font-black uppercase tracking-wider">
+                      Jadual Kuliah Semester Rasmi
+                    </span>
+                    <span className="text-[11px] font-bold text-rose-700">
+                      Bukan Tempahan & Bukan Demo
+                    </span>
+                  </div>
+                  <p className="text-rose-900 text-xs leading-relaxed">
+                    Slot ini <strong>bukan tempahan bilik</strong> dan <strong>bukan data demo</strong>. Ini merupakan jadual waktu perkuliahan rasmi semester (Master Timetable KPMBP) bagi mengelakkan pertindihan bilik semasa kelas akademik berlangsung.
+                  </p>
+                  <div className="pt-2 text-xs text-rose-950 space-y-1 border-t border-rose-200">
+                    <div><span className="text-slate-500">Subjek:</span> <strong>{(selectedCellInfo.check.academicSlot?.courseCode === 'TERKUNCI' ? 'LOCKED' : selectedCellInfo.check.academicSlot?.courseCode)} - {selectedCellInfo.check.academicSlot?.courseName}</strong></div>
+                    <div><span className="text-slate-500">Kelas / Maklumat:</span> <strong>{(() => {
+                      const cls = selectedCellInfo.check.academicSlot?.className;
+                      const lec = selectedCellInfo.check.academicSlot?.lecturerName;
+                      if (!cls) return 'Slot Terkunci';
+                      if (cls === 'Pengajian / Aktiviti' || cls.startsWith('Pensyarah (') || cls === 'TERKUNCI') {
+                        const raw = lec || cls.replace(/^Pensyarah\s*\((.*)\)$/, '$1') || cls;
+                        return /^[A-Z]{3,}$/.test(raw) ? raw.charAt(0) + raw.slice(1).toLowerCase() : raw;
+                      }
+                      return cls;
+                    })()}</strong></div>
+                    <div><span className="text-slate-500">Pensyarah:</span> <strong>{selectedCellInfo.check.academicSlot?.lecturerName}</strong></div>
+                  </div>
                 </div>
-                <div className="text-slate-800 text-xs leading-relaxed font-medium">
-                  {selectedCellInfo.check.conflictReason}
+              )}
+
+              {(selectedCellInfo.check.status === 'OCCUPIED_BOOKING' || selectedCellInfo.check.status === 'PENDING_BOOKING') && (
+                <div className="p-3.5 bg-amber-50 border border-amber-200 rounded-xl space-y-2">
+                  <div className="flex items-center gap-2">
+                    <span className="px-2 py-0.5 rounded bg-amber-200 text-amber-900 text-[10px] font-black uppercase tracking-wider">
+                      Tempahan Ad-Hoc Staf
+                    </span>
+                    <span className="text-[11px] font-bold text-amber-700">
+                      {selectedCellInfo.check.existingBooking?.status === 'CONFIRMED' ? 'Disahkan (Aktif)' : 'Menunggu Kelulusan'}
+                    </span>
+                  </div>
+                  <div className="pt-1 text-xs text-amber-950 space-y-1">
+                    <div><span className="text-slate-500">Pemohon:</span> <strong>{selectedCellInfo.check.existingBooking?.applicantName}</strong> ({selectedCellInfo.check.existingBooking?.applicantDepartment})</div>
+                    <div><span className="text-slate-500">Tujuan:</span> <strong>{selectedCellInfo.check.existingBooking?.purpose}</strong></div>
+                    <div><span className="text-slate-500">Kategori:</span> {selectedCellInfo.check.existingBooking?.purposeCategory}</div>
+                  </div>
                 </div>
-              </div>
+              )}
+
+              {selectedCellInfo.check.status === 'BLOCKED' && (
+                <div className="p-3.5 bg-slate-900 text-slate-100 rounded-xl space-y-1.5">
+                  <div className="flex items-center gap-2">
+                    <span className="px-2 py-0.5 rounded bg-amber-400 text-slate-950 text-[10px] font-black uppercase tracking-wider">
+                      Sekatan Institusi / Kolej
+                    </span>
+                  </div>
+                  <p className="text-slate-300 text-xs leading-relaxed">
+                    {selectedCellInfo.check.conflictReason}
+                  </p>
+                </div>
+              )}
+
+              {selectedCellInfo.check.status === 'AVAILABLE' && (
+                <div className="p-3.5 bg-emerald-50 border border-emerald-200 rounded-xl space-y-1.5">
+                  <div className="flex items-center gap-2 text-emerald-800 font-bold text-xs">
+                    <CheckCircle2 className="w-4 h-4 text-emerald-600" />
+                    <span>Ruang Kosong & Boleh Ditempah</span>
+                  </div>
+                  <p className="text-emerald-700 text-xs">
+                    Tiada jadual kuliah rasmi atau tempahan ad-hoc pada waktu ini.
+                  </p>
+                </div>
+              )}
             </div>
 
             <div className="pt-2 flex justify-end">
