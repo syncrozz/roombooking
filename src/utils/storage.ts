@@ -1,7 +1,7 @@
 import { Room, AcademicScheduleSlot, AdHocBooking, InstitutionalBlock, StaffUser } from '../types';
 import { INITIAL_ROOMS, INITIAL_ACADEMIC_SCHEDULE, INITIAL_ADHOC_BOOKINGS, INITIAL_INSTITUTIONAL_BLOCKS } from '../data/initialData';
 
-const ROOMS_KEY = 'kpmbp_rooms_v3';
+const ROOMS_KEY = 'kpmbp_rooms_v4';
 const ACADEMIC_SCHEDULE_KEY = 'kpmbp_academic_schedule_v3';
 const ADHOC_BOOKINGS_KEY = 'kpmbp_adhoc_bookings_v1';
 const INSTITUTIONAL_BLOCKS_KEY = 'kpmbp_institutional_blocks_v1';
@@ -13,6 +13,20 @@ export function getStoredRooms(): Room[] {
     if (!rooms || rooms.length !== INITIAL_ROOMS.length) {
       rooms = INITIAL_ROOMS;
       localStorage.setItem(ROOMS_KEY, JSON.stringify(INITIAL_ROOMS));
+    } else {
+      // Sync names/codes with INITIAL_ROOMS to ensure updated names take effect immediately
+      let hasChanges = false;
+      rooms = rooms.map(r => {
+        const init = INITIAL_ROOMS.find(i => i.id === r.id);
+        if (init && (r.code !== init.code || r.name !== init.name)) {
+          hasChanges = true;
+          return { ...r, code: init.code, name: init.name };
+        }
+        return r;
+      });
+      if (hasChanges) {
+        localStorage.setItem(ROOMS_KEY, JSON.stringify(rooms));
+      }
     }
     return rooms;
   } catch {

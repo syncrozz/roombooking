@@ -11,7 +11,8 @@ import {
   getDocs,
   writeBatch,
   getDocFromServer,
-  Firestore
+  Firestore,
+  setLogLevel
 } from 'firebase/firestore';
 import { AdHocBooking, Room, AcademicScheduleSlot, InstitutionalBlock, StaffUser } from '../types';
 import { INITIAL_ROOMS, INITIAL_ACADEMIC_SCHEDULE, INITIAL_ADHOC_BOOKINGS, INITIAL_INSTITUTIONAL_BLOCKS } from '../data/initialData';
@@ -27,13 +28,18 @@ const app = !getApps().length ? initializeApp(firebaseConfig) : getApp();
 
 export const auth = getAuth(app);
 
+// Set Firestore log level to error to suppress connection retry warnings
+try {
+  setLogLevel('error');
+} catch {}
+
 const databaseId = firebaseConfig.firestoreDatabaseId || '(default)';
 
-// Initialize Firestore with auto-detect long polling to gracefully handle web proxies and browser iframe environments
+// Initialize Firestore with force long polling to reliably handle web proxies and browser iframe environments
 let dbInstance: Firestore;
 try {
   dbInstance = initializeFirestore(app, {
-    experimentalAutoDetectLongPolling: true,
+    experimentalForceLongPolling: true,
   }, databaseId);
 } catch {
   dbInstance = getFirestore(app, databaseId);

@@ -226,6 +226,34 @@ export function resolveRoomId(rawVenue: string, tableId: string, existingRooms: 
   const venueUpper = rawVenue.trim().toUpperCase();
   const tableUpper = tableId.trim().toUpperCase();
 
+  // Alias lookup for renamed and alternate room labels
+  const ALIAS_MAP: Record<string, string> = {
+    'SMART CLASSROOM': 'SMART_CLASSROOM',
+    'S. CLASSROOM': 'SMART_CLASSROOM',
+    'S CLASSROOM': 'SMART_CLASSROOM',
+    'MAKMAL ALFA': 'MAKMAL_ALFA',
+    'LAB ALFA': 'MAKMAL_ALFA',
+    'MAKMAL BETA': 'MAKMAL_BETA',
+    'LAB BETA': 'MAKMAL_BETA',
+    'MAKMAL SIGMA': 'MAKMAL_SIGMA',
+    'LAB SIGMA': 'MAKMAL_SIGMA',
+    'MAKMAL GAMMA': 'MAKMAL_GAMMA',
+    'LAB GAMMA': 'MAKMAL_GAMMA',
+    'MAKMAL DELTA': 'MAKMAL_DELTA',
+    'LAB DELTA': 'MAKMAL_DELTA',
+    'ARAS 1 PERPUSTAKAAN': 'ARAS_1_PERPUSTAKAAN',
+    'L1 LIBRARY': 'ARAS_1_PERPUSTAKAAN',
+    'BILIK KOTA TINGGI': 'BILIK_KOTA_TINGGI',
+    'BLK. KOTA TINGGI': 'BILIK_KOTA_TINGGI',
+    'BLK KOTA TINGGI': 'BILIK_KOTA_TINGGI',
+  };
+
+  if (ALIAS_MAP[venueUpper]) {
+    const aliasedId = ALIAS_MAP[venueUpper];
+    const match = existingRooms.find(r => r.id === aliasedId);
+    if (match) return match.id;
+  }
+
   // Try matching rawVenue with room code, id or name
   for (const r of existingRooms) {
     if (

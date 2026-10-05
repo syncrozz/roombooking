@@ -307,15 +307,18 @@ export const RoomAvailabilityMatrix: React.FC<RoomAvailabilityMatrixProps> = ({
                   <tr key={room.id} className="hover:bg-slate-50 transition divide-x divide-slate-100">
                     {/* Room Info Sticky Cell */}
                     <td className="py-2.5 px-2.5 sm:py-3 sm:px-4 sticky left-0 z-10 bg-white font-medium shadow-r">
-                      <div className="flex items-center">
+                      <div className="flex items-center w-full">
                         <button
                           onClick={() => onViewRoomDetails(room)}
-                          className="font-bold text-slate-900 hover:text-emerald-600 transition flex items-center gap-1.5 text-left"
+                          className="w-full font-bold text-slate-900 hover:text-emerald-600 transition flex items-center justify-between gap-1.5 text-left"
                         >
                           <span className="shrink-0">{room.code}</span>
                           {room.hasAircond && (
-                            <span className="text-[10px] bg-cyan-100 text-cyan-800 px-1 py-0.5 rounded font-bold border border-cyan-300 shrink-0 whitespace-nowrap">
-                              💠 Aircond
+                            <span 
+                              className="text-[10px] bg-cyan-100 text-cyan-800 px-1 py-0.5 rounded font-bold border border-cyan-300 shrink-0 whitespace-nowrap ml-auto"
+                              title="Aircond"
+                            >
+                              💠
                             </span>
                           )}
                         </button>
