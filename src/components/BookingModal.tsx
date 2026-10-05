@@ -11,6 +11,7 @@ import {
 } from '../utils/storage';
 import { verifyStaffCredentialsLocally } from '../lib/firebase';
 import { INITIAL_STAFF_DATA } from '../data/staffData';
+import { ForgotPinHelp } from './ForgotPinHelp';
 import { 
   Building, 
   Calendar, 
@@ -30,7 +31,8 @@ import {
   KeyRound,
   ShieldCheck,
   Moon,
-  Sun
+  Sun,
+  Lock
 } from 'lucide-react';
 
 interface BookingModalProps {
@@ -42,6 +44,7 @@ interface BookingModalProps {
   staffList?: StaffUser[];
   onClose: () => void;
   onSubmitBooking: (bookingData: Omit<AdHocBooking, 'id' | 'status' | 'createdAt'>) => void;
+  onRequirePinChange?: (staff: StaffUser) => void;
 }
 
 export const BookingModal: React.FC<BookingModalProps> = ({
@@ -52,13 +55,12 @@ export const BookingModal: React.FC<BookingModalProps> = ({
   initialPurpose,
   staffList = INITIAL_STAFF_DATA,
   onClose,
-  onSubmitBooking
+  onSubmitBooking,
+  onRequirePinChange
 }) => {
-  const [savedProfiles, setSavedProfiles] = useState<UserProfileHistory[]>([]);
-
   const [applicantName, setApplicantName] = useState<string>('Ahmad Khairi Bin Mohd');
   const [applicantEmail, setApplicantEmail] = useState<string>('khaikerr@gmail.com');
-  const [passcode, setPasscode] = useState<string>('3756');
+  const [pinInput, setPinInput] = useState<string>('1234');
   const [applicantPhone, setApplicantPhone] = useState<string>('014-5313756');
   const [applicantRole, setApplicantRole] = useState<string>('Pensyarah');
   const [department, setDepartment] = useState<string>('Pengajian Am');
@@ -82,8 +84,6 @@ export const BookingModal: React.FC<BookingModalProps> = ({
 
   useEffect(() => {
     const activeUser = getStoredActiveUser();
-    const profiles = getStoredUserProfiles();
-    setSavedProfiles(profiles);
 
     if (activeUser && activeUser.applicantEmail) {
       setApplicantName(activeUser.applicantName);
@@ -92,19 +92,18 @@ export const BookingModal: React.FC<BookingModalProps> = ({
       setDepartment(activeUser.department || 'Pengajian Am');
       if (activeUser.applicantPhone) setApplicantPhone(activeUser.applicantPhone);
     }
-  }, []);
+  }, [staffList]);
 
   const handleEmailInputChange = (val: string) => {
     setApplicantEmail(val);
     setVerificationError(null);
-    // Auto-match staff from CSV
+    // Auto-match staff metadata from list (without populating PIN)
     const match = staffList.find(s => s.email.toLowerCase() === val.trim().toLowerCase());
     if (match) {
       setApplicantName(match.name);
       setApplicantRole(match.role);
       setDepartment(match.department);
       setApplicantPhone(match.phone);
-      setPasscode(match.passcode);
     }
   };
 
@@ -126,26 +125,36 @@ export const BookingModal: React.FC<BookingModalProps> = ({
       return;
     }
 
-    // Verify combination of Email and 4-digit Passcode in Firebase CSV staff database
-    const verifyResult = verifyStaffCredentialsLocally(applicantEmail, passcode, staffList);
+    // Verify combination of Email and 4-digit PIN in Firebase staff database
+    const verifyResult = verifyStaffCredentialsLocally(applicantEmail, pinInput, staffList);
 
     if (!verifyResult.success || !verifyResult.staff) {
       setVerificationError(
         verifyResult.errorMsg || 
-        'Pengesahan Gagal: E-mel dan passcode 4-digit telefon tidak berpadanan dengan pangkalan data CSV KPMBP dalam Firebase.'
+        'Email atau PIN tidak sah.'
       );
       return;
     }
 
     const verifiedStaff = verifyResult.staff;
 
+    // Check mandatory PIN change if still on default PIN 1234
+    if (verifiedStaff.pinStatus === 'DEFAULT' || verifiedStaff.pin === '1234') {
+      if (onRequirePinChange) {
+        onRequirePinChange(verifiedStaff);
+      }
+      return;
+    }
+
     // Save active user profile
     saveActiveUser({
+      staffId: verifiedStaff.id,
       applicantName: verifiedStaff.name,
       applicantEmail: verifiedStaff.email,
       applicantPhone: verifiedStaff.phone,
       applicantRole: verifiedStaff.role,
-      department: verifiedStaff.department
+      department: verifiedStaff.department,
+      pinStatus: verifiedStaff.pinStatus
     });
 
     onSubmitBooking({
@@ -173,19 +182,6 @@ export const BookingModal: React.FC<BookingModalProps> = ({
     room.name.toUpperCase().includes('SEMINAR') ||
     room.category === 'Dewan Kuliah' ||
     room.category === 'Ruang Khas';
-
-  const applyProfile = (profile: UserProfileHistory) => {
-    setApplicantName(profile.applicantName);
-    setApplicantEmail(profile.applicantEmail);
-    setApplicantRole(profile.applicantRole || 'Pensyarah');
-    setDepartment(profile.department || 'Pengajian Am');
-    if (profile.applicantPhone) setApplicantPhone(profile.applicantPhone);
-    setVerificationError(null);
-    const match = staffList.find(s => s.email.toLowerCase() === profile.applicantEmail.toLowerCase());
-    if (match) {
-      setPasscode(match.passcode);
-    }
-  };
 
   return (
     <div className="fixed inset-0 bg-slate-950/75 backdrop-blur-xs z-50 flex items-center justify-center p-4 overflow-y-auto">
@@ -258,60 +254,29 @@ export const BookingModal: React.FC<BookingModalProps> = ({
           )}
         </div>
 
-        {/* Auto-Suggestion Pills from Stored Profiles */}
-        {savedProfiles.length > 0 && (
-          <div className="bg-blue-50/60 rounded-xl p-2.5 border border-blue-100 space-y-1.5">
-            <div className="flex items-center justify-between text-[11px] font-bold text-blue-900">
-              <span className="flex items-center gap-1">
-                <Zap className="w-3.5 h-3.5 text-blue-600 fill-blue-600" />
-                Cadangan Detail Peribadi Autosuggestion:
-              </span>
-              <span className="text-[10px] text-blue-600 font-normal">Klik untuk auto-isi</span>
-            </div>
-            <div className="flex flex-wrap gap-1.5">
-              {savedProfiles.map((p, idx) => (
-                <button
-                  key={idx}
-                  type="button"
-                  onClick={() => applyProfile(p)}
-                  className={`text-[11px] px-2.5 py-1 rounded-lg border font-medium transition flex items-center gap-1.5 ${
-                    applicantEmail.toLowerCase() === p.applicantEmail.toLowerCase()
-                      ? 'bg-blue-600 text-white border-blue-600 font-bold shadow-xs'
-                      : 'bg-white text-slate-700 border-slate-200 hover:border-blue-400 hover:text-blue-700'
-                  }`}
-                >
-                  <User className="w-3 h-3 opacity-70" />
-                  <span>{p.applicantName.split(' ')[0]} ({p.applicantEmail})</span>
-                </button>
-              ))}
-            </div>
-          </div>
-        )}
-
         {/* Form */}
         <form onSubmit={handleSubmit} className="space-y-3 text-xs">
           
-          {/* Email and 4-digit Passcode Verification Block */}
+          {/* Authentication Block: Log Masuk */}
           <div className="bg-slate-50 border border-slate-200 rounded-xl p-3 space-y-2.5">
-            <div className="flex items-center justify-between text-slate-800 font-bold border-b border-slate-200 pb-1.5">
-              <span className="flex items-center gap-1.5 text-blue-700">
-                <ShieldCheck className="w-4 h-4 text-blue-600" />
-                Pengesahan Identiti Staf (CSV Firebase)
+            <div className="flex items-center text-slate-800 font-bold border-b border-slate-200 pb-1.5">
+              <span className="flex items-center gap-1.5 text-slate-900 text-xs">
+                <Lock className="w-3.5 h-3.5 text-blue-600" />
+                Log Masuk
               </span>
-              <span className="text-[10px] text-slate-500 font-normal">Wajib Diisi</span>
             </div>
 
-            <div className="grid grid-cols-1 sm:grid-cols-2 gap-2">
+            <div className="grid grid-cols-1 sm:grid-cols-2 gap-2.5">
               <div>
-                <label className="block font-bold text-slate-700 mb-1 flex items-center justify-between">
-                  <span>E-mel Pengguna:</span>
+                <label className="block font-bold text-slate-700 mb-1">
+                  E-mel
                 </label>
                 <div className="relative">
                   <Mail className="w-3.5 h-3.5 text-slate-400 absolute left-2.5 top-2.5" />
                   <input
                     type="email"
                     required
-                    placeholder="khaikerr@gmail.com"
+                    placeholder="nama@kpmbp.edu.my"
                     value={applicantEmail}
                     onChange={(e) => handleEmailInputChange(e.target.value)}
                     className="w-full bg-white border border-slate-300 rounded-lg pl-8 pr-2 py-1.5 text-slate-900 font-bold outline-none focus:ring-2 focus:ring-blue-500"
@@ -320,32 +285,40 @@ export const BookingModal: React.FC<BookingModalProps> = ({
               </div>
 
               <div>
-                <label className="block font-bold text-slate-700 mb-1 flex items-center justify-between">
-                  <span>Passcode (4 Digit Telefon):</span>
-                  <span className="text-[10px] text-amber-600 font-semibold">cth: 3756</span>
-                </label>
+                <div className="flex items-center justify-between mb-1">
+                  <label className="block font-bold text-slate-700">
+                    PIN
+                  </label>
+                  <ForgotPinHelp />
+                </div>
                 <div className="relative">
                   <KeyRound className="w-3.5 h-3.5 text-slate-400 absolute left-2.5 top-2.5" />
                   <input
                     type="password"
+                    inputMode="numeric"
                     maxLength={4}
                     required
-                    placeholder="3756"
-                    value={passcode}
+                    placeholder="••••"
+                    value={pinInput}
                     onChange={(e) => {
-                      setPasscode(e.target.value);
+                      setPinInput(e.target.value.replace(/\D/g, '').slice(0, 4));
                       setVerificationError(null);
                     }}
-                    className="w-full bg-white border border-slate-300 rounded-lg pl-8 pr-2 py-1.5 text-slate-900 font-mono font-bold outline-none focus:ring-2 focus:ring-blue-500"
+                    className="w-full bg-white border border-slate-300 rounded-lg pl-8 pr-2 py-1.5 text-slate-900 font-mono font-bold tracking-widest outline-none focus:ring-2 focus:ring-blue-500"
                   />
                 </div>
               </div>
             </div>
 
             {verificationError && (
-              <div className="text-[11px] text-red-700 bg-red-50 p-2 rounded-lg border border-red-200 font-semibold flex items-start gap-1.5 animate-fadeIn">
-                <AlertCircle className="w-4 h-4 text-red-600 shrink-0 mt-0.5" />
-                <span>{verificationError}</span>
+              <div className="text-[11px] text-red-700 bg-red-50 p-2.5 rounded-lg border border-red-200 font-semibold space-y-1.5 animate-fadeIn">
+                <div className="flex items-start gap-1.5">
+                  <AlertCircle className="w-4 h-4 text-red-600 shrink-0 mt-0.5" />
+                  <span>{verificationError}</span>
+                </div>
+                <div className="pt-1 border-t border-red-200/60">
+                  <ForgotPinHelp />
+                </div>
               </div>
             )}
           </div>

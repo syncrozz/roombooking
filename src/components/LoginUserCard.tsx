@@ -3,11 +3,14 @@ import {
   getStoredActiveUser, 
   saveActiveUser, 
   clearActiveUser,
+  subscribeToActiveUser,
   UserProfileHistory 
 } from '../utils/storage';
 import { StaffUser } from '../types';
 import { INITIAL_STAFF_DATA } from '../data/staffData';
 import { verifyStaffCredentialsLocally } from '../lib/firebase';
+import { ForgotPinHelp } from './ForgotPinHelp';
+import { WhatsAppIcon } from './WhatsAppIcon';
 import { 
   LogIn, 
   CheckCircle2, 
@@ -16,40 +19,35 @@ import {
   ShieldCheck, 
   KeyRound, 
   AlertTriangle,
-  Database,
-  Sparkles,
   Lock,
-  LogOut
+  LogOut,
+  ExternalLink
 } from 'lucide-react';
 
 interface LoginUserCardProps {
-  onProfileChange?: (profile: UserProfileHistory) => void;
+  onProfileChange?: (profile: UserProfileHistory | null) => void;
   staffList?: StaffUser[];
   compact?: boolean;
   isAdmin?: boolean;
+  onRequirePinChange?: (staff: StaffUser) => void;
 }
 
 export const LoginUserCard: React.FC<LoginUserCardProps> = ({ 
   onProfileChange, 
   staffList = INITIAL_STAFF_DATA,
   compact = false,
-  isAdmin = false
+  isAdmin = false,
+  onRequirePinChange
 }) => {
   const initialUser = getStoredActiveUser();
   const [activeUser, setActiveUser] = useState<UserProfileHistory | null>(initialUser);
   const [isEditing, setIsEditing] = useState<boolean>(!initialUser);
 
   // Verification Form states
-  const [emailInput, setEmailInput] = useState<string>(initialUser?.applicantEmail || 'khaikerr@gmail.com');
-  const [passcodeInput, setPasscodeInput] = useState<string>('3756');
+  const [emailInput, setEmailInput] = useState<string>(initialUser?.applicantEmail || '');
+  const [pinInput, setPinInput] = useState<string>('');
   const [errorMsg, setErrorMsg] = useState<string | null>(null);
   const [saveSuccessMsg, setSaveSuccessMsg] = useState<string | null>(null);
-
-  // Admin access states
-  const [adminUnlocked, setAdminUnlocked] = useState<boolean>(false);
-  const [showAdminPinPrompt, setShowAdminPinPrompt] = useState<boolean>(false);
-  const [adminPinInput, setAdminPinInput] = useState<string>('');
-  const [adminPinError, setAdminPinError] = useState<string | null>(null);
 
   useEffect(() => {
     const user = getStoredActiveUser();
@@ -59,40 +57,55 @@ export const LoginUserCard: React.FC<LoginUserCardProps> = ({
     } else {
       setIsEditing(true);
     }
-  }, []);
 
-  const handleQuickSelectStaff = (st: StaffUser) => {
-    setEmailInput(st.email);
-    setPasscodeInput(st.passcode);
-    setErrorMsg(null);
-  };
+    const unsubscribe = subscribeToActiveUser((latestUser) => {
+      setActiveUser(latestUser);
+      if (latestUser?.applicantEmail) {
+        setEmailInput(latestUser.applicantEmail);
+      }
+    });
+    return () => {
+      unsubscribe();
+    };
+  }, []);
 
   const handleVerifyAndLogin = (e: React.FormEvent) => {
     e.preventDefault();
     setErrorMsg(null);
 
-    const result = verifyStaffCredentialsLocally(emailInput, passcodeInput, staffList);
+    const result = verifyStaffCredentialsLocally(emailInput, pinInput, staffList);
 
     if (!result.success || !result.staff) {
-      setErrorMsg(result.errorMsg || 'Pengesahan Gagal. Sila pastikan E-mel dan Passcode 4-digit telefon tepat.');
+      setErrorMsg(result.errorMsg || 'Email atau PIN tidak sah.');
       return;
     }
 
     const matchedStaff = result.staff;
+
+    // Check mandatory PIN change if still using default PIN 1234
+    if (matchedStaff.pinStatus === 'DEFAULT' || matchedStaff.pin === '1234') {
+      if (onRequirePinChange) {
+        onRequirePinChange(matchedStaff);
+      }
+      return;
+    }
+
     const updatedProfile: UserProfileHistory = {
+      staffId: matchedStaff.id,
       applicantName: matchedStaff.name,
       applicantEmail: matchedStaff.email,
       applicantRole: matchedStaff.role,
       department: matchedStaff.department,
       applicantPhone: matchedStaff.phone,
-      lastUsedAt: new Date().toISOString()
+      lastUsedAt: new Date().toISOString(),
+      pinStatus: matchedStaff.pinStatus
     };
 
     saveActiveUser(updatedProfile);
     setActiveUser(updatedProfile);
     setIsEditing(false);
     setErrorMsg(null);
-    setSaveSuccessMsg(`Pengesahan Berjaya! Selamat datang, ${matchedStaff.name}. (Akaun CSV Firebase Disahkan)`);
+    setSaveSuccessMsg(`Pengesahan Berjaya! Selamat datang, ${matchedStaff.name}.`);
 
     if (onProfileChange) {
       onProfileChange(updatedProfile);
@@ -108,12 +121,12 @@ export const LoginUserCard: React.FC<LoginUserCardProps> = ({
     setActiveUser(null);
     setIsEditing(true);
     setEmailInput('');
-    setPasscodeInput('');
+    setPinInput('1234');
     setErrorMsg(null);
     setSaveSuccessMsg('Berjaya log keluar. Kembali ke paparan lalai (default view).');
 
     if (onProfileChange) {
-      onProfileChange(null as any);
+      onProfileChange(null);
     }
 
     setTimeout(() => {
@@ -137,8 +150,8 @@ export const LoginUserCard: React.FC<LoginUserCardProps> = ({
       <div className="px-3.5 py-2 bg-slate-950 border-b border-slate-800">
         <div className="flex items-center justify-between">
           <span className="text-[11px] font-bold text-slate-300 flex items-center gap-1.5">
-            <UserCheck className="w-3.5 h-3.5 text-blue-400" />
-            <span>{activeUser ? 'Akaun Staf Aktif' : 'Log Masuk Staf'}</span>
+            {activeUser ? <UserCheck className="w-3.5 h-3.5 text-blue-400" /> : <Lock className="w-3.5 h-3.5 text-blue-400" />}
+            <span>{activeUser ? 'Akaun Staf Aktif' : 'Log Masuk'}</span>
           </span>
           <div className="flex items-center gap-1.5">
             {activeUser && (
@@ -184,7 +197,7 @@ export const LoginUserCard: React.FC<LoginUserCardProps> = ({
                 <span className="text-xs font-bold text-white truncate block">
                   {activeUser.applicantName}
                 </span>
-                <ShieldCheck className="w-3.5 h-3.5 text-emerald-400 shrink-0" title="E-mel & Passcode Disahkan CSV KPMBP" />
+                <ShieldCheck className="w-3.5 h-3.5 text-emerald-400 shrink-0" title="Akaun Staf KPMBP Disahkan" />
               </div>
               <p className="text-[11px] text-blue-300 font-medium truncate">
                 {activeUser.applicantEmail}
@@ -202,7 +215,7 @@ export const LoginUserCard: React.FC<LoginUserCardProps> = ({
             </span>
             <span className="font-semibold text-emerald-400 bg-emerald-950/80 border border-emerald-800/80 px-2 py-1 rounded flex items-center gap-1.5 w-fit">
               <ShieldCheck className="w-3 h-3 shrink-0" />
-              E-mel & Passcode Sah
+              Akaun Staf Aktif &amp; Sah
             </span>
           </div>
 
@@ -225,112 +238,9 @@ export const LoginUserCard: React.FC<LoginUserCardProps> = ({
       {/* Mode 2: Verification Login Form */}
       {(isEditing || !activeUser) && (
         <form onSubmit={handleVerifyAndLogin} className="p-3.5 space-y-3 bg-slate-950/60">
-          
-          {/* Quick-fill dropdown for testing staff accounts - Accessible only by Admin */}
-          {(isAdmin || adminUnlocked) ? (
-            <div className="bg-amber-950/30 border border-amber-500/40 rounded-lg p-2 space-y-1.5 animate-in fade-in duration-150">
-              <div className="flex items-center justify-between">
-                <label className="block text-[10px] font-bold text-amber-300 flex items-center gap-1">
-                  <ShieldCheck className="w-3.5 h-3.5 text-amber-400" />
-                  <span>Akses Pentadbir: Ujian Akaun Staf</span>
-                </label>
-                {!isAdmin && (
-                  <button
-                    type="button"
-                    onClick={() => setAdminUnlocked(false)}
-                    className="text-[9px] text-slate-400 hover:text-slate-200"
-                  >
-                    Kunci Semula
-                  </button>
-                )}
-              </div>
-              <select
-                onChange={(e) => {
-                  const found = staffList.find(s => s.id === e.target.value);
-                  if (found) handleQuickSelectStaff(found);
-                }}
-                defaultValue=""
-                className="w-full bg-slate-800 border border-slate-700 rounded-lg px-2.5 py-1.5 text-xs text-slate-200 outline-none focus:border-amber-500"
-              >
-                <option value="" disabled>-- Pilih Staf CSV KPMBP --</option>
-                {staffList.slice(0, 30).map((st) => (
-                  <option key={st.id} value={st.id}>
-                    {st.name.split(' ')[0]} ({st.email || 'tanpa emel'}) - Passcode: {st.passcode}
-                  </option>
-                ))}
-              </select>
-            </div>
-          ) : (
-            <div className="flex justify-end">
-              <button
-                type="button"
-                onClick={() => setShowAdminPinPrompt(!showAdminPinPrompt)}
-                className="text-[10px] text-slate-500 hover:text-amber-400/80 flex items-center gap-1 transition select-none"
-                title="Akses Ujian Staf khusus untuk Pentadbir Sahaja"
-              >
-                <Lock className="w-2.5 h-2.5" />
-                <span>Akses Ujian (Admin Sahaja)</span>
-              </button>
-            </div>
-          )}
-
-          {showAdminPinPrompt && !(isAdmin || adminUnlocked) && (
-            <div className="bg-slate-900 border border-amber-500/40 rounded-lg p-2.5 space-y-2 animate-in fade-in duration-150">
-              <div className="flex items-center justify-between">
-                <span className="text-[10px] font-bold text-amber-300 flex items-center gap-1">
-                  <Lock className="w-3 h-3 text-amber-400" />
-                  Masukkan PIN Pentadbir:
-                </span>
-                <button
-                  type="button"
-                  onClick={() => {
-                    setShowAdminPinPrompt(false);
-                    setAdminPinError(null);
-                    setAdminPinInput('');
-                  }}
-                  className="text-slate-400 hover:text-slate-200 text-xs"
-                >
-                  ✕
-                </button>
-              </div>
-              <div className="flex gap-1.5">
-                <input
-                  type="password"
-                  maxLength={4}
-                  placeholder="PIN Admin"
-                  value={adminPinInput}
-                  onChange={(e) => {
-                    setAdminPinInput(e.target.value);
-                    setAdminPinError(null);
-                  }}
-                  className="flex-1 bg-slate-800 border border-slate-700 rounded px-2 py-1 text-xs text-white font-mono outline-none focus:border-amber-500"
-                />
-                <button
-                  type="button"
-                  onClick={() => {
-                    if (adminPinInput.trim() === '5313') {
-                      setAdminUnlocked(true);
-                      setShowAdminPinPrompt(false);
-                      setAdminPinInput('');
-                      setAdminPinError(null);
-                    } else {
-                      setAdminPinError('PIN Tidak Sah');
-                    }
-                  }}
-                  className="px-2.5 py-1 bg-amber-600 hover:bg-amber-500 text-white text-[11px] font-bold rounded"
-                >
-                  Buka
-                </button>
-              </div>
-              {adminPinError && (
-                <span className="text-[10px] text-rose-400 font-semibold block">{adminPinError}</span>
-              )}
-            </div>
-          )}
-
           <div>
             <label className="block text-[11px] font-bold text-slate-300 mb-1">
-              Email Berdaftar:
+              E-mel
             </label>
             <div className="relative">
               <Mail className="w-3.5 h-3.5 text-slate-400 absolute left-2.5 top-2.5" />
@@ -339,52 +249,84 @@ export const LoginUserCard: React.FC<LoginUserCardProps> = ({
                 required
                 value={emailInput}
                 onChange={(e) => setEmailInput(e.target.value)}
-                placeholder="khaikerr@gmail.com"
+                placeholder="nama@kpmbp.edu.my"
                 className="w-full pl-8 pr-3 py-1.5 bg-slate-800 border border-slate-700 rounded-lg text-xs text-white placeholder-slate-500 focus:outline-none focus:border-blue-500"
               />
             </div>
           </div>
 
           <div>
-            <label className="block text-[11px] font-bold text-slate-300 mb-1">
-              Passcode (4 Digit Terakhir No. Telefon):
-            </label>
+            <div className="flex items-center justify-between mb-1">
+              <label className="block text-[11px] font-bold text-slate-300">
+                PIN
+              </label>
+              <ForgotPinHelp />
+            </div>
             <div className="relative">
               <KeyRound className="w-3.5 h-3.5 text-slate-400 absolute left-2.5 top-2.5" />
               <input
                 type="password"
+                inputMode="numeric"
                 maxLength={4}
                 required
-                value={passcodeInput}
-                onChange={(e) => setPasscodeInput(e.target.value)}
-                placeholder="3756"
-                className="w-full pl-8 pr-3 py-1.5 bg-slate-800 border border-slate-700 rounded-lg text-xs text-white font-mono placeholder-slate-500 focus:outline-none focus:border-blue-500"
+                value={pinInput}
+                onChange={(e) => {
+                  setPinInput(e.target.value.replace(/\D/g, '').slice(0, 4));
+                  setErrorMsg(null);
+                }}
+                placeholder="••••"
+                className="w-full pl-8 pr-3 py-1.5 bg-slate-800 border border-slate-700 rounded-lg text-xs text-white font-mono tracking-widest placeholder-slate-500 focus:outline-none focus:border-blue-500"
               />
             </div>
-            <p className="text-[10px] text-slate-400 mt-1">
-              * Email dan passcode 4-digit Pin mestilah sepadan dengan pangkalan data CSV Platform
-            </p>
           </div>
 
           {/* Error Banner */}
           {errorMsg && (
-            <div className="bg-red-950/80 border border-red-800 p-2.5 rounded-lg text-[11px] text-red-200 flex items-start gap-2 animate-fadeIn">
-              <AlertTriangle className="w-4 h-4 text-red-400 shrink-0 mt-0.5" />
-              <div>
-                <span className="font-bold text-red-300 block">Pengesahan Gagal:</span>
-                <p className="text-[10px] text-red-200/90 leading-tight">
-                  {errorMsg}
+            <div className="bg-red-950/80 border border-red-800 p-2.5 rounded-lg text-[11px] text-red-200 flex flex-col gap-2 animate-fadeIn">
+              <div className="flex items-start gap-2">
+                <AlertTriangle className="w-4 h-4 text-red-400 shrink-0 mt-0.5" />
+                <div className="space-y-0.5">
+                  <span className="font-bold text-red-300 block">{errorMsg}</span>
+                  <p className="text-[10px] text-red-200/80 leading-tight">
+                    Sila pastikan e-mel dan PIN 4-digit tepat.
+                  </p>
+                </div>
+              </div>
+
+              {/* Forgot PIN direct assistance box as required */}
+              <div className="bg-slate-900/95 border border-red-800/60 rounded-lg p-2.5 space-y-1.5 text-[11px] text-slate-200">
+                <p className="font-bold text-amber-300 flex items-center gap-1.5">
+                  <span>Terlupa PIN?</span>
                 </p>
+                <p className="text-slate-300 text-[10px] leading-relaxed">
+                  Sila hubungi Admin untuk bantuan mendapatkan semula akses.
+                </p>
+                <div className="flex items-center justify-between gap-2 pt-1 border-t border-slate-800">
+                  <span className="text-[10px] text-slate-400 font-mono">
+                    WhatsApp Admin: 014-5313756
+                  </span>
+                  <a
+                    href="https://wasap.my/60145313756"
+                    target="_blank"
+                    rel="noopener noreferrer"
+                    className="px-2.5 py-1 bg-[#25D366] hover:bg-[#20bd5a] text-white font-bold text-[10px] rounded-md shadow-xs transition flex items-center gap-1 shrink-0"
+                    title="WhatsApp Admin untuk bantuan PIN"
+                  >
+                    <WhatsAppIcon className="w-3 h-3" />
+                    <span>WhatsApp Admin</span>
+                    <ExternalLink className="w-2.5 h-2.5" />
+                  </a>
+                </div>
               </div>
             </div>
           )}
 
           <button
             type="submit"
-            className="w-full py-2 bg-blue-600 hover:bg-blue-500 text-white font-bold text-xs rounded-lg shadow-md transition flex items-center justify-center gap-1.5"
+            className="w-full py-2 bg-blue-600 hover:bg-blue-500 text-white font-bold text-xs rounded-lg shadow-md transition flex items-center justify-center gap-1.5 cursor-pointer"
           >
-            <UserCheck className="w-3.5 h-3.5" />
-            Sah & Log Masuk Staf
+            <Lock className="w-3.5 h-3.5" />
+            <span>Log Masuk</span>
           </button>
 
           {activeUser && (

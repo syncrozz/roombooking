@@ -253,7 +253,7 @@ export const RoomAvailabilityMatrix: React.FC<RoomAvailabilityMatrixProps> = ({
               {periodFilter === 'ALL' ? (
                 <>
                   <tr className="border-b border-slate-200">
-                    <th rowSpan={2} className="py-3 px-4 font-bold sticky left-0 z-20 bg-slate-100 text-slate-800 text-xs uppercase tracking-wider min-w-[160px] border-r border-slate-200">
+                    <th rowSpan={2} className="py-2.5 px-2.5 sm:py-3 sm:px-4 font-bold sticky left-0 z-20 bg-slate-100 text-slate-800 text-xs uppercase tracking-wider min-w-[120px] sm:min-w-[160px] border-r border-slate-200">
                       Ruang Kuliah
                     </th>
                     <th colSpan={DAY_TIME_SLOTS.length} className="py-2 px-3 font-bold text-center bg-amber-50 text-amber-900 border-r border-slate-200 text-xs tracking-wider">
@@ -281,7 +281,7 @@ export const RoomAvailabilityMatrix: React.FC<RoomAvailabilityMatrixProps> = ({
                 </>
               ) : (
                 <tr className="bg-slate-50 text-slate-700 text-xs uppercase tracking-wider border-b border-slate-200 divide-x divide-slate-200">
-                  <th className="py-3 px-4 font-bold sticky left-0 z-20 bg-slate-50 min-w-[160px]">
+                  <th className="py-2.5 px-2.5 sm:py-3 sm:px-4 font-bold sticky left-0 z-20 bg-slate-50 min-w-[120px] sm:min-w-[160px]">
                     Ruang Kuliah
                   </th>
                   {activeSlots.map(slot => (
@@ -305,15 +305,15 @@ export const RoomAvailabilityMatrix: React.FC<RoomAvailabilityMatrixProps> = ({
                 return (
                   <tr key={room.id} className="hover:bg-slate-50 transition divide-x divide-slate-100">
                     {/* Room Info Sticky Cell */}
-                    <td className="py-3 px-4 sticky left-0 z-10 bg-white font-medium shadow-r">
-                      <div className="flex items-center justify-between gap-2">
+                    <td className="py-2.5 px-2.5 sm:py-3 sm:px-4 sticky left-0 z-10 bg-white font-medium shadow-r">
+                      <div className="flex items-center">
                         <button
                           onClick={() => onViewRoomDetails(room)}
-                          className="font-bold text-slate-900 hover:text-emerald-600 transition flex items-center justify-between w-full text-left"
+                          className="font-bold text-slate-900 hover:text-emerald-600 transition flex items-center gap-1.5 text-left"
                         >
-                          <span>{room.code}</span>
+                          <span className="shrink-0">{room.code}</span>
                           {room.hasAircond && (
-                            <span className="text-[10px] bg-cyan-100 text-cyan-800 px-1.5 py-0.2 rounded font-bold border border-cyan-300 ml-auto text-right">
+                            <span className="text-[10px] bg-cyan-100 text-cyan-800 px-1 py-0.5 rounded font-bold border border-cyan-300 shrink-0 whitespace-nowrap">
                               💠 Aircond
                             </span>
                           )}

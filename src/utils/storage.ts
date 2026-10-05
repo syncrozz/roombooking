@@ -1,4 +1,4 @@
-import { Room, AcademicScheduleSlot, AdHocBooking, InstitutionalBlock } from '../types';
+import { Room, AcademicScheduleSlot, AdHocBooking, InstitutionalBlock, StaffUser } from '../types';
 import { INITIAL_ROOMS, INITIAL_ACADEMIC_SCHEDULE, INITIAL_ADHOC_BOOKINGS, INITIAL_INSTITUTIONAL_BLOCKS } from '../data/initialData';
 
 const ROOMS_KEY = 'kpmbp_rooms_v3';
@@ -117,12 +117,14 @@ export function saveStoredInstitutionalBlocks(blocks: InstitutionalBlock[]): voi
 }
 
 export interface UserProfileHistory {
+  staffId?: string;
   applicantName: string;
   applicantEmail: string;
   applicantRole: string;
   department: string;
   applicantPhone?: string;
   lastUsedAt?: string;
+  pinStatus?: 'DEFAULT' | 'CUSTOM';
 }
 
 const USER_PROFILES_KEY = 'kpmbp_user_profiles_v1';
@@ -171,12 +173,33 @@ export function getStoredActiveUser(): UserProfileHistory | null {
   return null;
 }
 
+export type ActiveUserListener = (profile: UserProfileHistory | null) => void;
+const activeUserListeners = new Set<ActiveUserListener>();
+
+export function subscribeToActiveUser(listener: ActiveUserListener): () => void {
+  activeUserListeners.add(listener);
+  return () => {
+    activeUserListeners.delete(listener);
+  };
+}
+
+function notifyActiveUserChanged(profile: UserProfileHistory | null): void {
+  activeUserListeners.forEach(listener => {
+    try {
+      listener(profile);
+    } catch {
+      // ignore
+    }
+  });
+}
+
 export function saveActiveUser(profile: UserProfileHistory): void {
   try {
     if (!profile || !profile.applicantEmail) return;
     const updated = { ...profile, lastUsedAt: new Date().toISOString() };
     localStorage.setItem(ACTIVE_USER_KEY, JSON.stringify(updated));
     saveUserProfile(updated);
+    notifyActiveUserChanged(updated);
   } catch (err) {
     console.error('Error saving active user:', err);
   }
@@ -186,6 +209,7 @@ export function clearActiveUser(): void {
   try {
     localStorage.removeItem(ACTIVE_USER_KEY);
     localStorage.removeItem(USER_PROFILES_KEY);
+    notifyActiveUserChanged(null);
   } catch (err) {
     console.error('Error clearing active user:', err);
   }
@@ -226,4 +250,79 @@ export function generateBookingId(): string {
   const rand = Math.floor(100 + Math.random() * 900);
   const ts = Date.now().toString().slice(-4);
   return `BK-2026-${ts}${rand}`;
+}
+
+const STAFF_CACHE_KEY = 'kpmbp_staff_cache_v1';
+
+export function deduplicateStaffById(list: StaffUser[]): StaffUser[] {
+  const map = new Map<string, StaffUser>();
+  list.forEach((st) => {
+    const rawId = (st.id || '').trim();
+    if (!rawId) return;
+    const key = rawId.toLowerCase();
+    const existing = map.get(key);
+    if (!existing) {
+      map.set(key, { ...st, id: rawId });
+    } else {
+      // Identity is Staff ID: resolve duplicate record
+      // 1. Email: prefer @mara.gov.my over older domains if available
+      let chosenEmail = existing.email;
+      if (st.email && (st.email.includes('@mara.gov.my') || !existing.email.includes('@mara.gov.my'))) {
+        chosenEmail = st.email;
+      }
+      // 2. PIN: preserve CUSTOM pin if either has CUSTOM status
+      let chosenPin = existing.pin || '1234';
+      let chosenStatus: 'DEFAULT' | 'CUSTOM' = 'DEFAULT';
+      let chosenChangedAt = existing.pinChangedAt;
+
+      if (existing.pinStatus === 'CUSTOM') {
+        chosenPin = existing.pin;
+        chosenStatus = 'CUSTOM';
+        chosenChangedAt = existing.pinChangedAt;
+      } else if (st.pinStatus === 'CUSTOM') {
+        chosenPin = st.pin;
+        chosenStatus = 'CUSTOM';
+        chosenChangedAt = st.pinChangedAt;
+      } else {
+        chosenPin = existing.pin || st.pin || '1234';
+        chosenStatus = 'DEFAULT';
+      }
+
+      map.set(key, {
+        id: existing.id || st.id,
+        name: st.name || existing.name,
+        department: st.department || existing.department,
+        role: st.role || existing.role,
+        phone: st.phone || existing.phone,
+        email: chosenEmail,
+        pin: chosenPin,
+        pinStatus: chosenStatus,
+        pinChangedAt: chosenChangedAt
+      });
+    }
+  });
+  return Array.from(map.values());
+}
+
+export function getStoredStaffUsers(): StaffUser[] | null {
+  try {
+    const data = localStorage.getItem(STAFF_CACHE_KEY);
+    if (!data) return null;
+    const parsed = JSON.parse(data);
+    if (Array.isArray(parsed) && parsed.length > 0) {
+      return deduplicateStaffById(parsed);
+    }
+    return null;
+  } catch {
+    return null;
+  }
+}
+
+export function saveStoredStaffUsers(staffList: StaffUser[]): void {
+  try {
+    const clean = deduplicateStaffById(staffList);
+    localStorage.setItem(STAFF_CACHE_KEY, JSON.stringify(clean));
+  } catch (err) {
+    console.warn('Failed to cache staff list locally:', err);
+  }
 }

@@ -2,7 +2,7 @@ import React, { useState, useEffect } from 'react';
 import { LoginUserCard } from './LoginUserCard';
 import { CloudSyncModal } from './CloudSyncModal';
 import { StaffUser } from '../types';
-import { getStoredActiveUser, clearActiveUser } from '../utils/storage';
+import { getStoredActiveUser, clearActiveUser, subscribeToActiveUser } from '../utils/storage';
 import { 
   Building2, 
   LayoutDashboard,
@@ -30,6 +30,7 @@ interface HeaderProps {
   staffList?: StaffUser[];
   isAdmin?: boolean;
   onLogoutAdmin?: () => void;
+  onRequirePinChange?: (staff: StaffUser) => void;
 }
 
 export const Header: React.FC<HeaderProps> = ({ 
@@ -38,7 +39,8 @@ export const Header: React.FC<HeaderProps> = ({
   pendingCount, 
   staffList, 
   isAdmin = false,
-  onLogoutAdmin 
+  onLogoutAdmin,
+  onRequirePinChange
 }) => {
   const [mobileMenuOpen, setMobileMenuOpen] = useState(false);
   const [userMenuOpen, setUserMenuOpen] = useState(false);
@@ -50,8 +52,12 @@ export const Header: React.FC<HeaderProps> = ({
       setCurrentUser(getStoredActiveUser());
     };
     handleSync();
-    window.addEventListener('storage', handleSync);
-    return () => window.removeEventListener('storage', handleSync);
+    const unsubscribe = subscribeToActiveUser((user) => {
+      setCurrentUser(user);
+    });
+    return () => {
+      unsubscribe();
+    };
   }, [userMenuOpen]);
 
   useEffect(() => {
@@ -91,9 +97,9 @@ export const Header: React.FC<HeaderProps> = ({
           <div className="flex items-center gap-3 shrink-0">
             <button
               type="button"
-              onClick={() => handleTabClick('dashboard')}
+              onClick={() => handleTabClick('matrix')}
               className="flex items-center gap-2.5 cursor-pointer hover:opacity-90 active:scale-95 transition-all text-left bg-transparent border-0 p-0"
-              title="Kembali ke Dashboard Utama"
+              title="Papar Kalendar Ketersediaan Ruang (Calendar)"
             >
               <div className="w-9 h-9 bg-blue-600 rounded-lg flex items-center justify-center font-bold text-white shadow-md shadow-blue-900/50">
                 <Building2 className="w-5 h-5 text-white" />
@@ -272,7 +278,8 @@ export const Header: React.FC<HeaderProps> = ({
                       setCurrentUser(getStoredActiveUser());
                       setUserMenuOpen(false);
                     }} 
-                    isAdmin={isAdmin} 
+                    isAdmin={isAdmin}
+                    onRequirePinChange={onRequirePinChange}
                   />
                 </div>
               )}
@@ -368,7 +375,8 @@ export const Header: React.FC<HeaderProps> = ({
                 setCurrentUser(getStoredActiveUser());
                 setMobileMenuOpen(false);
               }} 
-              isAdmin={isAdmin} 
+              isAdmin={isAdmin}
+              onRequirePinChange={onRequirePinChange}
             />
           </div>
         </div>

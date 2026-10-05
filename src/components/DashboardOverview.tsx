@@ -62,45 +62,6 @@ export const DashboardOverview: React.FC<DashboardOverviewProps> = ({
   const hallsCount = rooms.filter(r => r.category === 'Dewan Kuliah').length;
   const specialCount = rooms.filter(r => r.category === 'Ruang Khas' || r.category === 'Surau').length;
 
-  const quickNavItems = [
-    {
-      id: 'search' as ActiveTab,
-      label: 'Cari & Tempah',
-      icon: Search,
-      color: 'text-emerald-700 bg-emerald-50 hover:bg-emerald-100/80 border-emerald-200/90',
-    },
-    {
-      id: 'matrix' as ActiveTab,
-      label: 'Calendar',
-      icon: CalendarDays,
-      color: 'text-blue-700 bg-blue-50 hover:bg-blue-100/80 border-blue-200/90',
-    },
-    {
-      id: 'academic' as ActiveTab,
-      label: 'Locked',
-      icon: Lock,
-      color: 'text-amber-700 bg-amber-50 hover:bg-amber-100/80 border-amber-200/90',
-    },
-    {
-      id: 'mybookings' as ActiveTab,
-      label: 'My Booking',
-      icon: QrCode,
-      color: 'text-indigo-700 bg-indigo-50 hover:bg-indigo-100/80 border-indigo-200/90',
-    },
-    {
-      id: 'directory' as ActiveTab,
-      label: 'Direktori',
-      icon: SlidersHorizontal,
-      color: 'text-purple-700 bg-purple-50 hover:bg-purple-100/80 border-purple-200/90',
-    },
-    {
-      id: 'admin' as ActiveTab,
-      label: 'Admin Access',
-      icon: ShieldCheck,
-      color: 'text-rose-700 bg-rose-50 hover:bg-rose-100/80 border-rose-200/90',
-    },
-  ];
-
   return (
     <div className="space-y-4 animate-in fade-in duration-200">
       
@@ -146,29 +107,7 @@ export const DashboardOverview: React.FC<DashboardOverviewProps> = ({
         </div>
       </div>
 
-      {/* 2. Compact Fast-Action Navigation Grid (Harmonized, Clean) */}
-      <div className="grid grid-cols-2 sm:grid-cols-3 lg:grid-cols-6 gap-2.5">
-        {quickNavItems.map((item) => {
-          const Icon = item.icon;
-          return (
-            <button
-              key={item.id}
-              onClick={() => onNavigateTab(item.id)}
-              className={`p-2.5 sm:p-3 rounded-xl border transition-all text-left flex items-center justify-between cursor-pointer hover:shadow-xs hover:-translate-y-0.5 group ${item.color}`}
-            >
-              <div className="flex items-center gap-2.5 min-w-0">
-                <div className="w-7 h-7 rounded-lg bg-white/80 shadow-2xs flex items-center justify-center shrink-0">
-                  <Icon className="w-3.5 h-3.5" />
-                </div>
-                <span className="text-xs font-bold truncate">{item.label}</span>
-              </div>
-              <ArrowRight className="w-3.5 h-3.5 opacity-40 group-hover:opacity-100 group-hover:translate-x-0.5 transition-all shrink-0 ml-1" />
-            </button>
-          );
-        })}
-      </div>
-
-      {/* 3. Compact 2-Column Split: Ruang Ringkas & Tempahan Pantas Hari Ini */}
+      {/* 2. Compact 2-Column Split: Ruang Ringkas & Tempahan Pantas Hari Ini */}
       <div className="grid grid-cols-1 lg:grid-cols-12 gap-4">
         
         {/* Left Column (5 cols): Kategori & Statistik Ruang */}

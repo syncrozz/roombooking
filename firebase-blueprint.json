@@ -79,7 +79,7 @@
     },
     "staff_users": {
       "title": "Registered Staff Directory",
-      "description": "Registered KPMBP staff details from CSV with email and phone passcode",
+      "description": "Registered KPMBP staff details from CSV with email and 4-digit Owner PIN",
       "type": "object",
       "properties": {
         "id": { "type": "string" },
@@ -88,9 +88,12 @@
         "role": { "type": "string" },
         "phone": { "type": "string" },
         "email": { "type": "string" },
-        "passcode": { "type": "string" }
+        "passcode": { "type": "string" },
+        "pin": { "type": "string" },
+        "pinStatus": { "type": "string", "enum": ["DEFAULT", "CUSTOM"] },
+        "pinChangedAt": { "type": "string" }
       },
-      "required": ["id", "name", "email", "passcode"]
+      "required": ["id", "name", "email", "pin"]
     }
   },
   "security": {

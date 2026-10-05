@@ -152,30 +152,108 @@ export async function testFirebaseConnection(): Promise<{
   }
 }
 
+export function normalizeStaffUser(st: any): StaffUser {
+  if (!st) {
+    return {
+      id: '',
+      department: '',
+      name: '',
+      role: '',
+      phone: '',
+      email: '',
+      pin: '1234',
+      pinStatus: 'DEFAULT'
+    };
+  }
+
+  // Determine single authoritative credential 'pin'
+  const rawPin = typeof st.pin === 'string' ? st.pin.trim() : (st.pin ? String(st.pin).trim() : '');
+  const rawPasscode = typeof st.passcode === 'string' ? st.passcode.trim() : (st.passcode ? String(st.passcode).trim() : '');
+
+  let effectivePin = '1234';
+  let pinStatus: 'DEFAULT' | 'CUSTOM' = 'DEFAULT';
+
+  if (rawPin && rawPin.length > 0) {
+    // Case A: pin exists
+    effectivePin = rawPin;
+    if (st.pinStatus === 'CUSTOM' || st.pinStatus === 'DEFAULT') {
+      pinStatus = st.pinStatus;
+    } else {
+      // Case D: pin exists but pinStatus is missing
+      pinStatus = effectivePin !== '1234' ? 'CUSTOM' : 'DEFAULT';
+    }
+  } else if (rawPasscode && rawPasscode.length > 0) {
+    // Case B: pin missing but legacy passcode exists
+    effectivePin = rawPasscode;
+    if (st.pinStatus === 'CUSTOM') {
+      pinStatus = 'CUSTOM';
+    } else if (st.pinStatus === 'DEFAULT') {
+      pinStatus = 'DEFAULT';
+    } else {
+      pinStatus = effectivePin !== '1234' ? 'CUSTOM' : 'DEFAULT';
+    }
+  } else {
+    // Case C: both missing
+    effectivePin = '1234';
+    pinStatus = 'DEFAULT';
+  }
+
+  return {
+    id: st.id || '',
+    department: st.department || '',
+    name: st.name || '',
+    role: st.role || '',
+    phone: st.phone || '',
+    email: (st.email || '').trim().toLowerCase(),
+    pin: effectivePin,
+    pinStatus,
+    pinChangedAt: st.pinChangedAt || undefined
+  };
+}
+
 /**
  * Real-time listener for Registered Staff in Firestore.
+ * SES v4.4 RULE: Database empty is a valid state. DO NOT automatically resurrect
+ * or re-seed obsolete legacy Gmail/kpmbp staff records on reload or empty collection.
  */
 export function subscribeToStaffUsers(onUpdate: (staffList: StaffUser[]) => void): () => void {
   try {
     const colRef = collection(db, STAFF_COLLECTION);
     return onSnapshot(colRef, (snapshot) => {
       if (snapshot.empty) {
-        seedInitialStaffUsers();
-        onUpdate(INITIAL_STAFF_DATA);
+        // SES v4.4: NO DATA RESURRECTION. An empty database is valid.
+        onUpdate([]);
         return;
       }
-      const staffList: StaffUser[] = [];
+      const staffMap = new Map<string, StaffUser>();
       snapshot.forEach((docSnap) => {
-        staffList.push(docSnap.data() as StaffUser);
+        const raw = docSnap.data();
+        const staff = normalizeStaffUser({ id: raw.id || docSnap.id, ...raw });
+        const key = (staff.id || '').trim().toLowerCase();
+        if (key) {
+          const existing = staffMap.get(key);
+          if (!existing) {
+            staffMap.set(key, staff);
+          } else {
+            // Identity is Staff ID: resolve duplicate record
+            // Prefer official @mara.gov.my email if available
+            const preferNew = staff.email.includes('@mara.gov.my') || (!existing.email.includes('@mara.gov.my') && staff.email);
+            const preservedPin = (existing.pinStatus === 'CUSTOM' ? existing.pin : staff.pin) || '1234';
+            const preservedStatus = (existing.pinStatus === 'CUSTOM' || staff.pinStatus === 'CUSTOM') ? 'CUSTOM' : 'DEFAULT';
+            staffMap.set(key, {
+              ...(preferNew ? staff : existing),
+              pin: preservedPin,
+              pinStatus: preservedStatus,
+              pinChangedAt: existing.pinChangedAt || staff.pinChangedAt
+            });
+          }
+        }
       });
-      onUpdate(staffList);
+      onUpdate(Array.from(staffMap.values()));
     }, (error) => {
-      // Graceful fallback to initial staff data if Firestore is offline or quota exceeded
       console.warn('Firestore offline / local fallback mode for staff users.');
-      onUpdate(INITIAL_STAFF_DATA);
     });
   } catch (err) {
-    onUpdate(INITIAL_STAFF_DATA);
     return () => {};
   }
 }
@@ -205,7 +283,8 @@ export async function bulkSaveStaffUsersToCloud(staffList: StaffUser[]): Promise
     staffList.forEach((st) => {
       const docId = st.id || `ST-${Date.now()}-${Math.random().toString(36).substr(2, 4)}`;
       const ref = doc(db, STAFF_COLLECTION, docId);
-      batch.set(ref, { ...st, id: docId }, { merge: true });
+      const normalized = normalizeStaffUser(st);
+      batch.set(ref, { ...normalized, id: docId }, { merge: true });
     });
     await batch.commit();
     console.log(`Successfully synced ${staffList.length} staff users to Cloud Firestore.`);
@@ -215,44 +294,66 @@ export async function bulkSaveStaffUsersToCloud(staffList: StaffUser[]): Promise
 }
 
 /**
+ * Update Staff Owner PIN in Cloud Firestore.
+ */
+export async function updateStaffPinInCloud(
+  staffId: string,
+  newPin: string,
+  pinStatus: 'DEFAULT' | 'CUSTOM' = 'CUSTOM'
+): Promise<void> {
+  try {
+    const docRef = doc(db, STAFF_COLLECTION, staffId);
+    const pinChangedAt = new Date().toISOString();
+    await setDoc(docRef, {
+      pin: newPin,
+      pinStatus,
+      pinChangedAt
+    }, { merge: true });
+    console.log(`Successfully updated PIN in Cloud Firestore for staff ${staffId}`);
+  } catch (err) {
+    console.warn('Error updating staff PIN in Cloud Firestore:', err);
+    throw err;
+  }
+}
+
+/**
  * Verification Engine:
- * Validates whether email matches a registered staff member AND passcode matches the 4 last digits of phone number.
+ * Validates whether email matches a registered staff member AND PIN matches the 4-digit PIN.
+ * Generic error: "Email atau PIN tidak sah."
+ * NO last4 phone fallback, NO development 5313 bypass.
  */
 export function verifyStaffCredentialsLocally(
   email: string,
-  passcode: string,
+  pin: string,
   staffList: StaffUser[] = INITIAL_STAFF_DATA
 ): { success: boolean; staff?: StaffUser; errorMsg?: string } {
   const cleanEmail = email.trim().toLowerCase();
-  const cleanPasscode = passcode.trim();
+  const cleanPin = pin.trim();
 
-  if (!cleanEmail) {
-    return { success: false, errorMsg: 'Sila masukkan e-mel pengguna.' };
-  }
-  if (!cleanPasscode || cleanPasscode.length < 4) {
-    return { success: false, errorMsg: 'Sila masukkan 4-digit passcode nombor telefon.' };
+  // Validate format: must be non-empty and exactly 4 digits numeric
+  if (!cleanEmail || !cleanPin || !/^\d{4}$/.test(cleanPin)) {
+    return { success: false, errorMsg: 'Email atau PIN tidak sah.' };
   }
 
   // Find staff by email
-  const staff = staffList.find(s => s.email.trim().toLowerCase() === cleanEmail);
+  const staffRaw = staffList.find(s => s.email.trim().toLowerCase() === cleanEmail);
 
-  if (!staff) {
+  if (!staffRaw) {
     return { 
       success: false, 
-      errorMsg: `E-mel ${cleanEmail} tidak dijumpai dalam direktori CSV staf KPMBP. Sila pastikan e-mel tepat.` 
+      errorMsg: 'Email atau PIN tidak sah.' 
     };
   }
 
-  // Check 4 last digits of phone number
-  const phoneDigits = staff.phone.replace(/\D/g, '');
-  const last4Phone = phoneDigits.slice(-4);
+  const staff = normalizeStaffUser(staffRaw);
 
-  if (cleanPasscode === '5313' || staff.passcode === cleanPasscode || last4Phone === cleanPasscode) {
+  // Exact PIN comparison
+  if (staff.pin === cleanPin) {
     return { success: true, staff };
   } else {
     return { 
       success: false, 
-      errorMsg: `Passcode ${cleanPasscode} tidak sah untuk e-mel ${cleanEmail}. Passcode mestilah 4-digit terakhir nombor telefon berdaftar.` 
+      errorMsg: 'Email atau PIN tidak sah.' 
     };
   }
 }

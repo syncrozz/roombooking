@@ -10,6 +10,8 @@ import { formatDateMalay } from '../utils/availabilityEngine';
 import { parseTimetableCSV, exportTimetableToStandardGridCSV } from '../utils/timetableCsvParser';
 import { MASTER_TIMETABLE_CSV, SAMPLE_LOCKED_SLOTS_CSV, STANDARD_GRID_TEMPLATE_CSV } from '../data/initialData';
 import { CloudSyncModal } from './CloudSyncModal';
+import { updateStaffPinInCloud } from '../lib/firebase';
+import { WhatsAppIcon } from './WhatsAppIcon';
 import { 
   ShieldCheck, 
   Lock, 
@@ -261,19 +263,36 @@ export const AdminManagementView: React.FC<AdminManagementViewProps> = ({
     alert('🟢 Block Institusi berjaya diletakkan pada ruang!');
   };
 
-  // Download Example CSV Template
+  // Download Example CSV Template (6 official profile fields only - NO credentials)
   const handleDownloadCSVTemplate = () => {
     const csvContent = 
-`id,department,name,role,phone,email,passcode
-ST089,Pengurusan,Pn. Maznah Binti Ismail,Pensyarah,019-1234567,maznah.ismail@kpmbp.edu.my,4567
-ST090,Perakaunan,En. Rosli Bin Ahmad,Pensyarah,012-9876543,rosli.ahmad@kpmbp.edu.my,6543
-ST091,Pengajian Am,Cik Siti Sarah Binti Razak,Pensyarah,013-5558899,siti.sarah@kpmbp.edu.my,8899`;
+`id,department,name,role,phone,email
+ST001,Pengurusan,Pn. Maznah Binti Ismail,Pensyarah,019-1234567,maznah.ismail@kpmbp.edu.my
+ST002,Perakaunan,En. Rosli Bin Ahmad,Pensyarah,012-9876543,rosli.ahmad@kpmbp.edu.my
+ST003,Pengajian Am,Cik Siti Sarah Binti Razak,Pensyarah,013-5558899,siti.sarah@kpmbp.edu.my`;
 
     const blob = new Blob([csvContent], { type: 'text/csv;charset=utf-8;' });
     const url = URL.createObjectURL(blob);
     const link = document.createElement('a');
     link.setAttribute('href', url);
     link.setAttribute('download', 'kpmbp_staf_template.csv');
+    document.body.appendChild(link);
+    link.click();
+    document.body.removeChild(link);
+  };
+
+  // Export Registered Staff Profiles to CSV (Standard Profile Export - NO PIN credentials)
+  const handleExportStaffListCSV = () => {
+    const header = 'id,department,name,role,phone,email';
+    const rows = staffList.map(s => 
+      `"${s.id}","${(s.department || '').replace(/"/g, '""')}","${(s.name || '').replace(/"/g, '""')}","${(s.role || '').replace(/"/g, '""')}","${s.phone || ''}","${s.email || ''}"`
+    );
+    const csvContent = [header, ...rows].join('\n');
+    const blob = new Blob([csvContent], { type: 'text/csv;charset=utf-8;' });
+    const url = URL.createObjectURL(blob);
+    const link = document.createElement('a');
+    link.setAttribute('href', url);
+    link.setAttribute('download', `kpmbp_senarai_staf_${new Date().toISOString().split('T')[0]}.csv`);
     document.body.appendChild(link);
     link.click();
     document.body.removeChild(link);
@@ -335,7 +354,7 @@ ST091,Pengajian Am,Cik Siti Sarah Binti Razak,Pensyarah,013-5558899,siti.sarah@k
       const role = roleIdx !== -1 ? cols[roleIdx] : cols[3] || 'Pensyarah';
       const phone = phoneIdx !== -1 ? cols[phoneIdx] : cols[4] || '';
       const customId = idIdx !== -1 ? cols[idIdx] : cols[0] || '';
-      const customPasscode = passcodeIdx !== -1 ? cols[passcodeIdx] : '';
+      const customPin = passcodeIdx !== -1 ? cols[passcodeIdx] : '';
 
       if (!email || !email.includes('@')) {
         errors.push(`Baris ${i + 1}: E-mel tidak sah ("${email}")`);
@@ -347,11 +366,34 @@ ST091,Pengajian Am,Cik Siti Sarah Binti Razak,Pensyarah,013-5558899,siti.sarah@k
         continue;
       }
 
-      const phoneDigits = phone.replace(/\D/g, '');
-      const fallbackPasscode = phoneDigits.length >= 4 ? phoneDigits.slice(-4) : '1234';
-      const passcode = customPasscode || fallbackPasscode;
+      const cleanEmail = email.trim().toLowerCase();
+      const id = (customId || `ST-${String(parsed.length + 100).padStart(3, '0')}`).trim();
 
-      const id = customId || `ST-${String(parsed.length + 100).padStart(3, '0')}`;
+      // SES v4.4: Staff ID is PRIMARY IDENTITY. Email is an editable attribute.
+      const existing = staffList.find(
+        s => s.id && s.id.trim().toLowerCase() === id.toLowerCase()
+      );
+
+      let pin = '1234';
+      let pinStatus: 'DEFAULT' | 'CUSTOM' = 'DEFAULT';
+      let pinChangedAt: string | undefined = undefined;
+
+      if (existing) {
+        // EXISTING STAFF: Update profile fields ONLY, MUST PRESERVE existing credentials!
+        // DO NOT reset existing custom PIN back to 1234.
+        pin = existing.pin || '1234';
+        pinStatus = existing.pinStatus || (pin !== '1234' ? 'CUSTOM' : 'DEFAULT');
+        pinChangedAt = existing.pinChangedAt;
+      } else {
+        // NEW STAFF: System automatically assigns default PIN 1234 & DEFAULT status
+        pin = '1234';
+        pinStatus = 'DEFAULT';
+        // Backward compatibility: If legacy CSV supplied an explicit valid 4-digit custom pin
+        if (customPin && /^\d{4}$/.test(customPin) && customPin !== '1234') {
+          pin = customPin;
+          pinStatus = 'CUSTOM';
+        }
+      }
 
       parsed.push({
         id,
@@ -359,8 +401,10 @@ ST091,Pengajian Am,Cik Siti Sarah Binti Razak,Pensyarah,013-5558899,siti.sarah@k
         name,
         role,
         phone,
-        email: email.trim().toLowerCase(),
-        passcode
+        email: cleanEmail,
+        pin,
+        pinStatus,
+        pinChangedAt
       });
     }
 
@@ -374,25 +418,63 @@ ST091,Pengajian Am,Cik Siti Sarah Binti Razak,Pensyarah,013-5558899,siti.sarah@k
       return;
     }
 
+    const count = parsedStaffList.length;
+
     if (onSyncStaffUsers) {
       setIsSyncing(true);
       try {
         await onSyncStaffUsers(parsedStaffList);
-        setSyncSuccessMsg(`🟢 Berjaya menyinkronkan ${parsedStaffList.length} rekod e-mel staf ke Cloud Firebase!`);
+        setSyncSuccessMsg(`🟢 Berjaya menyinkronkan ${count} rekod staf ke Cloud Firebase!`);
         setIsSyncing(false);
+        // SES v4.4: CSV Preview workspace is temporary. Clear it after successful sync!
+        setParsedStaffList([]);
+        setCsvFile(null);
       } catch (err) {
         setIsSyncing(false);
         alert('Gagal menyinkronkan data ke Cloud.');
       }
     } else {
-      setSyncSuccessMsg(`🟢 Berjaya memproses ${parsedStaffList.length} rekod staf secara tempatan!`);
+      setSyncSuccessMsg(`🟢 Berjaya memproses ${count} rekod staf secara tempatan!`);
+      setParsedStaffList([]);
+      setCsvFile(null);
+    }
+  };
+
+  const [copiedPinId, setCopiedPinId] = useState<string | null>(null);
+  const [resettingPinStaffId, setResettingPinStaffId] = useState<string | null>(null);
+
+  const handleCopyPin = (st: StaffUser) => {
+    navigator.clipboard.writeText(st.pin || '1234');
+    setCopiedPinId(st.id);
+    setTimeout(() => setCopiedPinId(null), 2500);
+  };
+
+  const handleResetStaffPin = async (st: StaffUser) => {
+    const confirmReset = window.confirm(
+      `Adakah anda pasti ingin menetapkan semula PIN untuk ${st.name} kepada PIN lalai (1234)?\n\nStaf akan diminta menetapkan PIN 4-digit baharu semasa log masuk seterusnya.`
+    );
+    if (!confirmReset) return;
+
+    setResettingPinStaffId(st.id);
+    try {
+      await updateStaffPinInCloud(st.id, '1234', 'DEFAULT');
+      if (onSyncStaffUsers) {
+        const updated = staffList.map(item =>
+          item.id === st.id ? { ...item, pin: '1234', pinStatus: 'DEFAULT' as const } : item
+        );
+        await onSyncStaffUsers(updated);
+      }
+      alert(`PIN untuk ${st.name} telah berjaya diset semula kepada 1234 (Lalai).`);
+    } catch (err) {
+      alert('Ralat semasa menetapkan semula PIN staf.');
+    } finally {
+      setResettingPinStaffId(null);
     }
   };
 
   const filteredStaffList = staffList.filter(s => 
     s.name.toLowerCase().includes(staffSearchTerm.toLowerCase()) ||
-    s.email.toLowerCase().includes(staffSearchTerm.toLowerCase()) ||
-    s.department.toLowerCase().includes(staffSearchTerm.toLowerCase())
+    s.email.toLowerCase().includes(staffSearchTerm.toLowerCase())
   );
 
   return (
@@ -809,13 +891,25 @@ ST091,Pengajian Am,Cik Siti Sarah Binti Razak,Pensyarah,013-5558899,siti.sarah@k
             </p>
           </div>
 
-          <button
-            onClick={handleDownloadCSVTemplate}
-            className="bg-emerald-50 hover:bg-emerald-100 text-emerald-800 border border-emerald-300 text-xs font-bold py-2 px-3.5 rounded-xl transition flex items-center gap-2 shadow-xs shrink-0"
-          >
-            <Download className="w-4 h-4 text-emerald-600" />
-            <span>Muat Turun Template CSV (.csv)</span>
-          </button>
+          <div className="flex flex-wrap items-center gap-2 shrink-0">
+            <button
+              onClick={handleExportStaffListCSV}
+              className="bg-slate-50 hover:bg-slate-100 text-slate-800 border border-slate-300 text-xs font-bold py-2 px-3.5 rounded-xl transition flex items-center gap-2 shadow-xs cursor-pointer"
+              title="Eksport senarai profil staf ke CSV (tanpa PIN credential)"
+            >
+              <FileSpreadsheet className="w-4 h-4 text-slate-600" />
+              <span>Eksport Profil Staf (.csv)</span>
+            </button>
+
+            <button
+              onClick={handleDownloadCSVTemplate}
+              className="bg-emerald-50 hover:bg-emerald-100 text-emerald-800 border border-emerald-300 text-xs font-bold py-2 px-3.5 rounded-xl transition flex items-center gap-2 shadow-xs shrink-0 cursor-pointer"
+              title="Muat turun templat CSV rasmi (6 medan asas tanpa PIN)"
+            >
+              <Download className="w-4 h-4 text-emerald-600" />
+              <span>Muat Turun Template CSV (.csv)</span>
+            </button>
+          </div>
         </div>
 
         {/* Upload Zone & Instructions */}
@@ -826,15 +920,26 @@ ST091,Pengajian Am,Cik Siti Sarah Binti Razak,Pensyarah,013-5558899,siti.sarah@k
               <span>Panduan Format Header CSV</span>
             </h4>
             <p className="text-slate-600 leading-relaxed">
-              Pastikan baris pertama fail CSV anda mengandungi nama header berikut:
+              Muat naik fail CSV yang mengandungi 6 maklumat asas profil staf:
             </p>
-            <div className="bg-slate-900 text-amber-300 p-3 rounded-lg font-mono text-[11px] overflow-x-auto border border-slate-800">
-              id,department,name,role,phone,email,passcode
+            <div className="bg-slate-900 text-amber-300 p-2.5 rounded-lg font-mono text-[11px] overflow-x-auto border border-slate-800">
+              id,department,name,role,phone,email
             </div>
+            
+            <div className="bg-blue-50 border border-blue-200 rounded-lg p-2.5 text-blue-900 text-[11px] space-y-1">
+              <p className="font-bold flex items-center gap-1 text-blue-950">
+                <Check className="w-3.5 h-3.5 text-blue-600 shrink-0" />
+                <span>PIN tidak perlu dimasukkan.</span>
+              </p>
+              <p className="text-blue-800/90 leading-relaxed text-[10.5px]">
+                Sistem akan menetapkan PIN lalai <strong className="font-mono font-bold">1234</strong> secara automatik untuk staf baharu. Staf akan diminta menukar PIN tersebut semasa log masuk kali pertama. Bagi staf sedia ada, PIN tersendiri akan dikekalkan.
+              </p>
+            </div>
+
             <ul className="list-disc list-inside space-y-1 text-slate-600 text-[11px]">
-              <li><strong>email</strong>: Alamat e-mel rasmi (cth: @kpmbp.edu.my)</li>
-              <li><strong>phone</strong>: Nombor telefon bimbit</li>
-              <li><strong>passcode</strong>: 4-digit digit terakhir telefon (autodijana jika kosong)</li>
+              <li><strong>email</strong>: Alamat e-mel rasmi kolej (@kpmbp.edu.my)</li>
+              <li><strong>phone</strong>: Nombor telefon bimbit untuk urusan WhatsApp</li>
+              <li><strong>department / role</strong>: Jabatan dan jawatan pensyarah/staf</li>
             </ul>
           </div>
 
@@ -851,7 +956,7 @@ ST091,Pengajian Am,Cik Siti Sarah Binti Razak,Pensyarah,013-5558899,siti.sarah@k
                 {csvFile ? `Fail dipilih: ${csvFile.name}` : 'Pilih atau Tarik Fail CSV ke Sini'}
               </div>
               <p className="text-xs text-slate-500 mt-1">
-                Klik untuk memuat naik fail bundle CSV staf baharu
+                Klik untuk memuat naik fail bundle CSV profil staf
               </p>
             </div>
 
@@ -881,13 +986,13 @@ ST091,Pengajian Am,Cik Siti Sarah Binti Razak,Pensyarah,013-5558899,siti.sarah@k
               <div className="space-y-3 pt-2">
                 <div className="flex items-center justify-between">
                   <span className="text-xs font-bold text-slate-800">
-                    Pratonton Rekod CSV Ditemui ({parsedStaffList.length} e-mel sah):
+                    Pratonton Rekod CSV Ditemui ({parsedStaffList.length} rekod):
                   </span>
 
                   <button
                     onClick={handleExecuteSync}
                     disabled={isSyncing}
-                    className="bg-blue-600 hover:bg-blue-700 disabled:bg-slate-400 text-white font-bold py-2 px-4 rounded-xl text-xs transition flex items-center gap-2 shadow-md active:scale-95"
+                    className="bg-blue-600 hover:bg-blue-700 disabled:bg-slate-400 text-white font-bold py-2 px-4 rounded-xl text-xs transition flex items-center gap-2 shadow-md active:scale-95 cursor-pointer"
                   >
                     <RefreshCw className={`w-4 h-4 ${isSyncing ? 'animate-spin' : ''}`} />
                     <span>{isSyncing ? 'Menyinkronkan...' : `SINKRONISASI ${parsedStaffList.length} REKOD KE FIREBASE`}</span>
@@ -903,20 +1008,54 @@ ST091,Pengajian Am,Cik Siti Sarah Binti Razak,Pensyarah,013-5558899,siti.sarah@k
                         <th className="p-2">E-mel</th>
                         <th className="p-2">Jabatan</th>
                         <th className="p-2">Telefon</th>
-                        <th className="p-2">Passcode</th>
+                        <th className="p-2">Status Akaun &amp; PIN</th>
                       </tr>
                     </thead>
                     <tbody className="divide-y divide-slate-100 text-slate-800">
                       {parsedStaffList.map((st, idx) => {
-                        const exists = staffList.some(s => s.email.toLowerCase() === st.email.toLowerCase());
+                        const existing = staffList.find(
+                          s => s.id && s.id.trim().toLowerCase() === st.id.trim().toLowerCase()
+                        );
+                        const isNew = !existing;
+                        const isEmailChanged = existing && existing.email.toLowerCase() !== st.email.toLowerCase();
+                        const isProfileChanged = existing && (
+                          isEmailChanged ||
+                          existing.name.trim() !== st.name.trim() ||
+                          existing.department.trim() !== st.department.trim() ||
+                          existing.phone.trim() !== st.phone.trim()
+                        );
+
                         return (
                           <tr key={idx} className="hover:bg-slate-50">
                             <td className="p-2 font-mono text-[11px] font-bold">{st.id}</td>
                             <td className="p-2 font-semibold">{st.name}</td>
-                            <td className="p-2 text-blue-600 font-medium">{st.email}</td>
+                            <td className="p-2 text-blue-600 font-medium">
+                              <div>{st.email}</div>
+                              {isEmailChanged && (
+                                <div className="text-[10px] text-amber-700 line-through">
+                                  {existing.email}
+                                </div>
+                              )}
+                            </td>
                             <td className="p-2">{st.department}</td>
-                            <td className="p-2">{st.phone}</td>
-                            <td className="p-2 font-mono text-[11px] font-bold bg-slate-100 px-1 rounded">{st.passcode}</td>
+                            <td className="p-2 font-mono">{st.phone}</td>
+                            <td className="p-2 whitespace-nowrap">
+                              {isNew ? (
+                                <span className="px-2 py-0.5 rounded-full text-[10px] font-bold bg-emerald-50 text-emerald-700 border border-emerald-300 inline-flex items-center gap-1">
+                                  <Sparkles className="w-3 h-3 text-emerald-600" />
+                                  STAF BAHARU (PIN LALAI 1234)
+                                </span>
+                              ) : isProfileChanged ? (
+                                <span className="px-2 py-0.5 rounded-full text-[10px] font-bold bg-blue-50 text-blue-700 border border-blue-200 inline-flex items-center gap-1" title={isEmailChanged ? `Email dikemas kini dari ${existing.email}` : 'Maklumat profil dikemas kini'}>
+                                  <Check className="w-3 h-3 text-blue-600" />
+                                  KEMAS KINI PROFIL (PIN DIKEKALKAN)
+                                </span>
+                              ) : (
+                                <span className="px-2 py-0.5 rounded-full text-[10px] font-bold bg-slate-100 text-slate-600 border border-slate-200 inline-flex items-center gap-1">
+                                  TIADA PERUBAHAN
+                                </span>
+                              )}
+                            </td>
                           </tr>
                         );
                       })}
@@ -940,7 +1079,7 @@ ST091,Pengajian Am,Cik Siti Sarah Binti Razak,Pensyarah,013-5558899,siti.sarah@k
               <Search className="w-3.5 h-3.5 text-slate-400 absolute left-3 top-1/2 -translate-y-1/2" />
               <input
                 type="text"
-                placeholder="Cari nama, e-mel atau jabatan..."
+                placeholder="Cari nama atau e-mel..."
                 value={staffSearchTerm}
                 onChange={(e) => setStaffSearchTerm(e.target.value)}
                 className="w-full bg-slate-50 border border-slate-300 rounded-xl pl-8 pr-3 py-1.5 text-xs text-slate-800 outline-none focus:ring-2 focus:ring-blue-500"
@@ -948,29 +1087,73 @@ ST091,Pengajian Am,Cik Siti Sarah Binti Razak,Pensyarah,013-5558899,siti.sarah@k
             </div>
           </div>
 
-          <div className="max-h-60 overflow-y-auto border border-slate-200 rounded-xl text-xs">
+          <div className="max-h-80 overflow-y-auto border border-slate-200 rounded-xl text-xs">
             <table className="w-full text-left">
               <thead className="bg-slate-900 text-white font-bold sticky top-0">
                 <tr>
                   <th className="p-2.5">ID</th>
                   <th className="p-2.5">Nama Staf</th>
-                  <th className="p-2.5">E-mel Rasmi</th>
-                  <th className="p-2.5">Jabatan / Unit</th>
-                  <th className="p-2.5">Jawatan</th>
-                  <th className="p-2.5">Telefon</th>
-                  <th className="p-2.5">Passcode</th>
+                  <th className="p-2.5">E-mel</th>
+                  <th className="p-2.5">PIN</th>
+                  <th className="p-2.5">Status PIN</th>
                 </tr>
               </thead>
               <tbody className="divide-y divide-slate-200 text-slate-800 bg-white">
-                {filteredStaffList.slice(0, 50).map((s) => (
+                {filteredStaffList.map((s) => (
                   <tr key={s.id} className="hover:bg-slate-50">
-                    <td className="p-2.5 font-mono font-bold text-slate-500">{s.id}</td>
+                    <td className="p-2.5 font-mono font-bold text-slate-500 whitespace-nowrap">{s.id}</td>
                     <td className="p-2.5 font-bold text-slate-900">{s.name}</td>
                     <td className="p-2.5 text-blue-600 font-medium">{s.email}</td>
-                    <td className="p-2.5">{s.department}</td>
-                    <td className="p-2.5 text-slate-600">{s.role}</td>
-                    <td className="p-2.5 font-mono">{s.phone}</td>
-                    <td className="p-2.5 font-mono font-bold bg-slate-100 text-slate-900 rounded">{s.passcode}</td>
+                    <td className="p-2.5 whitespace-nowrap">
+                      <div className="inline-flex items-center gap-1.5">
+                        <span className="font-mono font-bold bg-slate-100 text-slate-900 px-2 py-0.5 rounded text-xs">
+                          {s.pin || '1234'}
+                        </span>
+                        <button
+                          type="button"
+                          onClick={() => handleCopyPin(s)}
+                          className="px-2 py-0.5 bg-slate-100 hover:bg-slate-200 text-slate-700 font-semibold rounded text-[10px] transition cursor-pointer"
+                          title="Salin PIN Staf"
+                        >
+                          {copiedPinId === s.id ? '✓ Disalin' : 'Salin'}
+                        </button>
+                        {s.phone && (
+                          <a
+                            href={`https://wasap.my/6${s.phone.replace(/\D/g, '').replace(/^0/, '')}?text=${encodeURIComponent(`Salam ${s.name}, PIN semasa akaun RoomBooking KPMBP anda ialah: ${s.pin || '1234'}`)}`}
+                            target="_blank"
+                            rel="noopener noreferrer"
+                            className="p-1 bg-[#25D366]/10 hover:bg-[#25D366]/25 text-[#25D366] rounded transition inline-flex items-center"
+                            title={`Hantar PIN ke WhatsApp ${s.name}`}
+                          >
+                            <WhatsAppIcon className="w-3.5 h-3.5" />
+                          </a>
+                        )}
+                      </div>
+                    </td>
+                    <td className="p-2.5 whitespace-nowrap">
+                      <div className="inline-flex items-center gap-2">
+                        {s.pinStatus === 'CUSTOM' ? (
+                          <>
+                            <span className="px-2 py-0.5 rounded-full text-[10px] font-bold bg-emerald-100 text-emerald-800 border border-emerald-300">
+                              PIN Telah Ditukar
+                            </span>
+                            <button
+                              type="button"
+                              disabled={resettingPinStaffId === s.id}
+                              onClick={() => handleResetStaffPin(s)}
+                              className="px-2 py-0.5 bg-amber-50 hover:bg-amber-100 border border-amber-300 text-amber-800 font-bold rounded text-[10px] transition cursor-pointer disabled:opacity-50"
+                              title="Set semula PIN ke 1234 (Lalai) jika staf terlupa"
+                            >
+                              {resettingPinStaffId === s.id ? '...' : 'Reset ke 1234'}
+                            </button>
+                          </>
+                        ) : (
+                          <span className="px-2 py-0.5 rounded-full text-[10px] font-bold bg-amber-100 text-amber-800 border border-amber-300">
+                            PIN Belum Ditukar
+                          </span>
+                        )}
+                      </div>
+                    </td>
                   </tr>
                 ))}
               </tbody>

@@ -1,6 +1,6 @@
 import { StaffUser } from '../types';
 
-export const INITIAL_STAFF_DATA: StaffUser[] = [
+const RAW_STAFF_DATA = [
   {
     id: "ST001",
     department: "Pengurusan",
@@ -677,3 +677,11 @@ export const INITIAL_STAFF_DATA: StaffUser[] = [
     passcode: "7603"
   }
 ];
+
+export const INITIAL_STAFF_DATA: StaffUser[] = RAW_STAFF_DATA.map((st) => ({
+  ...st,
+  pin: '1234',
+  pinStatus: 'DEFAULT' as const,
+  passcode: '1234'
+}));
+

@@ -207,7 +207,7 @@ export const CloudSyncModal: React.FC<CloudSyncModalProps> = ({ isOpen, onClose 
                 <Smartphone className="w-4 h-4 text-emerald-500 shrink-0" />
                 <div>
                   <div className="font-bold text-slate-800 dark:text-slate-200">Direktori Staf (staff_users)</div>
-                  <div className="text-[10px] text-slate-500">Log masuk e-mel &amp; 4-digit passcode</div>
+                  <div className="text-[10px] text-slate-500">Log masuk e-mel &amp; 4-digit PIN</div>
                 </div>
               </div>
             </div>

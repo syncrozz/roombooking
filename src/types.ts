@@ -102,6 +102,9 @@ export interface StaffUser {
   role: string;
   phone: string;
   email: string;
-  passcode: string; // 4 last digits of phone
+  passcode?: string; // Legacy compatibility
+  pin: string;
+  pinStatus: 'DEFAULT' | 'CUSTOM';
+  pinChangedAt?: string;
 }
 

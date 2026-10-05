@@ -23,7 +23,13 @@ import {
   resetToDefaults, 
   purgeAllDemoDataLocal,
   generateBookingId,
-  saveUserProfile
+  saveUserProfile,
+  getStoredActiveUser,
+  subscribeToActiveUser,
+  UserProfileHistory,
+  getStoredStaffUsers,
+  saveStoredStaffUsers,
+  deduplicateStaffById
 } from './utils/storage';
 import { 
   subscribeToBookings, 
@@ -43,6 +49,7 @@ import {
 import { INITIAL_STAFF_DATA } from './data/staffData';
 
 import { Header, ActiveTab } from './components/Header';
+import { QuickNavGrid } from './components/QuickNavGrid';
 import { DashboardOverview } from './components/DashboardOverview';
 import { QuickBookingSearch } from './components/QuickBookingSearch';
 import { RoomAvailabilityMatrix } from './components/RoomAvailabilityMatrix';
@@ -53,11 +60,12 @@ import { AdminManagementView } from './components/AdminManagementView';
 import { BookingModal } from './components/BookingModal';
 import { QRCodeModal } from './components/QRCodeModal';
 import { SupportModal } from './components/SupportModal';
+import { SetPinModal } from './components/SetPinModal';
 
 import { Building2, Shield, Heart, Sparkles, CheckCircle2, Lock, X, KeyRound, ShieldCheck, AlertCircle } from 'lucide-react';
 
 export default function App() {
-  const [activeTab, setActiveTab] = useState<ActiveTab>('dashboard');
+  const [activeTab, setActiveTab] = useState<ActiveTab>('matrix');
   const [isSupportOpen, setIsSupportOpen] = useState<boolean>(false);
 
   // Admin PIN verification state
@@ -92,7 +100,7 @@ export default function App() {
 
   const handleLogoutAdmin = () => {
     setIsAdminUnlocked(false);
-    setActiveTab('dashboard');
+    setActiveTab('matrix');
     setShowAdminPinModal(false);
     setAdminPinInput('');
     setAdminPinError(null);
@@ -104,7 +112,13 @@ export default function App() {
   const [academicSchedule, setAcademicSchedule] = useState<AcademicScheduleSlot[]>([]);
   const [adhocBookings, setAdhocBookings] = useState<AdHocBooking[]>([]);
   const [institutionalBlocks, setInstitutionalBlocks] = useState<InstitutionalBlock[]>([]);
-  const [staffUsers, setStaffUsers] = useState<StaffUser[]>(INITIAL_STAFF_DATA);
+  const [staffUsers, setStaffUsers] = useState<StaffUser[]>(() => {
+    const cached = getStoredStaffUsers();
+    if (cached && cached.length > 0) {
+      return deduplicateStaffById(cached);
+    }
+    return deduplicateStaffById(INITIAL_STAFF_DATA);
+  });
 
   // Modals state
   const [bookingModalInfo, setBookingModalInfo] = useState<{
@@ -117,8 +131,45 @@ export default function App() {
 
   const [qrModalBooking, setQrModalBooking] = useState<AdHocBooking | null>(null);
 
+  // Mandatory PIN Change modal state for staff/owner on default PIN (1234)
+  const [mandatoryPinChangeStaff, setMandatoryPinChangeStaff] = useState<StaffUser | null>(null);
+
   // Toast notification state
   const [toastMessage, setToastMessage] = useState<string | null>(null);
+
+  // Automatically check if stored active user is still using default PIN 1234
+  useEffect(() => {
+    const checkMandatoryPin = (active: UserProfileHistory | null) => {
+      if (!active || !active.applicantEmail) {
+        setMandatoryPinChangeStaff(null);
+        return;
+      }
+      if (staffUsers.length > 0) {
+        const match = staffUsers.find(
+          (s) => s.email.trim().toLowerCase() === active.applicantEmail.trim().toLowerCase()
+        );
+        if (match && (match.pinStatus === 'DEFAULT' || match.pin === '1234')) {
+          setMandatoryPinChangeStaff(match);
+        } else {
+          setMandatoryPinChangeStaff(null);
+        }
+      }
+    };
+
+    checkMandatoryPin(getStoredActiveUser());
+    const unsubscribe = subscribeToActiveUser(checkMandatoryPin);
+    return () => {
+      unsubscribe();
+    };
+  }, [staffUsers]);
+
+  const handlePinChangeSuccess = (updatedStaff: StaffUser) => {
+    setStaffUsers((prev) =>
+      prev.map((s) => (s.id === updatedStaff.id ? updatedStaff : s))
+    );
+    setMandatoryPinChangeStaff(null);
+    showToast(`✅ PIN keselamatan berjaya ditetapkan untuk ${updatedStaff.name}.`);
+  };
 
   // Handle ESC key to close popups/modals
   useEffect(() => {
@@ -146,10 +197,12 @@ export default function App() {
     // Clean any obsolete demo records from Cloud Firestore (Strict Zero Demo Data)
     cleanObsoleteDemoRecordsFromCloud().catch(() => {});
 
-    // Subscribe to Firestore staff users (seeds automatically if Firestore is empty)
+    // Subscribe to Firestore staff users (SES v4.4: Authoritative Staff List)
     const unsubStaff = subscribeToStaffUsers((cloudStaff) => {
       if (cloudStaff && cloudStaff.length > 0) {
-        setStaffUsers(cloudStaff);
+        const deduplicated = deduplicateStaffById(cloudStaff);
+        setStaffUsers(deduplicated);
+        saveStoredStaffUsers(deduplicated);
       }
     });
 
@@ -334,21 +387,59 @@ export default function App() {
     showToast(`Lock Ruang telah dipadam.`);
   };
 
-  // Staff sync
+  // Staff sync (SES v4.4: Staff ID is PRIMARY IDENTITY. Email is an editable attribute)
   const handleSyncStaffUsers = async (newStaffList: StaffUser[]) => {
     try {
-      await bulkSaveStaffUsersToCloud(newStaffList);
-      const combined = [...staffUsers];
-      newStaffList.forEach((st) => {
-        const idx = combined.findIndex(s => s.email.toLowerCase() === st.email.toLowerCase());
-        if (idx !== -1) {
-          combined[idx] = st;
+      // 1. Staff ID is the PRIMARY IDENTITY.
+      // Build a map of existing staff keyed by normalized ID to avoid duplicate records.
+      const staffMap = new Map<string, StaffUser>();
+
+      // Seed with existing staff (deduplicated by ID)
+      staffUsers.forEach((st) => {
+        const idKey = (st.id || '').trim().toLowerCase();
+        if (idKey) staffMap.set(idKey, st);
+      });
+
+      // Apply incoming staff updates
+      newStaffList.forEach((incoming) => {
+        const idKey = (incoming.id || '').trim().toLowerCase();
+        if (!idKey) return;
+
+        const existing = staffMap.get(idKey);
+        if (existing) {
+          // EXISTING STAFF: Update profile fields ONLY, MUST PRESERVE existing credentials
+          staffMap.set(idKey, {
+            ...existing,
+            id: incoming.id || existing.id,
+            name: incoming.name || existing.name,
+            email: (incoming.email || existing.email).trim().toLowerCase(),
+            department: incoming.department || existing.department,
+            role: incoming.role || existing.role,
+            phone: incoming.phone || existing.phone,
+            // Credentials preserved:
+            pin: existing.pin || incoming.pin || '1234',
+            pinStatus: existing.pinStatus || incoming.pinStatus || 'DEFAULT',
+            pinChangedAt: existing.pinChangedAt || incoming.pinChangedAt
+          });
         } else {
-          combined.push(st);
+          // NEW STAFF: Add as new record
+          staffMap.set(idKey, {
+            ...incoming,
+            email: (incoming.email || '').trim().toLowerCase()
+          });
         }
       });
-      setStaffUsers(combined);
-      showToast(`🟢 ${newStaffList.length} rekod e-mel/staf berjaya disinkronkan ke Cloud Firebase!`);
+
+      const updatedList = Array.from(staffMap.values());
+
+      // 2. Persist authoritative records to Cloud Firestore
+      await bulkSaveStaffUsersToCloud(updatedList);
+
+      // 3. Update authoritative local state & cache
+      setStaffUsers(updatedList);
+      saveStoredStaffUsers(updatedList);
+
+      showToast(`🟢 ${newStaffList.length} rekod staf berjaya disinkronkan ke Cloud Firebase!`);
     } catch (err) {
       console.error('Error syncing staff users:', err);
       showToast(`🔴 Ralat semasa menyinkronkan data staf ke Cloud.`);
@@ -441,12 +532,20 @@ export default function App() {
         staffList={staffUsers}
         isAdmin={isAdminUnlocked}
         onLogoutAdmin={handleLogoutAdmin}
+        onRequirePinChange={(st) => setMandatoryPinChangeStaff(st)}
       />
 
       {/* Main Content Workspace */}
       <div className="flex-1 flex flex-col min-w-0">
         {/* View Section */}
         <main className="flex-1 max-w-7xl w-full mx-auto p-3.5 sm:p-5 lg:p-6 space-y-4">
+          {/* Quick Action Navigation Grid (Paparan Pantas untuk setiap seksyen) */}
+          <QuickNavGrid
+            activeTab={activeTab}
+            onNavigateTab={handleSelectTab}
+            pendingCount={pendingCount}
+          />
+
           {activeTab === 'dashboard' && (
             <DashboardOverview
               rooms={rooms}
@@ -496,8 +595,10 @@ export default function App() {
             <MyBookingsView
               bookings={adhocBookings}
               staffList={staffUsers}
+              isAdmin={isAdminUnlocked}
               onOpenQRModal={(b) => setQrModalBooking(b)}
               onCancelBooking={handleCancelBooking}
+              onRequirePinChange={(st) => setMandatoryPinChangeStaff(st)}
             />
           )}
 
@@ -592,6 +693,16 @@ export default function App() {
           staffList={staffUsers}
           onClose={() => setBookingModalInfo(null)}
           onSubmitBooking={handleSubmitBooking}
+          onRequirePinChange={(st) => setMandatoryPinChangeStaff(st)}
+        />
+      )}
+
+      {/* MANDATORY OWNER PIN CHANGE MODAL */}
+      {mandatoryPinChangeStaff && (
+        <SetPinModal
+          staff={mandatoryPinChangeStaff}
+          isOpen={true}
+          onSuccess={handlePinChangeSuccess}
         />
       )}
 
