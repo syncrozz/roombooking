@@ -4,7 +4,6 @@ import { CloudSyncModal } from './CloudSyncModal';
 import { StaffUser } from '../types';
 import { getStoredActiveUser, clearActiveUser, subscribeToActiveUser } from '../utils/storage';
 import { 
-  Building2, 
   LayoutDashboard,
   Search, 
   CalendarDays, 
@@ -101,8 +100,12 @@ export const Header: React.FC<HeaderProps> = ({
               className="flex items-center gap-2.5 cursor-pointer hover:opacity-90 active:scale-95 transition-all text-left bg-transparent border-0 p-0"
               title="Papar Kalendar Ketersediaan Ruang (Calendar)"
             >
-              <div className="w-9 h-9 bg-blue-600 rounded-lg flex items-center justify-center font-bold text-white shadow-md shadow-blue-900/50">
-                <Building2 className="w-5 h-5 text-white" />
+              <div className="w-9 h-9 rounded-xl overflow-hidden flex items-center justify-center bg-slate-800 border border-slate-700/80 shadow-md shadow-blue-900/30 shrink-0">
+                <img
+                  src="https://raw.githubusercontent.com/syncrozz/syncrozz-assets/main/logo/BookBK/icon-192x192.png"
+                  alt="Logo BookBK KPMBP"
+                  className="w-full h-full object-contain p-0.5"
+                />
               </div>
               <div className="leading-tight">
                 <span className="font-bold text-base tracking-tight">

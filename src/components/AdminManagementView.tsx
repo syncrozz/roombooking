@@ -1391,7 +1391,7 @@ ST003,Pengajian Am,Cik Siti Sarah Binti Razak,Pensyarah,013-5558899,siti.sarah@k
                         </button>
                         {s.phone && (
                           <a
-                            href={`https://wasap.my/6${s.phone.replace(/\D/g, '').replace(/^0/, '')}?text=${encodeURIComponent(`Salam ${s.name}, PIN semasa akaun RoomBooking KPMBP anda ialah: ${s.pin || '1234'}`)}`}
+                            href={`https://wasap.my/6${s.phone.replace(/\D/g, '').replace(/^0/, '')}?text=${encodeURIComponent(`Salam ${s.name}, PIN semasa akaun BookBK KPMBP anda ialah: ${s.pin || '1234'}`)}`}
                             target="_blank"
                             rel="noopener noreferrer"
                             className="p-1 bg-[#25D366]/10 hover:bg-[#25D366]/25 text-[#25D366] rounded transition inline-flex items-center"
