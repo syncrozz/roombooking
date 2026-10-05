@@ -21,6 +21,7 @@ import {
   isTimeRangeNight
 } from '../utils/timeSlots';
 import { formatLevel } from '../utils/storage';
+import { getShortName } from '../utils/displayName';
 import { 
   Calendar, 
   Filter, 
@@ -384,6 +385,7 @@ export const RoomAvailabilityMatrix: React.FC<RoomAvailabilityMatrixProps> = ({
                           {isAcad && (() => {
                             const acadSlot = check.academicSlot;
                             let displayClassName = acadSlot?.className || 'Slot Terkunci';
+                            let isLecturerText = false;
 
                             // If generic or wrapped with Pensyarah (...), extract only the lecturer name
                             if (
@@ -393,13 +395,17 @@ export const RoomAvailabilityMatrix: React.FC<RoomAvailabilityMatrixProps> = ({
                             ) {
                               if (acadSlot?.lecturerName) {
                                 displayClassName = acadSlot.lecturerName;
+                                isLecturerText = true;
                               } else if (displayClassName.startsWith('Pensyarah (') && displayClassName.endsWith(')')) {
                                 displayClassName = displayClassName.slice(11, -1).trim();
+                                isLecturerText = true;
                               }
                             }
 
-                            // Format single-word all-caps name (e.g. IBRAHIM -> Ibrahim)
-                            if (/^[A-Z]{3,}$/.test(displayClassName)) {
+                            if (isLecturerText) {
+                              displayClassName = getShortName(displayClassName);
+                            } else if (/^[A-Z]{3,}$/.test(displayClassName)) {
+                              // Format single-word all-caps name (e.g. IBRAHIM -> Ibrahim)
                               displayClassName = displayClassName.charAt(0) + displayClassName.slice(1).toLowerCase();
                             }
 
@@ -407,7 +413,7 @@ export const RoomAvailabilityMatrix: React.FC<RoomAvailabilityMatrixProps> = ({
                               <button
                                 onClick={() => setSelectedCellInfo({ room, startTime: slot.start, endTime: slot.end, check })}
                                 className="w-full h-11 rounded-lg bg-rose-50 hover:bg-rose-100 border border-rose-300 text-rose-900 font-semibold transition p-1 text-center flex flex-col items-center justify-center overflow-hidden group shadow-2xs active:scale-[0.98]"
-                                title={`Jadual Kuliah Semester Rasmi KPMBP (Bukan Tempahan Ad-hoc): ${displayClassName} - ${acadSlot?.courseCode === 'TERKUNCI' ? 'LOCKED' : acadSlot?.courseCode} (${acadSlot?.lecturerName || displayClassName})`}
+                                title={`Jadual Kuliah Semester Rasmi KPMBP (Bukan Tempahan Ad-hoc): ${acadSlot?.className || displayClassName} - ${acadSlot?.courseCode === 'TERKUNCI' ? 'LOCKED' : acadSlot?.courseCode} (${acadSlot?.lecturerName || displayClassName})`}
                               >
                                 <div className="flex items-center justify-center gap-1 w-full text-[9px] font-bold text-rose-700 tracking-tight">
                                   <span className="w-1.5 h-1.5 rounded-full bg-rose-500 shrink-0"></span>
@@ -427,7 +433,7 @@ export const RoomAvailabilityMatrix: React.FC<RoomAvailabilityMatrixProps> = ({
                               title={check.conflictReason}
                             >
                               <div className="text-[10px] font-bold truncate max-w-full text-amber-950">
-                                🟨 {check.existingBooking?.applicantName}
+                                🟨 {getShortName(check.existingBooking?.applicantName ?? '')}
                               </div>
                               <div className="text-[9px] truncate max-w-full text-amber-800">
                                 {check.existingBooking?.purposeCategory}

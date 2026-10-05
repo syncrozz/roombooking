@@ -249,7 +249,7 @@ export const LoginUserCard: React.FC<LoginUserCardProps> = ({
                 required
                 value={emailInput}
                 onChange={(e) => setEmailInput(e.target.value)}
-                placeholder="nama@kpmbp.edu.my"
+                placeholder="nama@mara.gov.my"
                 className="w-full pl-8 pr-3 py-1.5 bg-slate-800 border border-slate-700 rounded-lg text-xs text-white placeholder-slate-500 focus:outline-none focus:border-blue-500"
               />
             </div>

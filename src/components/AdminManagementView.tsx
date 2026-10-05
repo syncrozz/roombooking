@@ -52,7 +52,7 @@ interface AdminManagementViewProps {
   onAddBlock: (block: Omit<InstitutionalBlock, 'id'>) => void;
   onDeleteBlock: (id: string) => void;
   onResetData: () => void;
-  onSyncStaffUsers?: (staff: StaffUser[]) => Promise<void>;
+  onSyncStaffUsers?: (staff: StaffUser[], mode?: 'merge' | 'replace', resetAllPins?: boolean) => Promise<{ written: number; deleted: number } | void>;
   onSyncAcademicSchedule?: (schedule: AcademicScheduleSlot[], mode?: 'merge' | 'replace') => Promise<void> | void;
   onClearAcademicSchedule?: () => Promise<void> | void;
   onLogoutAdmin?: () => void;
@@ -105,6 +105,8 @@ export const AdminManagementView: React.FC<AdminManagementViewProps> = ({
   const [syncSuccessMsg, setSyncSuccessMsg] = useState<string | null>(null);
   const [staffSearchTerm, setStaffSearchTerm] = useState<string>('');
   const [showCloudSyncModal, setShowCloudSyncModal] = useState<boolean>(false);
+  const [staffSyncMode, setStaffSyncMode] = useState<'merge' | 'replace'>('merge');
+  const [resetAllPinsOnSync, setResetAllPinsOnSync] = useState<boolean>(false);
 
   // Download Standard Timetable CSV Template (Format Perkara/Hari yang diselaraskan)
   const handleDownloadStandardGridTemplate = () => {
@@ -162,7 +164,7 @@ export const AdminManagementView: React.FC<AdminManagementViewProps> = ({
     document.body.removeChild(link);
   };
 
-  // Timetable CSV File Handler
+  // Timetable CSV File Handler with Auto-Sync to Firebase
   const handleScheduleFileUpload = (e: React.ChangeEvent<HTMLInputElement>) => {
     const file = e.target.files?.[0];
     if (!file) return;
@@ -170,12 +172,33 @@ export const AdminManagementView: React.FC<AdminManagementViewProps> = ({
     setScheduleSyncSuccessMsg(null);
 
     const reader = new FileReader();
-    reader.onload = (event) => {
+    reader.onload = async (event) => {
       const text = event.target?.result as string;
       const res = parseTimetableCSV(text, rooms);
       setParsedScheduleSlots(res.slots);
       setScheduleParseSummary(res.summary);
       setScheduleParseErrors(res.errors);
+
+      // Auto-sync immediately to Firebase Cloud when slots are successfully parsed
+      if (res.slots.length > 0 && onSyncAcademicSchedule) {
+        setIsSyncingSchedule(true);
+        try {
+          await onSyncAcademicSchedule(res.slots, scheduleSyncMode);
+          if (scheduleSyncMode === 'replace') {
+            setScheduleSyncSuccessMsg(
+              `🟢 Berjaya auto-sync & MENGUNCI ${res.slots.length} slot baharu merentasi ${res.summary.roomsAffected.length} ruang ke Cloud Firebase (Mod Ganti Sepenuhnya)!`
+            );
+          } else {
+            setScheduleSyncSuccessMsg(
+              `🟢 Berjaya auto-sync & menggabungkan ${res.slots.length} slot jadual di ${res.summary.roomsAffected.length} ruang ke Cloud Firebase!`
+            );
+          }
+        } catch (err) {
+          console.error('Schedule auto sync error:', err);
+        } finally {
+          setIsSyncingSchedule(false);
+        }
+      }
     };
     reader.readAsText(file);
   };
@@ -298,7 +321,7 @@ ST003,Pengajian Am,Cik Siti Sarah Binti Razak,Pensyarah,013-5558899,siti.sarah@k
     document.body.removeChild(link);
   };
 
-  // CSV File Handler
+  // CSV File Handler with Auto-Sync to Firebase
   const handleFileUpload = (e: React.ChangeEvent<HTMLInputElement>) => {
     const file = e.target.files?.[0];
     if (!file) return;
@@ -306,26 +329,65 @@ ST003,Pengajian Am,Cik Siti Sarah Binti Razak,Pensyarah,013-5558899,siti.sarah@k
     setSyncSuccessMsg(null);
     
     const reader = new FileReader();
-    reader.onload = (event) => {
+    reader.onload = async (event) => {
       const text = event.target?.result as string;
-      parseCSVText(text);
+      const parsed = parseCSVText(text);
+
+      // Auto-sync immediately to Firebase Cloud when staff records are parsed
+      if (parsed && parsed.length > 0) {
+        if (staffSyncMode === 'replace') {
+          const confirmProceed = window.confirm(
+            'PERHATIAN: Anda memilih mod "Ganti Semua (padam data lama)". Semua rekod staf di Cloud Firestore yang tiada di dalam fail CSV ini akan DIPADAMKAN secara kekal.\n\nAdakah anda pasti mahu meneruskan?'
+          );
+          if (!confirmProceed) {
+            setCsvFile(null);
+            setParsedStaffList([]);
+            return;
+          }
+        }
+
+        if (onSyncStaffUsers) {
+          setIsSyncing(true);
+          try {
+            const res = await onSyncStaffUsers(parsed, staffSyncMode, resetAllPinsOnSync);
+            const written = res && 'written' in res ? res.written : parsed.length;
+            const deleted = res && 'deleted' in res ? res.deleted : 0;
+            if (staffSyncMode === 'replace') {
+              setSyncSuccessMsg(
+                `🟢 Mod Ganti Semua berjaya! ${written} rekod staf disimpan, ${deleted} rekod lama telah dipadamkan dari Cloud Firebase.`
+              );
+            } else {
+              setSyncSuccessMsg(`🟢 Berjaya auto-sync ${written} rekod staf ke Cloud Firebase secara automatik!`);
+            }
+          } catch (err) {
+            console.error('Auto sync error:', err);
+            alert('Ralat semasa auto-sync data staf ke Cloud Firebase.');
+          } finally {
+            setIsSyncing(false);
+          }
+        } else {
+          setSyncSuccessMsg(`🟢 Berjaya memproses ${parsed.length} rekod staf secara tempatan.`);
+        }
+      }
     };
     reader.readAsText(file);
   };
 
-  const parseCSVText = (text: string) => {
-    const lines = text.split(/\r\n|\n/).map(l => l.trim()).filter(l => l.length > 0);
+  const parseCSVText = (text: string): StaffUser[] => {
+    // 1. Tolerate UTF-8 BOM if present
+    const cleanText = text.replace(/^\uFEFF/, '');
+    const lines = cleanText.split(/\r\n|\n/).map(l => l.trim()).filter(l => l.length > 0);
     if (lines.length < 2) {
       setParseErrors(['Fail CSV kosong atau tiada baris data selepas tajuk (header).']);
       setParsedStaffList([]);
-      return;
+      return [];
     }
 
     // Detect delimiter
     const headerLine = lines[0];
     const delimiter = headerLine.includes(';') ? ';' : ',';
     
-    const headers = headerLine.split(delimiter).map(h => h.trim().toLowerCase().replace(/^["']|["']$/g, ''));
+    const headers = headerLine.split(delimiter).map(h => h.trim().toLowerCase().replace(/^["']|["']$/g, '').trim());
     
     const findIndex = (keys: string[]) => {
       return headers.findIndex(h => keys.some(k => h.includes(k)));
@@ -346,15 +408,16 @@ ST003,Pengajian Am,Cik Siti Sarah Binti Razak,Pensyarah,013-5558899,siti.sarah@k
       const rawLine = lines[i];
       if (!rawLine) continue;
 
-      const cols = rawLine.split(delimiter).map(c => c.trim().replace(/^["']|["']$/g, ''));
+      // 2. Trim every value and remove surrounding quotes
+      const cols = rawLine.split(delimiter).map(c => c.trim().replace(/^["']|["']$/g, '').trim());
       
-      const email = emailIdx !== -1 ? cols[emailIdx] : cols[5] || '';
-      const name = nameIdx !== -1 ? cols[nameIdx] : cols[2] || '';
-      const dept = deptIdx !== -1 ? cols[deptIdx] : cols[1] || 'Umum';
-      const role = roleIdx !== -1 ? cols[roleIdx] : cols[3] || 'Pensyarah';
-      const phone = phoneIdx !== -1 ? cols[phoneIdx] : cols[4] || '';
-      const customId = idIdx !== -1 ? cols[idIdx] : cols[0] || '';
-      const customPin = passcodeIdx !== -1 ? cols[passcodeIdx] : '';
+      const email = (emailIdx !== -1 ? cols[emailIdx] : cols[5] || '').trim();
+      const name = (nameIdx !== -1 ? cols[nameIdx] : cols[2] || '').trim();
+      const dept = (deptIdx !== -1 ? cols[deptIdx] : cols[1] || 'Umum').trim();
+      const role = (roleIdx !== -1 ? cols[roleIdx] : cols[3] || 'Pensyarah').trim();
+      const phone = (phoneIdx !== -1 ? cols[phoneIdx] : cols[4] || '').trim();
+      const customId = (idIdx !== -1 ? cols[idIdx] : cols[0] || '').trim();
+      const customPin = (passcodeIdx !== -1 ? cols[passcodeIdx] : '').trim();
 
       if (!email || !email.includes('@')) {
         errors.push(`Baris ${i + 1}: E-mel tidak sah ("${email}")`);
@@ -366,7 +429,8 @@ ST003,Pengajian Am,Cik Siti Sarah Binti Razak,Pensyarah,013-5558899,siti.sarah@k
         continue;
       }
 
-      const cleanEmail = email.trim().toLowerCase();
+      // 3. Lowercase emails
+      const cleanEmail = email.toLowerCase();
       const id = (customId || `ST-${String(parsed.length + 100).padStart(3, '0')}`).trim();
 
       // SES v4.4: Staff ID is PRIMARY IDENTITY. Email is an editable attribute.
@@ -380,19 +444,14 @@ ST003,Pengajian Am,Cik Siti Sarah Binti Razak,Pensyarah,013-5558899,siti.sarah@k
 
       if (existing) {
         // EXISTING STAFF: Update profile fields ONLY, MUST PRESERVE existing credentials!
-        // DO NOT reset existing custom PIN back to 1234.
-        pin = existing.pin || '1234';
-        pinStatus = existing.pinStatus || (pin !== '1234' ? 'CUSTOM' : 'DEFAULT');
-        pinChangedAt = existing.pinChangedAt;
+        const isCustom = existing.pinStatus === 'CUSTOM' && existing.pin && existing.pin !== '1234' && !!existing.pinChangedAt;
+        pin = isCustom ? existing.pin : '1234';
+        pinStatus = isCustom ? 'CUSTOM' : 'DEFAULT';
+        pinChangedAt = isCustom ? existing.pinChangedAt : undefined;
       } else {
         // NEW STAFF: System automatically assigns default PIN 1234 & DEFAULT status
         pin = '1234';
         pinStatus = 'DEFAULT';
-        // Backward compatibility: If legacy CSV supplied an explicit valid 4-digit custom pin
-        if (customPin && /^\d{4}$/.test(customPin) && customPin !== '1234') {
-          pin = customPin;
-          pinStatus = 'CUSTOM';
-        }
       }
 
       parsed.push({
@@ -410,6 +469,7 @@ ST003,Pengajian Am,Cik Siti Sarah Binti Razak,Pensyarah,013-5558899,siti.sarah@k
 
     setParseErrors(errors);
     setParsedStaffList(parsed);
+    return parsed;
   };
 
   const handleExecuteSync = async () => {
@@ -418,13 +478,28 @@ ST003,Pengajian Am,Cik Siti Sarah Binti Razak,Pensyarah,013-5558899,siti.sarah@k
       return;
     }
 
+    if (staffSyncMode === 'replace') {
+      const confirmProceed = window.confirm(
+        'PERHATIAN: Anda memilih mod "Ganti Semua (padam data lama)". Semua rekod staf di Cloud Firestore yang tiada di dalam fail CSV ini akan DIPADAMKAN secara kekal.\n\nAdakah anda pasti mahu meneruskan?'
+      );
+      if (!confirmProceed) return;
+    }
+
     const count = parsedStaffList.length;
 
     if (onSyncStaffUsers) {
       setIsSyncing(true);
       try {
-        await onSyncStaffUsers(parsedStaffList);
-        setSyncSuccessMsg(`🟢 Berjaya menyinkronkan ${count} rekod staf ke Cloud Firebase!`);
+        const res = await onSyncStaffUsers(parsedStaffList, staffSyncMode, resetAllPinsOnSync);
+        const written = res && 'written' in res ? res.written : count;
+        const deleted = res && 'deleted' in res ? res.deleted : 0;
+        if (staffSyncMode === 'replace') {
+          setSyncSuccessMsg(
+            `🟢 Mod Ganti Semua berjaya! ${written} rekod staf disimpan, ${deleted} rekod lama telah dipadamkan dari Cloud Firebase.`
+          );
+        } else {
+          setSyncSuccessMsg(`🟢 Berjaya menyinkronkan ${written} rekod staf ke Cloud Firebase!`);
+        }
         setIsSyncing(false);
         // SES v4.4: CSV Preview workspace is temporary. Clear it after successful sync!
         setParsedStaffList([]);
@@ -469,6 +544,33 @@ ST003,Pengajian Am,Cik Siti Sarah Binti Razak,Pensyarah,013-5558899,siti.sarah@k
       alert('Ralat semasa menetapkan semula PIN staf.');
     } finally {
       setResettingPinStaffId(null);
+    }
+  };
+
+  const [isResettingAllPins, setIsResettingAllPins] = useState<boolean>(false);
+
+  const handleResetAllPinsToDefault = async () => {
+    const confirmReset = window.confirm(
+      'Adakah anda pasti ingin menetapkan semula SEMUA staf kepada PIN lalai (1234)?\n\nSemua akaun akan berstatus lalai dan diminta menetapkan PIN keselamatan sendiri semasa log masuk kali pertama.'
+    );
+    if (!confirmReset) return;
+
+    setIsResettingAllPins(true);
+    try {
+      const resetList: StaffUser[] = staffList.map(item => ({
+        ...item,
+        pin: '1234',
+        pinStatus: 'DEFAULT' as const,
+        pinChangedAt: undefined
+      }));
+      if (onSyncStaffUsers) {
+        await onSyncStaffUsers(resetList);
+      }
+      alert('🟢 Berjaya! Semua PIN staf telah ditetapkan semula kepada 1234 (Lalai) dan disinkronkan ke Cloud Firebase.');
+    } catch (err) {
+      alert('Ralat semasa menetapkan semula semua PIN staf.');
+    } finally {
+      setIsResettingAllPins(false);
     }
   };
 
@@ -761,19 +863,43 @@ ST003,Pengajian Am,Cik Siti Sarah Binti Razak,Pensyarah,013-5558899,siti.sarah@k
               </div>
             </div>
 
-            <div className="border-2 border-dashed border-indigo-200 hover:border-indigo-500 bg-indigo-50/20 hover:bg-indigo-50/50 rounded-2xl p-6 text-center transition cursor-pointer relative">
+            <div className={`border-2 border-dashed rounded-2xl p-6 text-center transition cursor-pointer relative ${
+              isSyncingSchedule
+                ? 'border-indigo-500 bg-indigo-50/60'
+                : 'border-indigo-200 hover:border-indigo-500 bg-indigo-50/20 hover:bg-indigo-50/50'
+            }`}>
               <input
                 type="file"
                 accept=".csv"
                 onChange={handleScheduleFileUpload}
-                className="absolute inset-0 w-full h-full opacity-0 cursor-pointer"
+                disabled={isSyncingSchedule}
+                className="absolute inset-0 w-full h-full opacity-0 cursor-pointer disabled:cursor-not-allowed"
+                title="Pilih fail CSV jadual waktu untuk auto-sync ke Firebase"
               />
-              <UploadCloud className="w-10 h-10 text-indigo-600 mx-auto mb-2" />
+              <div className="inline-flex items-center gap-1.5 px-2.5 py-0.5 rounded-full bg-indigo-100 text-indigo-800 text-[10px] font-bold border border-indigo-300 mb-2">
+                <span className="relative flex h-2 w-2">
+                  <span className="animate-ping absolute inline-flex h-full w-full rounded-full bg-indigo-400 opacity-75"></span>
+                  <span className="relative inline-flex rounded-full h-2 w-2 bg-indigo-500"></span>
+                </span>
+                <span>Auto-Sync ke Firebase Aktif</span>
+              </div>
+              <UploadCloud className={`w-10 h-10 mx-auto mb-2 ${isSyncingSchedule ? 'text-indigo-600 animate-bounce' : 'text-indigo-600'}`} />
               <div className="font-bold text-slate-800 text-sm">
-                {scheduleCsvFile ? `Fail dipilih: ${scheduleCsvFile.name}` : 'Pilih atau Tarik Fail CSV Jadual Waktu di Sini'}
+                {isSyncingSchedule ? (
+                  <span className="text-indigo-700 flex items-center justify-center gap-2">
+                    <RefreshCw className="w-4 h-4 animate-spin text-indigo-600" />
+                    Sedang auto-sync jadual ke Firebase Cloud...
+                  </span>
+                ) : scheduleCsvFile ? (
+                  `Fail dipilih: ${scheduleCsvFile.name}`
+                ) : (
+                  'Pilih atau Tarik Fail CSV Jadual Waktu di Sini'
+                )}
               </div>
               <p className="text-xs text-slate-500 mt-1">
-                Menyokong fail templat grid terkunci (Perkara/Hari) serta fail CSV rasmi Unit Jadual Waktu
+                {isSyncingSchedule
+                  ? 'Slot jadual sedang disinkronkan dan dikunci secara langsung ke Cloud Firestore...'
+                  : 'Slot jadual akan auto-sync dan dikunci ke Firebase sebaik sahaja fail CSV dimasukkan (format Perkara/Hari atau fail FET).'}
               </p>
             </div>
 
@@ -944,19 +1070,152 @@ ST003,Pengajian Am,Cik Siti Sarah Binti Razak,Pensyarah,013-5558899,siti.sarah@k
           </div>
 
           <div className="lg:col-span-2 space-y-4">
-            <div className="border-2 border-dashed border-slate-300 hover:border-emerald-500 bg-slate-50/50 hover:bg-emerald-50/30 rounded-2xl p-6 text-center transition cursor-pointer relative">
+            {/* Staff Sync Mode Selection Cards */}
+            <div className="space-y-2">
+              <div className="text-xs font-bold text-slate-700 flex flex-col sm:flex-row sm:items-center justify-between gap-1">
+                <span className="flex items-center gap-1.5">
+                  <Layers className="w-4 h-4 text-emerald-600" />
+                  Pilihan Mod Penyelarasan E-mel &amp; Profil Staf:
+                </span>
+                <span className="text-[11px] font-normal text-slate-500">
+                  Staf berdaftar semasa di sistem: <strong className="text-emerald-900 font-bold">{staffList.length} orang</strong>
+                </span>
+              </div>
+
+              <div className="grid grid-cols-1 sm:grid-cols-2 gap-3">
+                {/* Option 1: Gabung (kemaskini & tambah) */}
+                <div 
+                  onClick={() => setStaffSyncMode('merge')}
+                  className={`p-3.5 rounded-xl border-2 cursor-pointer transition flex flex-col justify-between gap-2.5 ${
+                    staffSyncMode === 'merge'
+                      ? 'bg-emerald-50/80 border-emerald-500 shadow-sm ring-2 ring-emerald-400/20'
+                      : 'bg-slate-50 border-slate-200 hover:border-slate-300'
+                  }`}
+                >
+                  <div className="flex items-start justify-between gap-2">
+                    <div className="flex items-center gap-2">
+                      <input
+                        type="radio"
+                        name="staffSyncMode"
+                        value="merge"
+                        checked={staffSyncMode === 'merge'}
+                        onChange={() => setStaffSyncMode('merge')}
+                        className="text-emerald-600 focus:ring-emerald-500 mt-0.5"
+                      />
+                      <div>
+                        <span className="font-extrabold text-slate-900 text-xs block leading-tight">
+                          Gabung (kemaskini &amp; tambah)
+                        </span>
+                        <span className="text-[10px] text-emerald-700 font-bold uppercase tracking-wide">
+                          Kemas Kini Staf Terlibat
+                        </span>
+                      </div>
+                    </div>
+                    <span className="px-2 py-0.5 rounded text-[10px] font-bold bg-emerald-100 text-emerald-800 shrink-0">
+                      Lalai (Default)
+                    </span>
+                  </div>
+                  <p className="text-[11px] text-slate-600 leading-relaxed pl-5">
+                    Hanya mengemas kini atau menambah staf yang terdapat dalam fail CSV. Staf lain yang sedia ada dalam sistem akan dikekalkan.
+                  </p>
+                </div>
+
+                {/* Option 2: Ganti Semua (padam data lama) */}
+                <div 
+                  onClick={() => setStaffSyncMode('replace')}
+                  className={`p-3.5 rounded-xl border-2 cursor-pointer transition flex flex-col justify-between gap-2.5 ${
+                    staffSyncMode === 'replace'
+                      ? 'bg-rose-50/80 border-rose-500 shadow-sm ring-2 ring-rose-400/20'
+                      : 'bg-slate-50 border-slate-200 hover:border-slate-300'
+                  }`}
+                >
+                  <div className="flex items-start justify-between gap-2">
+                    <div className="flex items-center gap-2">
+                      <input
+                        type="radio"
+                        name="staffSyncMode"
+                        value="replace"
+                        checked={staffSyncMode === 'replace'}
+                        onChange={() => setStaffSyncMode('replace')}
+                        className="text-rose-600 focus:ring-rose-500 mt-0.5"
+                      />
+                      <div>
+                        <span className="font-extrabold text-slate-900 text-xs block leading-tight">
+                          Ganti Semua (padam data lama)
+                        </span>
+                        <span className="text-[10px] text-rose-700 font-bold uppercase tracking-wide">
+                          Padam Rekod Tiada Dalam CSV
+                        </span>
+                      </div>
+                    </div>
+                    <span className="px-2 py-0.5 rounded text-[10px] font-bold bg-rose-200 text-rose-900 shrink-0">
+                      Pembersihan Penuh
+                    </span>
+                  </div>
+                  <p className="text-[11px] text-slate-600 leading-relaxed pl-5">
+                    Memadamkan kesemua rekod staf lama di Cloud Firestore yang tiada di dalam fail CSV ini dan hanya mengekalkan senarai baharu (contoh: 75 staf rasmi).
+                  </p>
+                </div>
+              </div>
+
+              {/* Reset semua PIN kepada 1234 Checkbox */}
+              {staffSyncMode === 'replace' && (
+                <div className="bg-amber-50 border border-amber-300 rounded-xl p-3 flex items-center justify-between gap-3 text-xs">
+                  <label className="flex items-center gap-2.5 cursor-pointer select-none">
+                    <input
+                      type="checkbox"
+                      checked={resetAllPinsOnSync}
+                      onChange={(e) => setResetAllPinsOnSync(e.target.checked)}
+                      className="w-4 h-4 text-amber-600 rounded focus:ring-amber-500 border-amber-400"
+                    />
+                    <div>
+                      <span className="font-bold text-slate-900 block">Reset semua PIN kepada 1234</span>
+                      <span className="text-[11px] text-slate-600">
+                        Jika ditandakan, semua staf akan ditetapkan semula kepada PIN lalai 1234 (status DEFAULT). Jika tidak ditandakan, PIN tersendiri staf sedia ada akan dikekalkan.
+                      </span>
+                    </div>
+                  </label>
+                </div>
+              )}
+            </div>
+
+            <div className={`border-2 border-dashed rounded-2xl p-6 text-center transition cursor-pointer relative ${
+              isSyncing
+                ? 'border-blue-500 bg-blue-50/50'
+                : 'border-slate-300 hover:border-emerald-500 bg-slate-50/50 hover:bg-emerald-50/30'
+            }`}>
               <input
                 type="file"
                 accept=".csv"
                 onChange={handleFileUpload}
-                className="absolute inset-0 w-full h-full opacity-0 cursor-pointer"
+                disabled={isSyncing}
+                className="absolute inset-0 w-full h-full opacity-0 cursor-pointer disabled:cursor-not-allowed"
+                title="Pilih fail CSV profil staf untuk auto-sync ke Firebase"
               />
-              <UploadCloud className="w-10 h-10 text-emerald-600 mx-auto mb-2" />
+              <div className="inline-flex items-center gap-1.5 px-2.5 py-0.5 rounded-full bg-emerald-100 text-emerald-800 text-[10px] font-bold border border-emerald-300 mb-2">
+                <span className="relative flex h-2 w-2">
+                  <span className="animate-ping absolute inline-flex h-full w-full rounded-full bg-emerald-400 opacity-75"></span>
+                  <span className="relative inline-flex rounded-full h-2 w-2 bg-emerald-500"></span>
+                </span>
+                <span>Auto-Sync ke Firebase Aktif</span>
+              </div>
+              <UploadCloud className={`w-10 h-10 mx-auto mb-2 ${isSyncing ? 'text-blue-600 animate-bounce' : 'text-emerald-600'}`} />
               <div className="font-bold text-slate-800 text-sm">
-                {csvFile ? `Fail dipilih: ${csvFile.name}` : 'Pilih atau Tarik Fail CSV ke Sini'}
+                {isSyncing ? (
+                  <span className="text-blue-700 flex items-center justify-center gap-2">
+                    <RefreshCw className="w-4 h-4 animate-spin text-blue-600" />
+                    Sedang auto-sync ke Firebase Cloud...
+                  </span>
+                ) : csvFile ? (
+                  `Fail dipilih: ${csvFile.name}`
+                ) : (
+                  'Pilih atau Tarik Fail CSV ke Sini'
+                )}
               </div>
               <p className="text-xs text-slate-500 mt-1">
-                Klik untuk memuat naik fail bundle CSV profil staf
+                {isSyncing
+                  ? 'Data sedang disinkronkan secara langsung ke Firebase Cloud Firestore...'
+                  : 'Data akan auto-sync ke Firebase secara automatik sebaik sahaja fail CSV dimasukkan.'}
               </p>
             </div>
 
@@ -1075,15 +1334,28 @@ ST003,Pengajian Am,Cik Siti Sarah Binti Razak,Pensyarah,013-5558899,siti.sarah@k
               <span>Senarai Staf & E-mel Berdaftar Sedia Ada ({staffList.length})</span>
             </h4>
 
-            <div className="relative w-full sm:w-64">
-              <Search className="w-3.5 h-3.5 text-slate-400 absolute left-3 top-1/2 -translate-y-1/2" />
-              <input
-                type="text"
-                placeholder="Cari nama atau e-mel..."
-                value={staffSearchTerm}
-                onChange={(e) => setStaffSearchTerm(e.target.value)}
-                className="w-full bg-slate-50 border border-slate-300 rounded-xl pl-8 pr-3 py-1.5 text-xs text-slate-800 outline-none focus:ring-2 focus:ring-blue-500"
-              />
+            <div className="flex flex-wrap items-center gap-2 w-full sm:w-auto">
+              <button
+                type="button"
+                onClick={handleResetAllPinsToDefault}
+                disabled={isResettingAllPins}
+                className="px-3 py-1.5 rounded-xl bg-amber-50 hover:bg-amber-100 text-amber-900 border border-amber-300 text-xs font-bold transition flex items-center gap-1.5 cursor-pointer shadow-xs disabled:opacity-50"
+                title="Setkan semula semua user kepada PIN lalai (1234)"
+              >
+                <RotateCcw className={`w-3.5 h-3.5 text-amber-600 ${isResettingAllPins ? 'animate-spin' : ''}`} />
+                <span>{isResettingAllPins ? 'Sedang Memproses...' : 'Set Semua PIN Lalai (1234)'}</span>
+              </button>
+
+              <div className="relative w-full sm:w-64">
+                <Search className="w-3.5 h-3.5 text-slate-400 absolute left-3 top-1/2 -translate-y-1/2" />
+                <input
+                  type="text"
+                  placeholder="Cari nama atau e-mel..."
+                  value={staffSearchTerm}
+                  onChange={(e) => setStaffSearchTerm(e.target.value)}
+                  className="w-full bg-slate-50 border border-slate-300 rounded-xl pl-8 pr-3 py-1.5 text-xs text-slate-800 outline-none focus:ring-2 focus:ring-blue-500"
+                />
+              </div>
             </div>
           </div>
 

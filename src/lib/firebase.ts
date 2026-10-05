@@ -29,17 +29,13 @@ export const auth = getAuth(app);
 
 const databaseId = firebaseConfig.firestoreDatabaseId || '(default)';
 
-// Initialize Firestore with experimentalForceLongPolling in browser to bypass proxy/iframe streaming buffering
+// Initialize Firestore with auto-detect long polling to gracefully handle web proxies and browser iframe environments
 let dbInstance: Firestore;
-if (typeof window !== 'undefined') {
-  try {
-    dbInstance = initializeFirestore(app, {
-      experimentalForceLongPolling: true,
-    }, databaseId);
-  } catch {
-    dbInstance = getFirestore(app, databaseId);
-  }
-} else {
+try {
+  dbInstance = initializeFirestore(app, {
+    experimentalAutoDetectLongPolling: true,
+  }, databaseId);
+} catch {
   dbInstance = getFirestore(app, databaseId);
 }
 
@@ -167,38 +163,22 @@ export function normalizeStaffUser(st: any): StaffUser {
   }
 
   // Determine single authoritative credential 'pin'
+  // Rule: Since all users have not logged in for the first time yet, all default to '1234' with 'DEFAULT' status.
+  // A PIN is only treated as CUSTOM if explicitly changed by user (has valid pinChangedAt and is not 1234).
   const rawPin = typeof st.pin === 'string' ? st.pin.trim() : (st.pin ? String(st.pin).trim() : '');
-  const rawPasscode = typeof st.passcode === 'string' ? st.passcode.trim() : (st.passcode ? String(st.passcode).trim() : '');
 
   let effectivePin = '1234';
   let pinStatus: 'DEFAULT' | 'CUSTOM' = 'DEFAULT';
 
-  if (rawPin && rawPin.length > 0) {
-    // Case A: pin exists
+  if (st.pinStatus === 'CUSTOM' && rawPin && /^\d{4}$/.test(rawPin) && rawPin !== '1234' && st.pinChangedAt) {
     effectivePin = rawPin;
-    if (st.pinStatus === 'CUSTOM' || st.pinStatus === 'DEFAULT') {
-      pinStatus = st.pinStatus;
-    } else {
-      // Case D: pin exists but pinStatus is missing
-      pinStatus = effectivePin !== '1234' ? 'CUSTOM' : 'DEFAULT';
-    }
-  } else if (rawPasscode && rawPasscode.length > 0) {
-    // Case B: pin missing but legacy passcode exists
-    effectivePin = rawPasscode;
-    if (st.pinStatus === 'CUSTOM') {
-      pinStatus = 'CUSTOM';
-    } else if (st.pinStatus === 'DEFAULT') {
-      pinStatus = 'DEFAULT';
-    } else {
-      pinStatus = effectivePin !== '1234' ? 'CUSTOM' : 'DEFAULT';
-    }
+    pinStatus = 'CUSTOM';
   } else {
-    // Case C: both missing
     effectivePin = '1234';
     pinStatus = 'DEFAULT';
   }
 
-  return {
+  const user: StaffUser = {
     id: st.id || '',
     department: st.department || '',
     name: st.name || '',
@@ -206,9 +186,28 @@ export function normalizeStaffUser(st: any): StaffUser {
     phone: st.phone || '',
     email: (st.email || '').trim().toLowerCase(),
     pin: effectivePin,
-    pinStatus,
-    pinChangedAt: st.pinChangedAt || undefined
+    pinStatus
   };
+
+  if (pinStatus === 'CUSTOM' && st.pinChangedAt) {
+    user.pinChangedAt = st.pinChangedAt;
+  }
+
+  return user;
+}
+
+/**
+ * Remove any undefined values from an object before sending to Firestore
+ * (Firestore throws "Unsupported field value: undefined" if undefined is present)
+ */
+export function sanitizeForFirestore<T extends Record<string, any>>(obj: T): Record<string, any> {
+  const clean: Record<string, any> = {};
+  for (const [key, value] of Object.entries(obj)) {
+    if (value !== undefined) {
+      clean[key] = value;
+    }
+  }
+  return clean;
 }
 
 /**
@@ -238,13 +237,16 @@ export function subscribeToStaffUsers(onUpdate: (staffList: StaffUser[]) => void
             // Identity is Staff ID: resolve duplicate record
             // Prefer official @mara.gov.my email if available
             const preferNew = staff.email.includes('@mara.gov.my') || (!existing.email.includes('@mara.gov.my') && staff.email);
-            const preservedPin = (existing.pinStatus === 'CUSTOM' ? existing.pin : staff.pin) || '1234';
-            const preservedStatus = (existing.pinStatus === 'CUSTOM' || staff.pinStatus === 'CUSTOM') ? 'CUSTOM' : 'DEFAULT';
+            const isExistingCustom = existing.pinStatus === 'CUSTOM' && existing.pin && existing.pin !== '1234' && !!existing.pinChangedAt;
+            const isStaffCustom = staff.pinStatus === 'CUSTOM' && staff.pin && staff.pin !== '1234' && !!staff.pinChangedAt;
+            const preservedPin = isExistingCustom ? existing.pin : (isStaffCustom ? staff.pin : '1234');
+            const preservedStatus = (isExistingCustom || isStaffCustom) ? 'CUSTOM' : 'DEFAULT';
+            const preservedChangedAt = isExistingCustom ? existing.pinChangedAt : (isStaffCustom ? staff.pinChangedAt : undefined);
             staffMap.set(key, {
               ...(preferNew ? staff : existing),
               pin: preservedPin,
               pinStatus: preservedStatus,
-              pinChangedAt: existing.pinChangedAt || staff.pinChangedAt
+              pinChangedAt: preservedChangedAt
             });
           }
         }
@@ -266,7 +268,7 @@ export async function seedInitialStaffUsers() {
     const batch = writeBatch(db);
     INITIAL_STAFF_DATA.forEach((st) => {
       const ref = doc(db, STAFF_COLLECTION, st.id);
-      batch.set(ref, st);
+      batch.set(ref, sanitizeForFirestore(st));
     });
     await batch.commit();
   } catch (err) {
@@ -276,20 +278,93 @@ export async function seedInitialStaffUsers() {
 
 /**
  * Bulk save/sync staff users into Firestore.
+ * Supports 'merge' (default) and 'replace' (deletes any records not in the uploaded list).
  */
-export async function bulkSaveStaffUsersToCloud(staffList: StaffUser[]): Promise<void> {
+export async function bulkSaveStaffUsersToCloud(
+  staffList: StaffUser[],
+  mode: 'merge' | 'replace' = 'merge',
+  resetAllPins: boolean = false
+): Promise<{ written: number; deleted: number; updatedList: StaffUser[] }> {
   try {
-    const batch = writeBatch(db);
-    staffList.forEach((st) => {
-      const docId = st.id || `ST-${Date.now()}-${Math.random().toString(36).substr(2, 4)}`;
-      const ref = doc(db, STAFF_COLLECTION, docId);
-      const normalized = normalizeStaffUser(st);
-      batch.set(ref, { ...normalized, id: docId }, { merge: true });
+    const colRef = collection(db, STAFF_COLLECTION);
+    const existingSnap = await getDocs(colRef);
+    const existingDocs = existingSnap.docs;
+    const existingDocMap = new Map<string, any>();
+    existingDocs.forEach((d) => {
+      existingDocMap.set(d.id.trim().toLowerCase(), d.data());
     });
-    await batch.commit();
-    console.log(`Successfully synced ${staffList.length} staff users to Cloud Firestore.`);
+
+    const newDocIds = new Set<string>();
+
+    // 1. Prepare normalized staff list with preserved credentials
+    const preparedList: StaffUser[] = staffList.map((st) => {
+      const docId = (st.id || `ST-${Date.now()}-${Math.random().toString(36).substr(2, 4)}`).trim();
+      newDocIds.add(docId.toLowerCase());
+
+      const normalized = normalizeStaffUser(st);
+      const existing = existingDocMap.get(docId.toLowerCase());
+
+      if (resetAllPins) {
+        return {
+          ...normalized,
+          id: docId,
+          pin: '1234',
+          pinStatus: 'DEFAULT' as const,
+          pinChangedAt: undefined
+        };
+      }
+
+      // If id exists in both old and new data, keep existing pin, pinStatus and pinChangedAt
+      if (existing) {
+        const isCustom = existing.pinStatus === 'CUSTOM' && existing.pin && existing.pin !== '1234' && !!existing.pinChangedAt;
+        return {
+          ...normalized,
+          id: docId,
+          pin: isCustom ? existing.pin : (normalized.pin || '1234'),
+          pinStatus: isCustom ? 'CUSTOM' as const : 'DEFAULT' as const,
+          pinChangedAt: isCustom ? existing.pinChangedAt : undefined
+        };
+      }
+
+      return {
+        ...normalized,
+        id: docId
+      };
+    });
+
+    // 2. Upsert all CSV rows in batches of max 400
+    for (let i = 0; i < preparedList.length; i += 400) {
+      const chunk = preparedList.slice(i, i + 400);
+      const batch = writeBatch(db);
+      chunk.forEach((st) => {
+        const ref = doc(db, STAFF_COLLECTION, st.id);
+        const cleanPayload = sanitizeForFirestore(st);
+        batch.set(ref, cleanPayload, { merge: true });
+      });
+      await batch.commit();
+    }
+
+    let deletedCount = 0;
+    // 3. In 'replace' mode: Delete every document in Firestore staff_users collection whose id is not in the uploaded CSV
+    if (mode === 'replace') {
+      const docsToDelete = existingDocs.filter(d => !newDocIds.has(d.id.trim().toLowerCase()));
+      deletedCount = docsToDelete.length;
+
+      for (let i = 0; i < docsToDelete.length; i += 400) {
+        const chunk = docsToDelete.slice(i, i + 400);
+        const batch = writeBatch(db);
+        chunk.forEach(d => {
+          batch.delete(doc(db, STAFF_COLLECTION, d.id));
+        });
+        await batch.commit();
+      }
+    }
+
+    console.log(`Successfully synced ${preparedList.length} staff users (${mode} mode) to Cloud Firestore. Deleted ${deletedCount} obsolete records.`);
+    return { written: preparedList.length, deleted: deletedCount, updatedList: preparedList };
   } catch (err) {
-    console.warn('Firestore bulk sync staff users saved locally.');
+    console.warn('Firestore bulk sync staff users error:', err);
+    throw err;
   }
 }
 
@@ -304,11 +379,12 @@ export async function updateStaffPinInCloud(
   try {
     const docRef = doc(db, STAFF_COLLECTION, staffId);
     const pinChangedAt = new Date().toISOString();
-    await setDoc(docRef, {
+    const payload = sanitizeForFirestore({
       pin: newPin,
       pinStatus,
       pinChangedAt
-    }, { merge: true });
+    });
+    await setDoc(docRef, payload, { merge: true });
     console.log(`Successfully updated PIN in Cloud Firestore for staff ${staffId}`);
   } catch (err) {
     console.warn('Error updating staff PIN in Cloud Firestore:', err);
@@ -432,7 +508,7 @@ export function subscribeToBlocks(onUpdate: (blocks: InstitutionalBlock[]) => vo
 export async function saveBookingToCloud(booking: AdHocBooking): Promise<void> {
   try {
     const docRef = doc(db, BOOKINGS_COLLECTION, booking.id);
-    await setDoc(docRef, booking, { merge: true });
+    await setDoc(docRef, sanitizeForFirestore(booking), { merge: true });
   } catch (err) {
     console.warn('Booking saved locally (Cloud sync skipped / quota exceeded).');
   }
@@ -456,7 +532,7 @@ export async function deleteBookingFromCloud(bookingId: string): Promise<void> {
 export async function saveBlockToCloud(block: InstitutionalBlock): Promise<void> {
   try {
     const docRef = doc(db, BLOCKS_COLLECTION, block.id);
-    await setDoc(docRef, block, { merge: true });
+    await setDoc(docRef, sanitizeForFirestore(block), { merge: true });
   } catch (err) {
     console.warn('Block saved locally (Cloud sync skipped / quota exceeded).');
   }
@@ -534,7 +610,8 @@ export async function bulkSaveScheduleToCloud(
         const docId = slot.id || `SCH-${slot.roomId}-${slot.dayOfWeek}-${slot.startTime}`.replace(/[^a-zA-Z0-9_-]/g, '_');
         newDocIds.add(docId);
         const ref = doc(db, SCHEDULE_COLLECTION, docId);
-        batch.set(ref, { ...slot, id: docId });
+        const cleanSlot = sanitizeForFirestore({ ...slot, id: docId });
+        batch.set(ref, cleanSlot);
       });
       await batch.commit();
     }

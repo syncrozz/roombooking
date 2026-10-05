@@ -262,7 +262,14 @@ export function deduplicateStaffById(list: StaffUser[]): StaffUser[] {
     const key = rawId.toLowerCase();
     const existing = map.get(key);
     if (!existing) {
-      map.set(key, { ...st, id: rawId });
+      const isCustom = st.pinStatus === 'CUSTOM' && st.pin && /^\d{4}$/.test(st.pin) && st.pin !== '1234' && !!st.pinChangedAt;
+      map.set(key, {
+        ...st,
+        id: rawId,
+        pin: isCustom ? st.pin : '1234',
+        pinStatus: isCustom ? 'CUSTOM' : 'DEFAULT',
+        pinChangedAt: isCustom ? st.pinChangedAt : undefined
+      });
     } else {
       // Identity is Staff ID: resolve duplicate record
       // 1. Email: prefer @mara.gov.my over older domains if available
@@ -270,22 +277,22 @@ export function deduplicateStaffById(list: StaffUser[]): StaffUser[] {
       if (st.email && (st.email.includes('@mara.gov.my') || !existing.email.includes('@mara.gov.my'))) {
         chosenEmail = st.email;
       }
-      // 2. PIN: preserve CUSTOM pin if either has CUSTOM status
-      let chosenPin = existing.pin || '1234';
-      let chosenStatus: 'DEFAULT' | 'CUSTOM' = 'DEFAULT';
-      let chosenChangedAt = existing.pinChangedAt;
+      
+      const existingIsCustom = existing.pinStatus === 'CUSTOM' && existing.pin && existing.pin !== '1234' && !!existing.pinChangedAt;
+      const stIsCustom = st.pinStatus === 'CUSTOM' && st.pin && st.pin !== '1234' && !!st.pinChangedAt;
 
-      if (existing.pinStatus === 'CUSTOM') {
+      let chosenPin = '1234';
+      let chosenStatus: 'DEFAULT' | 'CUSTOM' = 'DEFAULT';
+      let chosenChangedAt: string | undefined = undefined;
+
+      if (existingIsCustom) {
         chosenPin = existing.pin;
         chosenStatus = 'CUSTOM';
         chosenChangedAt = existing.pinChangedAt;
-      } else if (st.pinStatus === 'CUSTOM') {
+      } else if (stIsCustom) {
         chosenPin = st.pin;
         chosenStatus = 'CUSTOM';
         chosenChangedAt = st.pinChangedAt;
-      } else {
-        chosenPin = existing.pin || st.pin || '1234';
-        chosenStatus = 'DEFAULT';
       }
 
       map.set(key, {

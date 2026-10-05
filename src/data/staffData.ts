@@ -4,11 +4,10 @@ const RAW_STAFF_DATA = [
   {
     id: "ST001",
     department: "Pengurusan",
-    name: "Muhammad Fazly Bin Jamaluddin 8.0",
+    name: "Muhammad Fazly Bin Jamaluddin",
     role: "Pengarah",
     phone: "013-9500149",
     email: "fazly.jamaluddin@mara.gov.my",
-    passcode: "0149"
   },
   {
     id: "ST002",
@@ -17,7 +16,6 @@ const RAW_STAFF_DATA = [
     role: "Timb. Pengarah HEP",
     phone: "018-3854235",
     email: "hakim.hafiz@mara.gov.my",
-    passcode: "4235"
   },
   {
     id: "ST003",
@@ -26,7 +24,6 @@ const RAW_STAFF_DATA = [
     role: "Timb. Pengarah HEA",
     phone: "017-4693512",
     email: "musamuhamadali77@gmail.com",
-    passcode: "3512"
   },
   {
     id: "ST004",
@@ -35,7 +32,6 @@ const RAW_STAFF_DATA = [
     role: "Timb. Pengarah (Khidmat Pengurusan)",
     phone: "013-8661616",
     email: "ajahar@mara.gov.my",
-    passcode: "1616"
   },
   {
     id: "ST009",
@@ -44,7 +40,6 @@ const RAW_STAFF_DATA = [
     role: "Ketua UPPK",
     phone: "012-6623364",
     email: "syahida.rahamad@kpmbp.edu.my",
-    passcode: "3364"
   },
   {
     id: "ST010",
@@ -53,7 +48,6 @@ const RAW_STAFF_DATA = [
     role: "Ketua Jabatan",
     phone: "012-7278737",
     email: "norhasnah2@gmail.com",
-    passcode: "8737"
   },
   {
     id: "ST011",
@@ -62,7 +56,6 @@ const RAW_STAFF_DATA = [
     role: "Pegawai Teknologi Maklumat",
     phone: "014-3999593",
     email: "n4nie84@gmail.com",
-    passcode: "9593"
   },
   {
     id: "ST012",
@@ -71,7 +64,6 @@ const RAW_STAFF_DATA = [
     role: "Pegawai Perpustakaan",
     phone: "017-3473519",
     email: "orchidrose040312@gmail.com",
-    passcode: "3519"
   },
   {
     id: "ST015",
@@ -80,7 +72,6 @@ const RAW_STAFF_DATA = [
     role: "Penolong Pegawai Tadbir",
     phone: "019-7337194",
     email: "farhana.jabbar@kpmbp.edu.my",
-    passcode: "7194"
   },
   {
     id: "ST018",
@@ -89,7 +80,6 @@ const RAW_STAFF_DATA = [
     role: "Pensyarah",
     phone: "013-2395183",
     email: "arnishahida@kpmbp.edu.my",
-    passcode: "5183"
   },
   {
     id: "ST019",
@@ -98,7 +88,6 @@ const RAW_STAFF_DATA = [
     role: "Pensyarah",
     phone: "017-2823252",
     email: "nasihin.ariffin@kpmbp.edu.my",
-    passcode: "3252"
   },
   {
     id: "ST020",
@@ -107,7 +96,6 @@ const RAW_STAFF_DATA = [
     role: "Pensyarah",
     phone: "017-7804852",
     email: "saadiah.safar@kpmbp.edu.my",
-    passcode: "4852"
   },
   {
     id: "ST021",
@@ -116,7 +104,6 @@ const RAW_STAFF_DATA = [
     role: "Pensyarah",
     phone: "019-2046144",
     email: "muzlinda.roshidi@kpmbp.edu.my",
-    passcode: "6144"
   },
   {
     id: "ST022",
@@ -125,7 +112,6 @@ const RAW_STAFF_DATA = [
     role: "Pensyarah",
     phone: "011-7808882",
     email: "syahmi.ismail@kpmbp.edu.my",
-    passcode: "8882"
   },
   {
     id: "ST023",
@@ -134,7 +120,6 @@ const RAW_STAFF_DATA = [
     role: "Pensyarah",
     phone: "019-2788790",
     email: "adam.ihsan@kpmbp.edu.my",
-    passcode: "8790"
   },
   {
     id: "ST026",
@@ -143,7 +128,6 @@ const RAW_STAFF_DATA = [
     role: "Ketua Jabatan",
     phone: "019-4887223",
     email: "hamizulhazrin@kpmbp.edu.my",
-    passcode: "7223"
   },
   {
     id: "ST027",
@@ -152,7 +136,6 @@ const RAW_STAFF_DATA = [
     role: "Pensyarah",
     phone: "012-5337908",
     email: "syamrie.nazhari@kpmbp.edu.my",
-    passcode: "7908"
   },
   {
     id: "ST028",
@@ -161,7 +144,6 @@ const RAW_STAFF_DATA = [
     role: "Pensyarah",
     phone: "010-8288932",
     email: "fakharuddin.ali@kpmbp.edu.my",
-    passcode: "8932"
   },
   {
     id: "ST029",
@@ -170,7 +152,6 @@ const RAW_STAFF_DATA = [
     role: "Pensyarah",
     phone: "011-0682203",
     email: "ibrahim.damit@kpmbp.edu.my",
-    passcode: "2203"
   },
   {
     id: "ST030",
@@ -179,7 +160,6 @@ const RAW_STAFF_DATA = [
     role: "Pensyarah",
     phone: "017-4993053",
     email: "ammirumuzzaki@gmail.com",
-    passcode: "3053"
   },
   {
     id: "ST031",
@@ -188,7 +168,6 @@ const RAW_STAFF_DATA = [
     role: "Pensyarah",
     phone: "019-5121343",
     email: "nurdiyana1014@gmail.com",
-    passcode: "1343"
   },
   {
     id: "ST032",
@@ -197,7 +176,6 @@ const RAW_STAFF_DATA = [
     role: "Pensyarah",
     phone: "019-7009192",
     email: "pazila.salleh@kpmbp.edu.my",
-    passcode: "9192"
   },
   {
     id: "ST033",
@@ -206,7 +184,6 @@ const RAW_STAFF_DATA = [
     role: "Pensyarah",
     phone: "016-4538781",
     email: "norliza.ramliy@kpmbp.edu.my",
-    passcode: "8781"
   },
   {
     id: "ST034",
@@ -215,7 +192,6 @@ const RAW_STAFF_DATA = [
     role: "Pensyarah",
     phone: "012-9675490",
     email: "hazaniah.baharin@kpmbp.edu.my",
-    passcode: "5490"
   },
   {
     id: "ST035",
@@ -224,7 +200,6 @@ const RAW_STAFF_DATA = [
     role: "Pensyarah",
     phone: "017-2565366",
     email: "syakirah.ghazali@kpmbp.edu.my",
-    passcode: "5366"
   },
   {
     id: "ST036",
@@ -233,7 +208,6 @@ const RAW_STAFF_DATA = [
     role: "Pensyarah",
     phone: "010-9820290",
     email: "syafiqah.sabri@kpmbp.edu.my",
-    passcode: "0290"
   },
   {
     id: "ST037",
@@ -242,7 +216,6 @@ const RAW_STAFF_DATA = [
     role: "Pensyarah",
     phone: "013-7183217",
     email: "raidah.latiff@kpmbp.edu.my",
-    passcode: "3217"
   },
   {
     id: "ST038",
@@ -251,7 +224,6 @@ const RAW_STAFF_DATA = [
     role: "Pensyarah",
     phone: "010-9261097",
     email: "aisya.sabri@kpmbp.edu.my",
-    passcode: "1097"
   },
   {
     id: "ST039",
@@ -260,7 +232,6 @@ const RAW_STAFF_DATA = [
     role: "Pensyarah",
     phone: "019-6192421",
     email: "rabiahtul9332@gmail.com",
-    passcode: "2421"
   },
   {
     id: "ST040",
@@ -269,7 +240,6 @@ const RAW_STAFF_DATA = [
     role: "Pensyarah",
     phone: "013-9144807",
     email: "nazhan.kamil@kpmbp.edu.my",
-    passcode: "4807"
   },
   {
     id: "ST041",
@@ -278,7 +248,6 @@ const RAW_STAFF_DATA = [
     role: "Pensyarah",
     phone: "013-5155735",
     email: "farah.kamil@kpmbp.edu.my",
-    passcode: "5735"
   },
   {
     id: "ST042",
@@ -287,7 +256,6 @@ const RAW_STAFF_DATA = [
     role: "Ketua Jabatan",
     phone: "013-7186161",
     email: "surayabahar@gmail.com",
-    passcode: "6161"
   },
   {
     id: "ST043",
@@ -296,7 +264,6 @@ const RAW_STAFF_DATA = [
     role: "Pensyarah",
     phone: "017-5834421",
     email: "khairani.kamil@kpmbp.edu.my",
-    passcode: "4421"
   },
   {
     id: "ST044",
@@ -305,7 +272,6 @@ const RAW_STAFF_DATA = [
     role: "Pensyarah",
     phone: "010-8802317",
     email: "marina.nasir@kpmbp.edu.my",
-    passcode: "2317"
   },
   {
     id: "ST045",
@@ -314,7 +280,6 @@ const RAW_STAFF_DATA = [
     role: "Pensyarah",
     phone: "013-5336235",
     email: "normala0978@gmail.com",
-    passcode: "6235"
   },
   {
     id: "ST046",
@@ -323,7 +288,6 @@ const RAW_STAFF_DATA = [
     role: "Pensyarah",
     phone: "019-7745239",
     email: "julia.abas@kpmbp.edu.my",
-    passcode: "5239"
   },
   {
     id: "ST047",
@@ -332,7 +296,6 @@ const RAW_STAFF_DATA = [
     role: "Pensyarah",
     phone: "010-5207130",
     email: "syifa.shahariman@kpmbp.edu.my",
-    passcode: "7130"
   },
   {
     id: "ST048",
@@ -341,7 +304,6 @@ const RAW_STAFF_DATA = [
     role: "Pensyarah",
     phone: "017-5898322",
     email: "nfirzanahajahar@gmail.com",
-    passcode: "8322"
   },
   {
     id: "ST049",
@@ -350,7 +312,6 @@ const RAW_STAFF_DATA = [
     role: "Pensyarah",
     phone: "012-6970212",
     email: "safuan.jaafar@kpmbp.edu.my",
-    passcode: "0212"
   },
   {
     id: "ST050",
@@ -359,7 +320,6 @@ const RAW_STAFF_DATA = [
     role: "Pensyarah",
     phone: "013-4741267",
     email: "zaki.zuki@kpmbp.edu.my",
-    passcode: "1267"
   },
   {
     id: "ST051",
@@ -368,7 +328,6 @@ const RAW_STAFF_DATA = [
     role: "Pensyarah",
     phone: "018-3852051",
     email: "helmi.hamid@kpmbp.edu.my",
-    passcode: "2051"
   },
   {
     id: "ST052",
@@ -377,7 +336,6 @@ const RAW_STAFF_DATA = [
     role: "Ketua Jabatan",
     phone: "019-2577634",
     email: "anisnorman84@gmail.com",
-    passcode: "7634"
   },
   {
     id: "ST053",
@@ -386,7 +344,6 @@ const RAW_STAFF_DATA = [
     role: "Pensyarah",
     phone: "013-3578180",
     email: "afifmamat@gmail.com",
-    passcode: "8180"
   },
   {
     id: "ST054",
@@ -395,7 +352,6 @@ const RAW_STAFF_DATA = [
     role: "Pensyarah",
     phone: "014-5313756",
     email: "khaikerr@gmail.com",
-    passcode: "3756"
   },
   {
     id: "ST055",
@@ -404,7 +360,6 @@ const RAW_STAFF_DATA = [
     role: "Pensyarah",
     phone: "019-7772038",
     email: "shaiful.wagiman@kpmbp.edu.my",
-    passcode: "2038"
   },
   {
     id: "ST056",
@@ -413,7 +368,6 @@ const RAW_STAFF_DATA = [
     role: "Pensyarah",
     phone: "019-7842454",
     email: "nizam.gani@kpmbp.edu.my",
-    passcode: "2454"
   },
   {
     id: "ST057",
@@ -422,7 +376,6 @@ const RAW_STAFF_DATA = [
     role: "Pensyarah",
     phone: "015-4138385",
     email: "fauzan.ghazi@kpmbp.edu.my",
-    passcode: "8385"
   },
   {
     id: "ST058",
@@ -431,7 +384,6 @@ const RAW_STAFF_DATA = [
     role: "Pensyarah",
     phone: "019-2916860",
     email: "solahuddin.arshad@kpmbp.edu.my",
-    passcode: "6860"
   },
   {
     id: "ST059",
@@ -440,7 +392,6 @@ const RAW_STAFF_DATA = [
     role: "Pensyarah",
     phone: "019-7076393",
     email: "tahira.tarikh@kpmbp.edu.my",
-    passcode: "6393"
   },
   {
     id: "ST060",
@@ -449,7 +400,6 @@ const RAW_STAFF_DATA = [
     role: "Pensyarah",
     phone: "012-7058100",
     email: "akmal.fauzi@kpmbp.edu.my",
-    passcode: "8100"
   },
   {
     id: "ST061",
@@ -458,7 +408,6 @@ const RAW_STAFF_DATA = [
     role: "Pensyarah",
     phone: "014-5274771",
     email: "nurlailibalqis91@gmail.com",
-    passcode: "4771"
   },
   {
     id: "ST062",
@@ -467,7 +416,6 @@ const RAW_STAFF_DATA = [
     role: "Pensyarah",
     phone: "017-6633639",
     email: "mariam.mazlan@kpmbp.edu.my",
-    passcode: "3639"
   },
   {
     id: "ST064",
@@ -476,7 +424,6 @@ const RAW_STAFF_DATA = [
     role: "Pensyarah",
     phone: "013-8261994",
     email: "nafifahmrosli@gmail.com",
-    passcode: "1994"
   },
   {
     id: "ST065",
@@ -485,7 +432,6 @@ const RAW_STAFF_DATA = [
     role: "Pensyarah",
     phone: "017-6175872",
     email: "azimah.razak@kpmbp.edu.my",
-    passcode: "5872"
   },
   {
     id: "ST066",
@@ -494,7 +440,6 @@ const RAW_STAFF_DATA = [
     role: "Kaunselor",
     phone: "013-3312425",
     email: "shafiq.hasan@kpmbp.edu.my",
-    passcode: "2425"
   },
   {
     id: "ST068",
@@ -503,7 +448,6 @@ const RAW_STAFF_DATA = [
     role: "Pegawai Ko-Kurikulum",
     phone: "019-7274921",
     email: "fadly.harudin@kpmbp.edu.my",
-    passcode: "4921"
   },
   {
     id: "ST069",
@@ -512,7 +456,6 @@ const RAW_STAFF_DATA = [
     role: "Pegawai Ko-Kurikulum",
     phone: "012-7142990",
     email: "sabahriah.yusof@kpmbp.edu.my",
-    passcode: "2990"
   },
   {
     id: "ST071",
@@ -521,7 +464,6 @@ const RAW_STAFF_DATA = [
     role: "Penolong Pustakawan",
     phone: "019-7947113",
     email: "iskandar.mazlan@kpmbp.edu.my",
-    passcode: "7113"
   },
   {
     id: "ST072",
@@ -530,7 +472,6 @@ const RAW_STAFF_DATA = [
     role: "Penolong Jurutera (Kanan)",
     phone: "013-9970981",
     email: "ikhsan.achok@gmail.com",
-    passcode: "0981"
   },
   {
     id: "ST073",
@@ -539,7 +480,6 @@ const RAW_STAFF_DATA = [
     role: "Pembantu Tadbir (Kewangan)",
     phone: "012-7364248",
     email: "aussayob@gmail.com",
-    passcode: "4248"
   },
   {
     id: "ST074",
@@ -548,7 +488,6 @@ const RAW_STAFF_DATA = [
     role: "Pembantu Tadbir (HEP)",
     phone: "014-9132906",
     email: "hasliza.mdzan@kpmbp.edu.my",
-    passcode: "2906"
   },
   {
     id: "ST075",
@@ -557,7 +496,6 @@ const RAW_STAFF_DATA = [
     role: "Pembantu Tadbir (Asrama) / Kenderaan",
     phone: "013-7603749",
     email: "ramiza.masom@kpmbp.edu.my",
-    passcode: "3749"
   },
   {
     id: "ST076",
@@ -566,7 +504,6 @@ const RAW_STAFF_DATA = [
     role: "Pembantu Tadbir (Khidmat Pengurusan)",
     phone: "013-7554283",
     email: "hafiz.ramli@kpmbp.edu.my",
-    passcode: "4283"
   },
   {
     id: "ST077",
@@ -575,7 +512,6 @@ const RAW_STAFF_DATA = [
     role: "Pembantu Tadbir (Stor)",
     phone: "019-7047411",
     email: "rokiah.ali@kpmbp.edu.my",
-    passcode: "7411"
   },
   {
     id: "ST078",
@@ -584,7 +520,6 @@ const RAW_STAFF_DATA = [
     role: "Pembantu Tadbir (UPP)",
     phone: "012-7285223",
     email: "rahmah.yasnain@kpmbp.edu.my",
-    passcode: "5223"
   },
   {
     id: "ST079",
@@ -593,7 +528,6 @@ const RAW_STAFF_DATA = [
     role: "Pembantu Tadbir (Surat-Menyurat)",
     phone: "019-7247559",
     email: "rayharahim004@gmail.com",
-    passcode: "7559"
   },
   {
     id: "ST080",
@@ -602,7 +536,6 @@ const RAW_STAFF_DATA = [
     role: "Penolong Pegawai Teknologi Maklumat",
     phone: "012-7496044",
     email: "aremal6225@gmail.com",
-    passcode: "6044"
   },
   {
     id: "ST081",
@@ -611,7 +544,6 @@ const RAW_STAFF_DATA = [
     role: "Penolong Pegawai Teknologi Maklumat",
     phone: "019-3426542",
     email: "norizuan.aris@kpmbp.edu.my",
-    passcode: "6542"
   },
   {
     id: "ST082",
@@ -620,7 +552,6 @@ const RAW_STAFF_DATA = [
     role: "Pembantu Khidmat Am (Pembantu Operasi)",
     phone: "017-7515694",
     email: "zakiyy62@gmail.com",
-    passcode: "5694"
   },
   {
     id: "ST083",
@@ -629,7 +560,6 @@ const RAW_STAFF_DATA = [
     role: "Pembantu Khidmat Am (Pembantu Operasi)",
     phone: "013-7040211",
     email: "rizuan.ruji@kpmbp.edu.my",
-    passcode: "0211"
   },
   {
     id: "ST084",
@@ -638,7 +568,6 @@ const RAW_STAFF_DATA = [
     role: "Pembantu Khidmat Am (Pembantu Operasi)",
     phone: "017-7102351",
     email: "sufi.halim@kpmbp.edu.my",
-    passcode: "2351"
   },
   {
     id: "ST085",
@@ -647,7 +576,6 @@ const RAW_STAFF_DATA = [
     role: "Pembantu Khidmat Am (Pemandu)",
     phone: "019-7894925",
     email: "adikuncup76@gmail.com",
-    passcode: "4925"
   },
   {
     id: "ST086",
@@ -656,7 +584,6 @@ const RAW_STAFF_DATA = [
     role: "Pembantu Khidmat Am (Pemandu)",
     phone: "018-5780311",
     email: "rahmattuahsenawi@gmail.com",
-    passcode: "0311"
   },
   {
     id: "ST087",
@@ -665,7 +592,6 @@ const RAW_STAFF_DATA = [
     role: "Pembantu Khidmat Am (Pemandu)",
     phone: "019-7894925",
     email: "azmi.arshad@kpmbp.edu.my",
-    passcode: "4925"
   },
   {
     id: "ST088",
@@ -674,7 +600,6 @@ const RAW_STAFF_DATA = [
     role: "Pembantu Khidmat Am (Pembantu Operasi)",
     phone: "016-9217603",
     email: "halimah.hamid@kpmbp.edu.my",
-    passcode: "7603"
   }
 ];
 

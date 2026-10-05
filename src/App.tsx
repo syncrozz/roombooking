@@ -387,59 +387,34 @@ export default function App() {
     showToast(`Lock Ruang telah dipadam.`);
   };
 
-  // Staff sync (SES v4.4: Staff ID is PRIMARY IDENTITY. Email is an editable attribute)
-  const handleSyncStaffUsers = async (newStaffList: StaffUser[]) => {
+  // Staff sync (Supports 'merge' and 'replace' mode)
+  const handleSyncStaffUsers = async (
+    newStaffList: StaffUser[],
+    mode: 'merge' | 'replace' = 'merge',
+    resetAllPins: boolean = false
+  ): Promise<{ written: number; deleted: number }> => {
     try {
-      // 1. Staff ID is the PRIMARY IDENTITY.
-      // Build a map of existing staff keyed by normalized ID to avoid duplicate records.
-      const staffMap = new Map<string, StaffUser>();
+      // 1. In 'replace' mode:
+      // Remove localStorage key kpmbp_staff_cache_v1 first as specified
+      if (mode === 'replace') {
+        localStorage.removeItem('kpmbp_staff_cache_v1');
+      }
 
-      // Seed with existing staff (deduplicated by ID)
-      staffUsers.forEach((st) => {
-        const idKey = (st.id || '').trim().toLowerCase();
-        if (idKey) staffMap.set(idKey, st);
-      });
+      // 2. Persist to Cloud Firestore with replace or merge logic
+      const result = await bulkSaveStaffUsersToCloud(newStaffList, mode, resetAllPins);
+      const finalStaffList = result.updatedList;
 
-      // Apply incoming staff updates
-      newStaffList.forEach((incoming) => {
-        const idKey = (incoming.id || '').trim().toLowerCase();
-        if (!idKey) return;
+      // 3. Save new list to localStorage & React state
+      setStaffUsers(finalStaffList);
+      saveStoredStaffUsers(finalStaffList);
 
-        const existing = staffMap.get(idKey);
-        if (existing) {
-          // EXISTING STAFF: Update profile fields ONLY, MUST PRESERVE existing credentials
-          staffMap.set(idKey, {
-            ...existing,
-            id: incoming.id || existing.id,
-            name: incoming.name || existing.name,
-            email: (incoming.email || existing.email).trim().toLowerCase(),
-            department: incoming.department || existing.department,
-            role: incoming.role || existing.role,
-            phone: incoming.phone || existing.phone,
-            // Credentials preserved:
-            pin: existing.pin || incoming.pin || '1234',
-            pinStatus: existing.pinStatus || incoming.pinStatus || 'DEFAULT',
-            pinChangedAt: existing.pinChangedAt || incoming.pinChangedAt
-          });
-        } else {
-          // NEW STAFF: Add as new record
-          staffMap.set(idKey, {
-            ...incoming,
-            email: (incoming.email || '').trim().toLowerCase()
-          });
-        }
-      });
+      if (mode === 'replace') {
+        showToast(`🟢 Mod Ganti Semua: ${result.written} rekod staf disimpan, ${result.deleted} rekod lama dipadamkan dari Cloud.`);
+      } else {
+        showToast(`🟢 ${result.written} rekod staf berjaya disinkronkan ke Cloud Firebase!`);
+      }
 
-      const updatedList = Array.from(staffMap.values());
-
-      // 2. Persist authoritative records to Cloud Firestore
-      await bulkSaveStaffUsersToCloud(updatedList);
-
-      // 3. Update authoritative local state & cache
-      setStaffUsers(updatedList);
-      saveStoredStaffUsers(updatedList);
-
-      showToast(`🟢 ${newStaffList.length} rekod staf berjaya disinkronkan ke Cloud Firebase!`);
+      return { written: result.written, deleted: result.deleted };
     } catch (err) {
       console.error('Error syncing staff users:', err);
       showToast(`🔴 Ralat semasa menyinkronkan data staf ke Cloud.`);
