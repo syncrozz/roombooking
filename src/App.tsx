@@ -715,6 +715,9 @@ export default function App() {
           endTime={bookingModalInfo.endTime}
           initialPurpose={bookingModalInfo.purpose}
           staffList={staffUsers}
+          academicSchedule={academicSchedule}
+          adhocBookings={adhocBookings}
+          institutionalBlocks={institutionalBlocks}
           onClose={() => setBookingModalInfo(null)}
           onSubmitBooking={handleSubmitBooking}
           onRequirePinChange={(st) => setMandatoryPinChangeStaff(st)}

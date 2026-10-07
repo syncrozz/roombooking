@@ -109,7 +109,7 @@ export const RoomAvailabilityMatrix: React.FC<RoomAvailabilityMatrixProps> = ({
           <div>
             <div className="inline-flex items-center gap-1.5 bg-indigo-50 text-indigo-700 px-3 py-1 rounded-full text-xs font-bold border border-indigo-200">
               <Calendar className="w-3.5 h-3.5" />
-              Matriks Ketersediaan (Jadual By Bilik Kuliah)
+              Matriks Ketersediaan
             </div>
           </div>
 
@@ -216,18 +216,18 @@ export const RoomAvailabilityMatrix: React.FC<RoomAvailabilityMatrixProps> = ({
           {/* Status Legend Bar */}
           <div className="mt-4 pt-3 border-t border-slate-100 flex flex-wrap items-center justify-between gap-3 text-xs">
             <div className="flex flex-wrap items-center gap-3">
-              <span className="font-bold text-slate-700">Petunjuk Status:</span>
+              <span className="font-bold text-slate-700">Petunjuk :</span>
               <div className="flex items-center gap-1.5">
                 <span className="hidden w-3.5 h-3.5 rounded bg-emerald-500 border border-emerald-600"></span>
-                <span className="text-slate-700 font-medium">🟢 Kosong (Boleh Ditempah)</span>
+                <span className="text-slate-700 font-medium">🟢 Kosong</span>
               </div>
-              <div className="flex items-center gap-1.5" title="Jadual kuliah semester rasmi kolej (Bukan tempahan ad-hoc & bukan demo data)">
+              <div className="flex items-center gap-1.5" title="Jadual kuliah semester rasmi kolej">
                 <span className="hidden w-3.5 h-3.5 rounded bg-rose-500 border border-rose-600"></span>
-                <span className="text-slate-700 font-medium">🔴 Jadual Kuliah Rasmi (Semester)</span>
+                <span className="text-slate-700 font-medium">🔴 Jadual Kuliah</span>
               </div>
               <div className="flex items-center gap-1.5">
                 <span className="hidden w-3.5 h-3.5 rounded bg-amber-400 border border-amber-500"></span>
-                <span className="text-slate-700 font-medium">🟨 Tempahan Ad-Hoc Staf</span>
+                <span className="text-slate-700 font-medium">🟨 Tempahan Ad-Hoc</span>
               </div>
               <div className="flex items-center gap-1.5">
                 <span className="hidden w-3.5 h-3.5 rounded bg-slate-900 border border-slate-950"></span>
