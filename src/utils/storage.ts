@@ -12,6 +12,15 @@ export function getStoredRooms(): Room[] {
     if (data) {
       const parsed = JSON.parse(data);
       if (Array.isArray(parsed) && parsed.length > 0) {
+        // Ensure DEWAN_BESAR is present
+        const hasDewanBesar = parsed.some(r => r.id === 'DEWAN_BESAR' || r.code === 'DEWAN BESAR');
+        if (!hasDewanBesar) {
+          const dewanBesar = INITIAL_ROOMS.find(r => r.id === 'DEWAN_BESAR');
+          if (dewanBesar) {
+            parsed.push(dewanBesar);
+            localStorage.setItem(ROOMS_KEY, JSON.stringify(parsed));
+          }
+        }
         return parsed;
       }
     }

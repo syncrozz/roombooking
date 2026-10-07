@@ -18,7 +18,8 @@ import {
   validateBookingTime, 
   isTimeRangeNight,
   isNightTime,
-  minutesToTimeString 
+  minutesToTimeString,
+  BOOKING_START_OPTIONS
 } from '../utils/timeSlots';
 import { 
   getStoredUserProfiles, 
@@ -64,7 +65,7 @@ interface BookingModalProps {
   adhocBookings?: AdHocBooking[];
   institutionalBlocks?: InstitutionalBlock[];
   onClose: () => void;
-  onSubmitBooking: (bookingData: Omit<AdHocBooking, 'id' | 'status' | 'createdAt'>) => void;
+  onSubmitBooking: (bookingData: Omit<AdHocBooking, 'id' | 'status' | 'createdAt'> | Omit<AdHocBooking, 'id' | 'status' | 'createdAt'>[]) => void;
   onRequirePinChange?: (staff: StaffUser) => void;
 }
 
@@ -82,12 +83,17 @@ export const BookingModal: React.FC<BookingModalProps> = ({
   onSubmitBooking,
   onRequirePinChange
 }) => {
+  // Multi-day state (Support e.g. 11 - 13 Okt 2026 or any custom range)
+  const isOctSpecial = date >= '2026-10-11' && date <= '2026-10-13';
+  const [isMultiDay, setIsMultiDay] = useState<boolean>(isOctSpecial);
+  const [startDate, setStartDate] = useState<string>(date);
+  const [endDate, setEndDate] = useState<string>(isOctSpecial ? '2026-10-13' : date);
+
   // Compute default end time: prefer 2 hours (120 mins) if available, fallback to endTime
   const computeInitialEndTime = () => {
     const startMin = parseTimeMinutes(startTime);
     const twoHoursEndMin = startMin + 120;
-    const isNight = isTimeRangeNight(startTime, endTime);
-    const maxEndMin = isNight ? 1380 : 1110; // 23:00 for night, 18:30 for day
+    const maxEndMin = 1380; // 23:00 ceiling
 
     if (twoHoursEndMin <= maxEndMin) {
       const twoHoursStr = minutesToTimeString(twoHoursEndMin);
@@ -113,6 +119,27 @@ export const BookingModal: React.FC<BookingModalProps> = ({
 
   const [selectedStartTime, setSelectedStartTime] = useState<string>(startTime);
   const [selectedEndTime, setSelectedEndTime] = useState<string>(computeInitialEndTime);
+
+  // Helper to compute list of dates in range
+  const getDatesInRange = (s: string, e: string): string[] => {
+    if (!s) return [];
+    if (!e || e < s) return [s];
+    const list: string[] = [];
+    const curr = new Date(s);
+    const finish = new Date(e);
+    let count = 0;
+    while (curr <= finish && count < 14) {
+      const y = curr.getFullYear();
+      const m = String(curr.getMonth() + 1).padStart(2, '0');
+      const d = String(curr.getDate()).padStart(2, '0');
+      list.push(`${y}-${m}-${d}`);
+      curr.setDate(curr.getDate() + 1);
+      count++;
+    }
+    return list.length > 0 ? list : [s];
+  };
+
+  const activeDates = isMultiDay ? getDatesInRange(startDate, endDate) : [startDate || date];
 
   const [applicantName, setApplicantName] = useState<string>('Ahmad Khairi Bin Mohd');
   const [applicantEmail, setApplicantEmail] = useState<string>('khaikerr@gmail.com');
@@ -164,29 +191,62 @@ export const BookingModal: React.FC<BookingModalProps> = ({
 
   const isNightBooking = isTimeRangeNight(selectedStartTime, selectedEndTime);
   const startMinutes = parseTimeMinutes(selectedStartTime);
-  const maxEndMinutes = isNightBooking ? 1380 : 1110; // 23:00 max night, 18:30 max day
+  const maxEndMinutes = room.allowNightBooking === false ? 1110 : 1380; // 23:00 max ceiling
 
-  // Pre-calculate 1 to 4 hour duration options
-  const durationOptions = [1, 2, 3, 4]
+  // Check availability across all active dates
+  const datesStatus = activeDates.map(d => {
+    const check = checkRoomAvailability(
+      room,
+      d,
+      selectedStartTime,
+      selectedEndTime,
+      academicSchedule,
+      adhocBookings,
+      institutionalBlocks
+    );
+    return {
+      date: d,
+      day: getMalayDayOfWeek(d),
+      isAvailable: check.status === 'AVAILABLE',
+      conflictReason: check.conflictReason
+    };
+  });
+  const allDatesAvailable = datesStatus.every(d => d.isAvailable);
+
+  // Pre-calculate 1 to 4 hour duration options, plus 7 hours for 16:00 -> 23:00
+  const durationHoursToTest = [1, 2, 3, 4];
+  if (startMinutes === 960) { // 16:00 (4:00 PM) -> add 7 hours (up to 23:00)
+    durationHoursToTest.push(7);
+  } else if (startMinutes + 7 * 60 <= maxEndMinutes) {
+    durationHoursToTest.push(7);
+  }
+
+  const durationOptions = durationHoursToTest
     .map(hours => {
       const endMin = startMinutes + hours * 60;
       if (endMin > maxEndMinutes) return null;
       const endStr = minutesToTimeString(endMin);
+      
       let isAvailable = true;
       let conflictReason: string | undefined;
 
-      if (academicSchedule.length > 0 || adhocBookings.length > 0 || institutionalBlocks.length > 0) {
-        const check = checkRoomAvailability(
-          room,
-          date,
-          selectedStartTime,
-          endStr,
-          academicSchedule,
-          adhocBookings,
-          institutionalBlocks
-        );
-        isAvailable = check.status === 'AVAILABLE';
-        conflictReason = check.conflictReason;
+      for (const d of activeDates) {
+        if (academicSchedule.length > 0 || adhocBookings.length > 0 || institutionalBlocks.length > 0) {
+          const check = checkRoomAvailability(
+            room,
+            d,
+            selectedStartTime,
+            endStr,
+            academicSchedule,
+            adhocBookings,
+            institutionalBlocks
+          );
+          if (check.status !== 'AVAILABLE') {
+            isAvailable = false;
+            conflictReason = `${getMalayDayOfWeek(d)}: ${check.conflictReason}`;
+            break;
+          }
+        }
       }
 
       return {
@@ -205,27 +265,33 @@ export const BookingModal: React.FC<BookingModalProps> = ({
       conflictReason?: string;
     }[];
 
-  // All potential valid end times for dropdown
-  const allValidEndTimes = [
-    ...(isNightBooking
-      ? ['21:00', '22:00', '23:00']
-      : ['09:30', '10:30', '11:30', '12:30', '13:30', '14:30', '15:30', '16:30', '17:30', '18:30']
-    )
-  ]
+  // All potential valid end times for dropdown (up to 23:00)
+  const candidateEndTimes = [
+    '09:30', '10:30', '11:30', '12:30', '13:30', '14:30', '15:30', 
+    '16:00', '16:30', '17:00', '17:30', '18:00', '18:30', 
+    '19:00', '20:00', '21:00', '22:00', '23:00'
+  ];
+
+  const allValidEndTimes = candidateEndTimes
     .filter(t => parseTimeMinutes(t) > startMinutes && parseTimeMinutes(t) <= maxEndMinutes)
     .map(t => {
       let isAvailable = true;
-      if (academicSchedule.length > 0 || adhocBookings.length > 0 || institutionalBlocks.length > 0) {
-        const check = checkRoomAvailability(
-          room,
-          date,
-          selectedStartTime,
-          t,
-          academicSchedule,
-          adhocBookings,
-          institutionalBlocks
-        );
-        isAvailable = check.status === 'AVAILABLE';
+      for (const d of activeDates) {
+        if (academicSchedule.length > 0 || adhocBookings.length > 0 || institutionalBlocks.length > 0) {
+          const check = checkRoomAvailability(
+            room,
+            d,
+            selectedStartTime,
+            t,
+            academicSchedule,
+            adhocBookings,
+            institutionalBlocks
+          );
+          if (check.status !== 'AVAILABLE') {
+            isAvailable = false;
+            break;
+          }
+        }
       }
       return { value: t, isAvailable };
     });
@@ -246,20 +312,22 @@ export const BookingModal: React.FC<BookingModalProps> = ({
       return;
     }
 
-    // Availability validation for selected duration
-    if (academicSchedule.length > 0 || adhocBookings.length > 0 || institutionalBlocks.length > 0) {
-      const availCheck = checkRoomAvailability(
-        room,
-        date,
-        selectedStartTime,
-        selectedEndTime,
-        academicSchedule,
-        adhocBookings,
-        institutionalBlocks
-      );
-      if (availCheck.status !== 'AVAILABLE') {
-        setVerificationError(availCheck.conflictReason || 'Slot masa yang dipilih telah mempunyai pertembungan jadual atau sekatan.');
-        return;
+    // Availability validation across all active dates
+    for (const d of activeDates) {
+      if (academicSchedule.length > 0 || adhocBookings.length > 0 || institutionalBlocks.length > 0) {
+        const availCheck = checkRoomAvailability(
+          room,
+          d,
+          selectedStartTime,
+          selectedEndTime,
+          academicSchedule,
+          adhocBookings,
+          institutionalBlocks
+        );
+        if (availCheck.status !== 'AVAILABLE') {
+          setVerificationError(`Pertembungan pada ${formatDateMalay(d)} (${getMalayDayOfWeek(d)}): ${availCheck.conflictReason || 'Slot tidak tersedia.'}`);
+          return;
+        }
       }
     }
 
@@ -295,31 +363,45 @@ export const BookingModal: React.FC<BookingModalProps> = ({
       pinStatus: verifiedStaff.pinStatus
     });
 
-    onSubmitBooking({
-      roomId: room.id,
-      roomName: room.name,
-      date,
-      startTime: selectedStartTime,
-      endTime: selectedEndTime,
-      applicantName: verifiedStaff.name,
-      applicantEmail: verifiedStaff.email,
-      applicantPhone: verifiedStaff.phone,
-      applicantRole: verifiedStaff.role,
-      department: verifiedStaff.department,
-      purposeCategory,
-      title: `${purposeCategory} (${room.code})`,
-      paxCount,
-      notes: notes.trim() || undefined
-    });
+    if (isMultiDay && activeDates.length > 1) {
+      const seriesBookings = activeDates.map((d, index) => ({
+        roomId: room.id,
+        roomName: room.name,
+        date: d,
+        startTime: selectedStartTime,
+        endTime: selectedEndTime,
+        applicantName: verifiedStaff.name,
+        applicantEmail: verifiedStaff.email,
+        applicantPhone: verifiedStaff.phone,
+        applicantRole: verifiedStaff.role,
+        department: verifiedStaff.department,
+        purposeCategory,
+        title: `${purposeCategory} (${room.code}) - Siri ${index + 1}/${activeDates.length}`,
+        paxCount,
+        notes: notes.trim()
+          ? `${notes.trim()} [Siri Hari ${index + 1}/${activeDates.length}]`
+          : `Siri Tempahan ${activeDates.length} Hari (${formatDateMalay(startDate)} - ${formatDateMalay(endDate)})`
+      }));
+      onSubmitBooking(seriesBookings);
+    } else {
+      onSubmitBooking({
+        roomId: room.id,
+        roomName: room.name,
+        date: activeDates[0] || date,
+        startTime: selectedStartTime,
+        endTime: selectedEndTime,
+        applicantName: verifiedStaff.name,
+        applicantEmail: verifiedStaff.email,
+        applicantPhone: verifiedStaff.phone,
+        applicantRole: verifiedStaff.role,
+        department: verifiedStaff.department,
+        purposeCategory,
+        title: `${purposeCategory} (${room.code})`,
+        paxCount,
+        notes: notes.trim() || undefined
+      });
+    }
   };
-
-  const isLargeVenue = 
-    room.code.toUpperCase().includes('DKA') ||
-    room.code.toUpperCase().includes('DKB') ||
-    room.name.toUpperCase().includes('DEWAN') ||
-    room.name.toUpperCase().includes('SEMINAR') ||
-    room.category === 'Dewan Kuliah' ||
-    room.category === 'Ruang Khas';
 
   return (
     <div className="fixed inset-0 bg-slate-950/75 backdrop-blur-xs z-50 flex items-center justify-center p-4 overflow-y-auto">
@@ -339,8 +421,94 @@ export const BookingModal: React.FC<BookingModalProps> = ({
           </button>
         </div>
 
+        {/* Multi-Day / Single-Day Option Card */}
+        <div className="bg-slate-50 border border-slate-200 rounded-xl p-3 space-y-2 text-xs">
+          <div className="flex items-center justify-between">
+            <label className="flex items-center gap-2 cursor-pointer font-bold text-slate-800 text-xs">
+              <input
+                type="checkbox"
+                checked={isMultiDay}
+                onChange={(e) => setIsMultiDay(e.target.checked)}
+                className="rounded text-blue-600 focus:ring-blue-500 cursor-pointer"
+              />
+              <span>📅 Tempahan Berbilang Hari</span>
+            </label>
+            {isMultiDay && (
+              <span className="bg-blue-100 text-blue-800 text-[10px] font-bold px-2 py-0.5 rounded-full">
+                {activeDates.length} Hari Terpilih
+              </span>
+            )}
+          </div>
+
+          {isMultiDay ? (
+            <div className="grid grid-cols-2 gap-2 pt-1">
+              <div>
+                <label className="text-[10px] font-semibold text-slate-600 block mb-0.5">Tarikh Mula:</label>
+                <input
+                  type="date"
+                  value={startDate}
+                  onChange={(e) => {
+                    setStartDate(e.target.value);
+                    if (endDate < e.target.value) setEndDate(e.target.value);
+                  }}
+                  className="w-full bg-white border border-slate-300 rounded-lg p-1.5 text-xs font-bold text-slate-800 outline-none focus:border-blue-500 cursor-pointer"
+                />
+              </div>
+              <div>
+                <label className="text-[10px] font-semibold text-slate-600 block mb-0.5">Tarikh Tamat:</label>
+                <input
+                  type="date"
+                  value={endDate}
+                  min={startDate}
+                  onChange={(e) => setEndDate(e.target.value)}
+                  className="w-full bg-white border border-slate-300 rounded-lg p-1.5 text-xs font-bold text-slate-800 outline-none focus:border-blue-500 cursor-pointer"
+                />
+              </div>
+            </div>
+          ) : (
+            <div className="flex items-center justify-between text-xs pt-0.5">
+              <span className="text-slate-600 font-medium">Tarikh Tempahan:</span>
+              <input
+                type="date"
+                value={startDate}
+                onChange={(e) => {
+                  setStartDate(e.target.value);
+                  setEndDate(e.target.value);
+                }}
+                className="bg-white border border-slate-300 rounded-lg p-1.5 text-xs font-bold text-slate-800 outline-none cursor-pointer"
+              />
+            </div>
+          )}
+
+          {isMultiDay && activeDates.length > 0 && (
+            <div className="pt-2 border-t border-slate-200 space-y-1">
+              <span className="text-[10px] text-slate-600 font-bold block">Jadual Pengesahan Harian:</span>
+              <div className="grid grid-cols-1 sm:grid-cols-3 gap-1.5 text-[10px]">
+                {datesStatus.map(ds => (
+                  <div
+                    key={ds.date}
+                    className={`p-2 rounded-lg border font-medium flex flex-col justify-between ${
+                      ds.isAvailable
+                        ? 'bg-emerald-50/80 border-emerald-300 text-emerald-900'
+                        : 'bg-rose-50 border-rose-300 text-rose-900'
+                    }`}
+                  >
+                    <div className="flex items-center justify-between">
+                      <span className="font-bold">{formatDateMalay(ds.date)}</span>
+                      <span>{ds.isAvailable ? '🟢 Tersedia' : '🔴 Bertembung'}</span>
+                    </div>
+                    <div className="text-[9.5px] opacity-80 mt-1">
+                      {ds.day}: {selectedStartTime} – {selectedEndTime}
+                    </div>
+                  </div>
+                ))}
+              </div>
+            </div>
+          )}
+        </div>
+
         {/* Selected Slot Summary Card */}
-        <div className={`rounded-xl p-3.5 space-y-2 text-xs border ${
+        <div className={`rounded-xl p-3.5 space-y-2.5 text-xs border ${
           isNightBooking 
             ? 'bg-slate-900 border-indigo-500/50 text-white' 
             : 'bg-slate-900 border-slate-800 text-white'
@@ -356,7 +524,7 @@ export const BookingModal: React.FC<BookingModalProps> = ({
             }`}>
               {isNightBooking ? (
                 <>
-                  <Moon className="w-2.5 h-2.5" /> Sesi Malam (20:00 – 23:00)
+                  <Moon className="w-2.5 h-2.5" /> Sesi Petang / Malam (hingga 23:00)
                 </>
               ) : (
                 <>
@@ -369,29 +537,75 @@ export const BookingModal: React.FC<BookingModalProps> = ({
           <div className="grid grid-cols-2 gap-2 pt-1 border-t border-slate-800 text-slate-300">
             <div>
               <span className="text-slate-400 block text-[10px]">Tarikh:</span>
-              <strong className="text-white">{formatDateMalay(date)} ({getMalayDayOfWeek(date)})</strong>
+              <strong className="text-white">
+                {isMultiDay && activeDates.length > 1 
+                  ? `${formatDateMalay(startDate)} – ${formatDateMalay(endDate)} (${activeDates.length} Hari)`
+                  : `${formatDateMalay(startDate || date)} (${getMalayDayOfWeek(startDate || date)})`
+                }
+              </strong>
             </div>
             <div>
-              <span className="text-slate-400 block text-[10px]">Masa Tempahan:</span>
+              <span className="text-slate-400 block text-[10px]">Masa Tempahan Setiap Hari:</span>
               <strong className={isNightBooking ? "text-indigo-300" : "text-blue-300"}>
                 {selectedStartTime} – {selectedEndTime} ({calculateDurationText(selectedStartTime, selectedEndTime)})
               </strong>
             </div>
           </div>
 
-          {/* Quick Duration Selection (1 Jam, 2 Jam Lalai/Biasa, 3 Jam, 4 Jam) */}
+          {/* Time Picker Controls: Start Time & End Time */}
+          <div className="grid grid-cols-2 gap-2 pt-1.5 border-t border-slate-800/80">
+            <div>
+              <label htmlFor="modal-start-time" className="text-slate-400 block text-[10px] mb-1 font-semibold">
+                Masa Mula:
+              </label>
+              <select
+                id="modal-start-time"
+                value={selectedStartTime}
+                onChange={(e) => {
+                  setSelectedStartTime(e.target.value);
+                  setVerificationError(null);
+                }}
+                className="w-full bg-slate-800 border border-slate-700 rounded-lg px-2 py-1.5 text-white font-mono text-xs outline-none focus:ring-1 focus:ring-blue-500 cursor-pointer"
+              >
+                {BOOKING_START_OPTIONS.map(opt => (
+                  <option key={opt.value} value={opt.value}>
+                    {opt.label}
+                  </option>
+                ))}
+              </select>
+            </div>
+            <div>
+              <label htmlFor="modal-custom-end-time" className="text-slate-400 block text-[10px] mb-1 font-semibold">
+                Masa Tamat:
+              </label>
+              <select
+                id="modal-custom-end-time"
+                value={selectedEndTime}
+                onChange={(e) => {
+                  setSelectedEndTime(e.target.value);
+                  setVerificationError(null);
+                }}
+                className="w-full bg-slate-800 border border-slate-700 rounded-lg px-2 py-1.5 text-white font-mono text-xs outline-none focus:ring-1 focus:ring-blue-500 cursor-pointer"
+              >
+                {allValidEndTimes.map(t => (
+                  <option key={t.value} value={t.value} disabled={!t.isAvailable}>
+                    {t.value} ({calculateDurationText(selectedStartTime, t.value)}) {!t.isAvailable ? '— Bertembung' : ''}
+                  </option>
+                ))}
+              </select>
+            </div>
+          </div>
+
+          {/* Quick Duration Selection */}
           <div className="pt-2 border-t border-slate-800/80 space-y-2">
             <div className="flex items-center justify-between text-[11px]">
               <span className="text-slate-300 font-bold flex items-center gap-1.5">
                 <Clock className="w-3.5 h-3.5 text-blue-400" />
-                Pilihan Tempoh Tempahan:
-              </span>
-              <span className="text-[10px] text-amber-300 font-semibold bg-amber-950/60 border border-amber-800/80 px-2 py-0.5 rounded-full">
-                ⭐ Biasanya 2 Jam (Sesi Kuliah)
+                Pilihan Tempoh Pantas:
               </span>
             </div>
 
-            <div className="grid grid-cols-4 gap-1.5">
+            <div className="grid grid-cols-4 sm:grid-cols-5 gap-1.5">
               {durationOptions.map(opt => {
                 const isSelected = selectedEndTime === opt.endTime;
                 const isAvail = opt.isAvailable;
@@ -416,6 +630,7 @@ export const BookingModal: React.FC<BookingModalProps> = ({
                     <span className="flex items-center gap-0.5 leading-tight">
                       {opt.hours} Jam
                       {opt.isPopular && <span className="text-amber-300 text-[10px]">★</span>}
+                      {opt.hours === 7 && <span className="text-amber-300 text-[10px]">🌙</span>}
                     </span>
                     <span className="text-[9.5px] font-normal opacity-80 leading-tight">
                       hingga {opt.endTime}
@@ -424,34 +639,12 @@ export const BookingModal: React.FC<BookingModalProps> = ({
                 );
               })}
             </div>
-
-            {/* Custom End Time Dropdown if needed */}
-            <div className="flex items-center justify-between pt-1 text-[11px] text-slate-400">
-              <label htmlFor="modal-custom-end-time" className="text-[10px]">
-                Atau pilih Masa Tamat tersuai:
-              </label>
-              <select
-                id="modal-custom-end-time"
-                value={selectedEndTime}
-                onChange={(e) => {
-                  setSelectedEndTime(e.target.value);
-                  setVerificationError(null);
-                }}
-                className="bg-slate-800 border border-slate-700 rounded-lg px-2.5 py-1 text-white font-mono text-[11px] outline-none focus:ring-1 focus:ring-blue-500 cursor-pointer"
-              >
-                {allValidEndTimes.map(t => (
-                  <option key={t.value} value={t.value} disabled={!t.isAvailable}>
-                    {t.value} ({calculateDurationText(selectedStartTime, t.value)}) {!t.isAvailable ? '— Bertembung' : ''}
-                  </option>
-                ))}
-              </select>
-            </div>
           </div>
 
           {isNightBooking && (
             <div className="pt-1.5 border-t border-slate-800/80 text-[10px] text-indigo-200/90 flex items-center gap-1.5">
               <Moon className="w-3 h-3 text-indigo-400 shrink-0" />
-              <span>Peringatan Waktu Malam: Maksimum sehingga 23:00. Sila pastikan suis lampu &amp; pendingin hawa ditutup selepas sesi tamat.</span>
+              <span>Peringatan Sesi Malam / Lanjutan: Had maksimum sehingga 23:00 (11:00 PM). Sila pastikan dewan dikunci dan suis ditutup selepas sesi tamat.</span>
             </div>
           )}
         </div>
@@ -570,41 +763,25 @@ export const BookingModal: React.FC<BookingModalProps> = ({
             </div>
           </div>
 
-          <div className={isLargeVenue ? "grid grid-cols-2 gap-2" : "w-full"}>
-            <div>
-              <label className="block font-bold text-slate-700 mb-1">Kategori Tujuan:</label>
-              <select
-                value={purposeCategory}
-                onChange={(e) => setPurposeCategory(e.target.value as PurposeCategory)}
-                className="w-full bg-slate-50 border border-slate-300 rounded-xl px-3 py-2 text-slate-900 font-medium outline-none focus:ring-2 focus:ring-blue-500"
-              >
-                <option value="Kelas">Kelas</option>
-                <option value="Kelas Ganti">Kelas Ganti</option>
-                <option value="Konsultasi">Konsultasi</option>
-                <option value="Mesyuarat">Mesyuarat</option>
-                <option value="Aktiviti Pelajar">Aktiviti Pelajar</option>
-                <option value="Lain-lain">Lain-lain</option>
-              </select>
-            </div>
-
-            {isLargeVenue && (
-              <div>
-                <label className="block font-bold text-slate-700 mb-1">Anggaran Hadirin (Pax):</label>
-                <input
-                  type="number"
-                  max={room.capacity}
-                  min={1}
-                  value={paxCount}
-                  onChange={(e) => setPaxCount(Number(e.target.value))}
-                  className="w-full bg-slate-50 border border-slate-300 rounded-xl px-3 py-2 text-slate-900 font-semibold outline-none focus:ring-2 focus:ring-blue-500"
-                />
-              </div>
-            )}
+          <div>
+            <label className="block font-bold text-slate-700 mb-1">Kategori Tujuan:</label>
+            <select
+              value={purposeCategory}
+              onChange={(e) => setPurposeCategory(e.target.value as PurposeCategory)}
+              className="w-full bg-slate-50 border border-slate-300 rounded-xl px-3 py-2 text-slate-900 font-medium outline-none focus:ring-2 focus:ring-blue-500"
+            >
+              <option value="Kelas">Kelas</option>
+              <option value="Kelas Ganti">Kelas Ganti</option>
+              <option value="Konsultasi">Konsultasi</option>
+              <option value="Mesyuarat">Mesyuarat</option>
+              <option value="Aktiviti Pelajar">Aktiviti Pelajar</option>
+              <option value="Lain-lain">Lain-lain</option>
+            </select>
           </div>
 
           <div>
             <label className="block font-bold text-slate-700 mb-1">
-              Catatan Tambahan <span className="text-slate-400 font-normal text-[11px]">(Pilihan)</span>:
+              Catatan:
             </label>
             <input
               type="text"

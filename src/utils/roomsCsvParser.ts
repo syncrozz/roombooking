@@ -16,6 +16,7 @@ export const ROOMS_CSV_HEADERS = [
 ];
 
 export const SAMPLE_ROOMS_CSV_TEMPLATE = `id,code,name,category,capacity,block,level,facilities,hasAircond,isSmartClassroom,notes
+DEWAN_BESAR,DEWAN BESAR,Dewan Besar (Dewan Utama),Dewan Kuliah,500,Bangunan Pentadbiran & Dewan Utama,Ground Floor,Pentas Utama & Tirai Bermotor; Sistem PA Audio Profesional; Dual Skrin Projektor LED; Pendingin Hawa Pusat; Kapasiti 500 Kerusi,true,false,Dewan Utama serbaguna untuk majlis rasmi seminar kebangsaan dan program petang & malam (4pm-11pm)
 MAKMAL_GAMMA,LAB GAMMA,LAB GAMMA,Makmal Komputer,35,Pusat Komputer & IT,1st Floor,35x PC Komputer; Projektor HD; Pendingin Hawa Pusat; Rangkaian Gigabit LAN; Papan Putih,true,false,Makmal komputer untuk pembangunan perisian dan reka bentuk
 MAKMAL_ALFA,LAB ALFA,LAB ALFA,Makmal Komputer,35,Pusat Komputer & IT,1st Floor,35x PC Komputer Berprestasi Tinggi; Projektor HD & Skrin Bermotor; Pendingin Hawa Pusat; Rangkaian Gigabit LAN,true,false,Makmal komputer utama untuk praktikal pengaturcaraan
 MAKMAL_SIGMA,LAB SIGMA,LAB SIGMA,Makmal Komputer,35,Pusat Komputer & IT,Ground Floor,35x PC Komputer; Projektor HD; Pendingin Hawa Pusat; Rangkaian Gigabit LAN; Papan Putih,true,false,Makmal komputer multimedia dan sistem maklumat perniagaan

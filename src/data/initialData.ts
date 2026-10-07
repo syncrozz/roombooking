@@ -115,7 +115,28 @@ export const INITIAL_ROOMS: Room[] = [
     notes: 'Makmal komputer untuk penyelidikan data dan bengkel teknologi'
   },
 
-  // Dewan Kuliah (2 halls)
+  // Dewan Kuliah & Dewan Utama
+  {
+    id: 'DEWAN_BESAR',
+    code: 'DEWAN BESAR',
+    name: 'Dewan Besar (Dewan Utama)',
+    category: 'Dewan Kuliah',
+    capacity: 500,
+    block: 'Bangunan Pentadbiran & Dewan Utama',
+    level: 'Ground Floor',
+    facilities: [
+      'Pentas Utama & Tirai Bermotor',
+      'Sistem PA Audio Profesional & 4x Wireless Mic',
+      'Dual Skrin Projektor LED Besar',
+      'Pendingin Hawa Pusat (Central Aircond)',
+      'Lampu Sorot & Sistem Pencahayaan Pentas',
+      'Bilik Persalinan & Bilik Menunggu VIP',
+      'Kapasiti 500 Kerusi'
+    ],
+    hasAircond: true,
+    allowNightBooking: true,
+    notes: 'Dewan Utama serbaguna untuk majlis rasmi, seminar kebangsaan, peperiksaan berpusat, taklimat kolej, dan program petang & malam (4pm-11pm)'
+  },
   {
     id: 'DKA',
     code: 'DKA',
@@ -126,6 +147,7 @@ export const INITIAL_ROOMS: Room[] = [
     level: 2,
     facilities: ['Dual Projektor HD', 'Kerusi Bertingkat (Auditorium)', 'Sistem Audio Dewan', 'Pendingin Hawa Pusat', 'Papan Pintar'],
     hasAircond: true,
+    allowNightBooking: true,
     notes: 'Sesuai untuk kuliah gabungan kelas besar, ceramah khas, dan taklimat program'
   },
   {
@@ -138,6 +160,7 @@ export const INITIAL_ROOMS: Room[] = [
     level: 2,
     facilities: ['Dual Projektor HD', 'Kerusi Bertingkat (Auditorium)', 'Sistem Audio Dewan', 'Pendingin Hawa Pusat'],
     hasAircond: true,
+    allowNightBooking: true,
     notes: 'Sesuai untuk peperiksaan, taklimat, dan perkongsian ilmu'
   },
 

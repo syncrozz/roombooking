@@ -261,58 +261,74 @@ export default function App() {
     setBookingModalInfo({ room, date, startTime, endTime, purpose });
   };
 
-  // Submit new booking
+  // Submit new booking (Supports single booking or multi-day series)
   const handleSubmitBooking = async (
-    data: Omit<AdHocBooking, 'id' | 'status' | 'createdAt'>
+    data: Omit<AdHocBooking, 'id' | 'status' | 'createdAt'> | Omit<AdHocBooking, 'id' | 'status' | 'createdAt'>[]
   ) => {
-    // Data Integrity: Check for duplicate submissions and exact overlap
-    const isOverlapping = adhocBookings.some(
-      b => b.roomId === data.roomId &&
-           b.date === data.date &&
-           b.status !== 'REJECTED' &&
-           b.status !== 'CANCELLED' &&
-           ((data.startTime >= b.startTime && data.startTime < b.endTime) ||
-            (data.endTime > b.startTime && data.endTime <= b.endTime) ||
-            (data.startTime <= b.startTime && data.endTime >= b.endTime))
-    );
+    const dataList = Array.isArray(data) ? data : [data];
+    const newBookings: AdHocBooking[] = [];
 
-    if (isOverlapping) {
-      showToast(`⚠️ Ralat: Ruang tersebut telah mempunyai tempahan disahkan pada waktu berkenaan!`);
-      return;
+    // Check overlaps for all items in the submission
+    for (const item of dataList) {
+      const isOverlapping = adhocBookings.some(
+        b => b.roomId === item.roomId &&
+             b.date === item.date &&
+             b.status !== 'REJECTED' &&
+             b.status !== 'CANCELLED' &&
+             ((item.startTime >= b.startTime && item.startTime < b.endTime) ||
+              (item.endTime > b.startTime && item.endTime <= b.endTime) ||
+              (item.startTime <= b.startTime && item.endTime >= b.endTime))
+      );
+
+      if (isOverlapping) {
+        showToast(`⚠️ Ralat: Ruang tersebut telah mempunyai tempahan disahkan pada tarikh ${item.date}!`);
+        return;
+      }
     }
 
-    const newId = generateBookingId();
-    const newBooking: AdHocBooking = {
-      ...data,
-      id: newId,
-      status: 'CONFIRMED', // Auto-confirmed by the engine after zero-conflict verification
-      createdAt: new Date().toISOString()
-    };
+    for (let i = 0; i < dataList.length; i++) {
+      const item = dataList[i];
+      const baseId = generateBookingId();
+      const newId = dataList.length > 1 ? `${baseId}-D${i + 1}` : baseId;
+      const newBooking: AdHocBooking = {
+        ...item,
+        id: newId,
+        status: 'CONFIRMED', // Auto-confirmed by the engine after zero-conflict verification
+        createdAt: new Date().toISOString()
+      };
+      newBookings.push(newBooking);
+    }
 
-    if (newBooking.applicantEmail) {
+    if (newBookings.length > 0 && newBookings[0].applicantEmail) {
       saveUserProfile({
-        applicantName: newBooking.applicantName,
-        applicantEmail: newBooking.applicantEmail,
-        applicantRole: newBooking.applicantRole,
-        department: newBooking.department,
-        applicantPhone: newBooking.applicantPhone
+        applicantName: newBookings[0].applicantName,
+        applicantEmail: newBookings[0].applicantEmail,
+        applicantRole: newBookings[0].applicantRole,
+        department: newBookings[0].department,
+        applicantPhone: newBookings[0].applicantPhone
       });
     }
 
-    const updated = [newBooking, ...adhocBookings];
+    const updated = [...newBookings, ...adhocBookings];
     setAdhocBookings(updated);
     saveStoredAdHocBookings(updated);
 
     // Sync to Firestore cloud
-    try {
-      await saveBookingToCloud(newBooking);
-    } catch (err) {
-      console.error('Cloud sync error on create booking:', err);
+    for (const b of newBookings) {
+      try {
+        await saveBookingToCloud(b);
+      } catch (err) {
+        console.error('Cloud sync error on create booking:', err);
+      }
     }
 
     setBookingModalInfo(null);
-    setQrModalBooking(newBooking);
-    showToast(`🟢 Tempahan ${newBooking.id} di ${newBooking.roomName} berjaya disahkan & disimpan ke Cloud!`);
+    setQrModalBooking(newBookings[0]);
+    if (newBookings.length > 1) {
+      showToast(`🟢 Berjaya! ${newBookings.length} siri tempahan di ${newBookings[0].roomName} (11–13 Okt 2026, 4pm–11pm) telah disahkan!`);
+    } else {
+      showToast(`🟢 Tempahan ${newBookings[0].id} di ${newBookings[0].roomName} berjaya disahkan & disimpan ke Cloud!`);
+    }
   };
 
   // Cancel booking

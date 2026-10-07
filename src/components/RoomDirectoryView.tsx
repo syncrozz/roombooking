@@ -67,10 +67,10 @@ export const RoomDirectoryView: React.FC<RoomDirectoryViewProps> = ({
               Direktori KPMBP
             </div>
             <h2 className="text-2xl font-extrabold text-slate-900 tracking-tight">
-              Direktori 42 Ruang Kuliah & Fasiliti
+              Direktori {rooms.length} Ruang Kuliah & Fasiliti
             </h2>
             <p className="text-slate-600 text-xs sm:text-sm mt-0.5">
-              Maklumat lengkap 28 Bilik Kuliah, Smart Classroom, 5 Makmal Komputer, 2 Dewan Kuliah, 4 Ruang Khas, dan 2 Surau Kolej Profesional MARA Bandar Penawar.
+              Maklumat lengkap Bilik Kuliah, Smart Classroom, Makmal Komputer, Dewan Besar, Dewan Kuliah, Ruang Khas, dan Surau Kolej Profesional MARA Bandar Penawar.
             </p>
           </div>
 
@@ -82,10 +82,10 @@ export const RoomDirectoryView: React.FC<RoomDirectoryViewProps> = ({
               💻 5 Makmal Komputer
             </span>
             <span className="bg-blue-50 border border-blue-200 text-blue-800 px-3 py-1.5 rounded-xl">
-              🏛️ 2 Dewan Kuliah
+              🏛️ {rooms.filter(r => r.category === 'Dewan Kuliah').length} Dewan
             </span>
             <span className="bg-amber-50 border border-amber-200 text-amber-800 px-3 py-1.5 rounded-xl">
-              🎓 4 Ruang Khas
+              🎓 {rooms.filter(r => r.category === 'Ruang Khas').length} Ruang Khas
             </span>
             <span className="bg-emerald-50 border border-emerald-200 text-emerald-800 px-3 py-1.5 rounded-xl">
               🕌 2 Surau
@@ -101,11 +101,11 @@ export const RoomDirectoryView: React.FC<RoomDirectoryViewProps> = ({
               onChange={(e) => setCategoryFilter(e.target.value as RoomCategory | 'Semua')}
               className="bg-slate-50 border border-slate-300 rounded-xl px-3.5 py-2 font-medium text-slate-800 outline-none focus:ring-2 focus:ring-emerald-500"
             >
-              <option value="Semua">Kategori: Semua (42 Ruang)</option>
+              <option value="Semua">Kategori: Semua ({rooms.length} Ruang)</option>
               <option value="Bilik Kuliah">🏫 Bilik Kuliah (BK01 – BK28, Smart Classroom)</option>
               <option value="Makmal Komputer">💻 Makmal Komputer (Alfa, Beta, Sigma, Gamma, Delta)</option>
-              <option value="Dewan Kuliah">🏛️ Dewan Kuliah (DKA & DKB)</option>
-              <option value="Ruang Khas">🎓 Ruang Khas (Aras 1 Perpustakaan, Bilik Kota Tinggi, Dewan Seminar, Mini Seminar)</option>
+              <option value="Dewan Kuliah">🏛️ Dewan Utama & Dewan Kuliah (Dewan Besar, DKA, DKB)</option>
+              <option value="Ruang Khas">🎓 Ruang Khas (Aras 1 Perpustakaan, Bilik Kota Tinggi, Dewan Seminar, Mini Seminar, Bilik Inkubator)</option>
               <option value="Surau">🕌 Surau (Surau 1 & Surau 2)</option>
             </select>
 

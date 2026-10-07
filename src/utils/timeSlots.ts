@@ -82,18 +82,23 @@ export const ALL_BOOKING_TIME_SLOTS: TimeSlot[] = [
 
 // Quick Booking & Filter: Start Time Options
 export const BOOKING_START_OPTIONS: TimeOption[] = [
-  // Sesi Siang
-  { value: '08:30', label: '08:30 AM', period: 'DAY' },
-  { value: '09:30', label: '09:30 AM', period: 'DAY' },
-  { value: '10:30', label: '10:30 AM', period: 'DAY' },
-  { value: '11:30', label: '11:30 AM', period: 'DAY' },
-  { value: '12:30', label: '12:30 PM', period: 'DAY' },
-  { value: '13:30', label: '01:30 PM', period: 'DAY' },
-  { value: '14:30', label: '02:30 PM', period: 'DAY' },
-  { value: '15:30', label: '03:30 PM', period: 'DAY' },
-  { value: '16:30', label: '04:30 PM', period: 'DAY' },
-  { value: '17:30', label: '05:30 PM', period: 'DAY' },
-  // Sesi Malam (20:00 - 22:00)
+  // Sesi Pagi & Siang
+  { value: '08:30', label: '08:30 AM (Pagi)', period: 'DAY' },
+  { value: '09:30', label: '09:30 AM (Pagi)', period: 'DAY' },
+  { value: '10:30', label: '10:30 AM (Pagi)', period: 'DAY' },
+  { value: '11:30', label: '11:30 AM (Pagi)', period: 'DAY' },
+  { value: '12:30', label: '12:30 PM (Tengah Hari)', period: 'DAY' },
+  { value: '13:30', label: '01:30 PM (Petang)', period: 'DAY' },
+  { value: '14:30', label: '02:30 PM (Petang)', period: 'DAY' },
+  { value: '15:30', label: '03:30 PM (Petang)', period: 'DAY' },
+  // Sesi Petang Lanjutan (4:00 PM / 16:00)
+  { value: '16:00', label: '04:00 PM (Petang)', period: 'DAY' },
+  { value: '16:30', label: '04:30 PM (Petang)', period: 'DAY' },
+  { value: '17:00', label: '05:00 PM (Petang)', period: 'DAY' },
+  { value: '17:30', label: '05:30 PM (Petang)', period: 'DAY' },
+  { value: '18:00', label: '06:00 PM (Petang)', period: 'DAY' },
+  // Sesi Malam (19:00 - 22:00)
+  { value: '19:00', label: '07:00 PM (Malam)', period: 'NIGHT' },
   { value: '20:00', label: '08:00 PM (Malam)', period: 'NIGHT' },
   { value: '21:00', label: '09:00 PM (Malam)', period: 'NIGHT' },
   { value: '22:00', label: '10:00 PM (Malam)', period: 'NIGHT' },
@@ -109,10 +114,15 @@ export const BOOKING_END_OPTIONS: TimeOption[] = [
   { value: '13:30', label: '01:30 PM', period: 'DAY' },
   { value: '14:30', label: '02:30 PM', period: 'DAY' },
   { value: '15:30', label: '03:30 PM', period: 'DAY' },
+  { value: '16:00', label: '04:00 PM', period: 'DAY' },
   { value: '16:30', label: '04:30 PM', period: 'DAY' },
+  { value: '17:00', label: '05:00 PM', period: 'DAY' },
   { value: '17:30', label: '05:30 PM', period: 'DAY' },
+  { value: '18:00', label: '06:00 PM', period: 'DAY' },
   { value: '18:30', label: '06:30 PM', period: 'DAY' },
-  // Sesi Malam (21:00 - 23:00 max)
+  // Sesi Malam (19:00 - 23:00 max)
+  { value: '19:00', label: '07:00 PM (Malam)', period: 'NIGHT' },
+  { value: '20:00', label: '08:00 PM (Malam)', period: 'NIGHT' },
   { value: '21:00', label: '09:00 PM (Malam)', period: 'NIGHT' },
   { value: '22:00', label: '10:00 PM (Malam)', period: 'NIGHT' },
   { value: '23:00', label: '11:00 PM (Malam - Had Maksimum)', period: 'NIGHT' },
@@ -188,21 +198,14 @@ export function validateBookingTime(
     };
   }
 
-  // 4. Booking cannot span across the college evening closure window (18:30 - 20:00)
-  if (startMin < nightStartMin && endMin > daytimeMaxEndMin && endMin > nightStartMin) {
+  // 4. Booking cannot start after closing hours (after 23:00)
+  if (startMin >= latestMin) {
     return {
       isValid: false,
-      errorMsg: `Tempahan tidak boleh merentasi waktu penutupan antara sesi petang (tamat 18:30) dan sesi malam (bermula 20:00).`
+      errorMsg: `Waktu mula tidak boleh melebihi jam 23:00 (11:00 PM).`
     };
   }
 
-  // 5. If booking falls within the evening closure window (e.g. 18:31 - 19:59)
-  if (startMin >= daytimeMaxEndMin && startMin < nightStartMin) {
-    return {
-      isValid: false,
-      errorMsg: `Sesi antara jam 18:30 dan 20:00 adalah waktu penutupan operasi kampus. Sesi malam bermula pada jam 20:00.`
-    };
-  }
-
+  // Extended sessions (e.g. 16:00 - 23:00 / 4:00 PM - 11:00 PM untuk Dewan / Aktiviti Pensyarah) adalah sah sepenuhnya
   return { isValid: true };
 }
