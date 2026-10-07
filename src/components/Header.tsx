@@ -5,6 +5,7 @@ import { StaffUser } from '../types';
 import { getStoredActiveUser, clearActiveUser, subscribeToActiveUser } from '../utils/storage';
 import { 
   LayoutDashboard,
+  Search, 
   CalendarDays, 
   BookOpen, 
   Lock,
@@ -19,7 +20,7 @@ import {
   LogOut
 } from 'lucide-react';
 
-export type ActiveTab = 'dashboard' | 'matrix' | 'academic' | 'mybookings' | 'directory' | 'admin';
+export type ActiveTab = 'dashboard' | 'search' | 'matrix' | 'academic' | 'mybookings' | 'directory' | 'admin';
 
 interface HeaderProps {
   activeTab: ActiveTab;
@@ -73,6 +74,7 @@ export const Header: React.FC<HeaderProps> = ({
   // Standard navigation items (horizontal sequence)
   const mainNavItems = [
     { id: 'dashboard' as ActiveTab, label: 'Dashboard', icon: LayoutDashboard },
+    { id: 'search' as ActiveTab, label: 'Cari & Tempah', icon: Search },
     { id: 'matrix' as ActiveTab, label: 'Calendar', icon: CalendarDays },
     { id: 'academic' as ActiveTab, label: 'Locked', icon: Lock },
     { id: 'mybookings' as ActiveTab, label: 'My Booking', icon: QrCode },

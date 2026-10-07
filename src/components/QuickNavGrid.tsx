@@ -2,6 +2,7 @@ import React from 'react';
 import { ActiveTab } from './Header';
 import { 
   LayoutDashboard,
+  Search, 
   CalendarDays, 
   Lock, 
   QrCode, 
@@ -28,6 +29,13 @@ export const QuickNavGrid: React.FC<QuickNavGridProps> = ({
       icon: LayoutDashboard,
       color: 'text-slate-800 bg-slate-100 hover:bg-slate-200/90 border-slate-300',
       activeRing: 'ring-2 ring-slate-800 border-slate-400 bg-slate-200/80 shadow-xs',
+    },
+    {
+      id: 'search' as ActiveTab,
+      label: 'Cari & Tempah',
+      icon: Search,
+      color: 'text-emerald-700 bg-emerald-50 hover:bg-emerald-100/80 border-emerald-200/90',
+      activeRing: 'ring-2 ring-emerald-600 border-emerald-400 bg-emerald-100/90 shadow-xs',
     },
     {
       id: 'matrix' as ActiveTab,
@@ -67,7 +75,7 @@ export const QuickNavGrid: React.FC<QuickNavGridProps> = ({
   ];
 
   return (
-    <div className="grid grid-cols-2 sm:grid-cols-3 lg:grid-cols-6 gap-2 sm:gap-2.5">
+    <div className="grid grid-cols-2 sm:grid-cols-4 lg:grid-cols-7 gap-2 sm:gap-2.5">
       {navItems.map((item) => {
         const Icon = item.icon;
         const isActive = activeTab === item.id;

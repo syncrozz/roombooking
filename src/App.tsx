@@ -54,6 +54,7 @@ import { INITIAL_STAFF_DATA } from './data/staffData';
 import { Header, ActiveTab } from './components/Header';
 import { QuickNavGrid } from './components/QuickNavGrid';
 import { DashboardOverview } from './components/DashboardOverview';
+import { QuickBookingSearch } from './components/QuickBookingSearch';
 import { RoomAvailabilityMatrix } from './components/RoomAvailabilityMatrix';
 import { AcademicScheduleView } from './components/AcademicScheduleView';
 import { MyBookingsView } from './components/MyBookingsView';
@@ -543,6 +544,7 @@ export default function App() {
   const getTabBreadcrumb = (tab: ActiveTab) => {
     switch (tab) {
       case 'dashboard': return 'Dashboard & Ringkasan Utama';
+      case 'search': return 'Cari & Tempah Ruang';
       case 'matrix': return 'Lihat Ketersediaan Ruang';
       case 'academic': return 'Locked (Jadual Rasmi)';
       case 'mybookings': return 'My Booking & Pas QR';
@@ -592,6 +594,19 @@ export default function App() {
               staffList={staffUsers}
               onNavigateTab={handleSelectTab}
               onOpenBookingModal={handleOpenBookingModal}
+            />
+          )}
+
+          {activeTab === 'search' && (
+            <QuickBookingSearch
+              rooms={rooms}
+              academicSchedule={academicSchedule}
+              adhocBookings={adhocBookings}
+              institutionalBlocks={institutionalBlocks}
+              onOpenBookingModal={handleOpenBookingModal}
+              onViewRoomDetails={(room) => {
+                setActiveTab('directory');
+              }}
             />
           )}
 
