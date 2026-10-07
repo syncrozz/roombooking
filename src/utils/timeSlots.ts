@@ -27,7 +27,7 @@ export interface TimeOption {
 export const OPERATING_HOURS = {
   EARLIEST_BOOKING_START: '08:30',
   DAYTIME_START: '08:30',
-  DAYTIME_STANDARD_END: '16:30',
+  DAYTIME_STANDARD_END: '17:30',
   DAYTIME_MAX_END: '18:30',
   NIGHT_START: '20:00',
   NIGHT_END: '23:00',
@@ -65,6 +65,7 @@ export const DAY_TIME_SLOTS: TimeSlot[] = [
   { id: 'DAY-1330', start: '13:30', end: '14:30', label: '13:30 - 14:30', period: 'DAY', periodLabel: '☀️ Waktu Siang' },
   { id: 'DAY-1430', start: '14:30', end: '15:30', label: '14:30 - 15:30', period: 'DAY', periodLabel: '☀️ Waktu Siang' },
   { id: 'DAY-1530', start: '15:30', end: '16:30', label: '15:30 - 16:30', period: 'DAY', periodLabel: '☀️ Waktu Siang' },
+  { id: 'DAY-1630', start: '16:30', end: '17:30', label: '16:30 - 17:30', period: 'DAY', periodLabel: '☀️ Waktu Siang' },
 ];
 
 // Standard 1-Hour Night Slots (20:00 - 23:00 max)

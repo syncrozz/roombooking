@@ -33,7 +33,8 @@ import {
   Building,
   Sparkles,
   Moon,
-  Sun
+  Sun,
+  X
 } from 'lucide-react';
 
 interface RoomAvailabilityMatrixProps {
@@ -140,15 +141,25 @@ export const RoomAvailabilityMatrix: React.FC<RoomAvailabilityMatrixProps> = ({
         {/* Filter Controls Bar */}
         <div className="mt-4 flex flex-wrap items-center justify-between gap-3 text-xs">
           <div className="flex flex-wrap items-center gap-2">
-            <div className="relative min-w-[180px]">
-              <Search className="w-3.5 h-3.5 absolute left-3 top-2.5 text-slate-400" />
+            <div className="relative min-w-[220px] sm:min-w-[260px]">
+              <Search className="w-4 h-4 absolute left-3 top-2.5 text-emerald-600 pointer-events-none" />
               <input
                 type="text"
                 placeholder="Cari bilik (cth: BK04, DKA)..."
                 value={searchQuery}
                 onChange={(e) => setSearchQuery(e.target.value)}
-                className="w-full bg-slate-50 border border-slate-300 rounded-lg pl-8 pr-3 py-1.5 text-slate-800 outline-none focus:ring-2 focus:ring-emerald-500"
+                className="w-full bg-white border-2 border-slate-300 hover:border-emerald-500 focus:border-emerald-600 rounded-xl pl-9 pr-8 py-2 text-slate-900 font-semibold placeholder:text-slate-400 placeholder:font-normal outline-none focus:ring-4 focus:ring-emerald-500/15 shadow-sm hover:shadow transition-all"
               />
+              {searchQuery && (
+                <button
+                  type="button"
+                  onClick={() => setSearchQuery('')}
+                  className="absolute right-2.5 top-2.5 text-slate-400 hover:text-slate-600 p-0.5 rounded-full hover:bg-slate-100 transition cursor-pointer"
+                  title="Kosongkan carian"
+                >
+                  <X className="w-3.5 h-3.5" />
+                </button>
+              )}
             </div>
 
             <select
@@ -237,7 +248,7 @@ export const RoomAvailabilityMatrix: React.FC<RoomAvailabilityMatrixProps> = ({
 
             <div className="flex items-center gap-2 text-[11px] text-slate-500">
               <span className="inline-flex items-center gap-1 bg-amber-50 text-amber-800 px-2 py-0.5 rounded border border-amber-200">
-                ☀️ Sesi Siang: 08:30 – 16:30
+                ☀️ Sesi Siang: 08:30 – 17:30
               </span>
               <span className="inline-flex items-center gap-1 bg-indigo-50 text-indigo-800 px-2 py-0.5 rounded border border-indigo-200 font-semibold">
                 🌙 Sesi Malam: 20:00 – 23:00 (Maksimum 23:00)
@@ -258,7 +269,7 @@ export const RoomAvailabilityMatrix: React.FC<RoomAvailabilityMatrixProps> = ({
                       Ruang Kuliah
                     </th>
                     <th colSpan={DAY_TIME_SLOTS.length} className="py-2 px-3 font-bold text-center bg-amber-50 text-amber-900 border-r border-slate-200 text-xs tracking-wider">
-                      ☀️ WAKTU SIANG (08:30 – 16:30)
+                      ☀️ WAKTU SIANG (08:30 – 17:30)
                     </th>
                     <th colSpan={NIGHT_TIME_SLOTS.length} className="py-2 px-3 font-bold text-center bg-indigo-900 text-indigo-100 text-xs tracking-wider">
                       🌙 WAKTU MALAM (20:00 – 23:00)

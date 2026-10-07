@@ -37,7 +37,8 @@ export type PurposeCategory =
   | 'Konsultasi'
   | 'Mesyuarat'
   | 'Aktiviti Pelajar'
-  | 'Lain-lain';
+  | 'Lain-lain'
+  | (string & {});
 
 export type BookingStatus = 'CONFIRMED' | 'PENDING' | 'REJECTED' | 'CANCELLED';
 

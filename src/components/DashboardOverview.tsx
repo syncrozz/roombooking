@@ -9,7 +9,6 @@ import {
 } from '../types';
 import { ActiveTab } from './Header';
 import { 
-  Search, 
   CalendarDays, 
   BookOpen, 
   QrCode, 
@@ -18,14 +17,14 @@ import {
   CheckCircle2, 
   Clock, 
   ShieldCheck, 
-  ArrowRight,
-  Sparkles,
-  Calendar,
-  Layers,
-  MapPin,
-  Laptop,
-  GraduationCap,
-  Lock
+  ArrowRight, 
+  Sparkles, 
+  Calendar, 
+  Layers, 
+  MapPin, 
+  Laptop, 
+  GraduationCap, 
+  Lock 
 } from 'lucide-react';
 
 interface DashboardOverviewProps {
@@ -174,10 +173,10 @@ export const DashboardOverview: React.FC<DashboardOverviewProps> = ({
               <h2 className="text-xs font-bold text-slate-900 uppercase tracking-wider">Tempahan Pantas ({todayStr})</h2>
             </div>
             <button
-              onClick={() => onNavigateTab('search')}
-              className="text-[11px] font-bold text-emerald-600 hover:text-emerald-700"
+              onClick={() => onNavigateTab('matrix')}
+              className="text-[11px] font-bold text-emerald-600 hover:text-emerald-700 cursor-pointer"
             >
-              Carian Slot Penuh →
+              Lihat Kalendar Ruang →
             </button>
           </div>
 
