@@ -363,6 +363,8 @@ export const BookingModal: React.FC<BookingModalProps> = ({
       pinStatus: verifiedStaff.pinStatus
     });
 
+    const effectivePurpose = purposeCategory.trim() || 'Kelas';
+
     if (isMultiDay && activeDates.length > 1) {
       const seriesBookings = activeDates.map((d, index) => ({
         roomId: room.id,
@@ -375,8 +377,8 @@ export const BookingModal: React.FC<BookingModalProps> = ({
         applicantPhone: verifiedStaff.phone,
         applicantRole: verifiedStaff.role,
         department: verifiedStaff.department,
-        purposeCategory,
-        title: `${purposeCategory} (${room.code}) - Siri ${index + 1}/${activeDates.length}`,
+        purposeCategory: effectivePurpose,
+        title: `${effectivePurpose} (${room.code}) - Siri ${index + 1}/${activeDates.length}`,
         paxCount,
         notes: notes.trim()
           ? `${notes.trim()} [Siri Hari ${index + 1}/${activeDates.length}]`
@@ -395,8 +397,8 @@ export const BookingModal: React.FC<BookingModalProps> = ({
         applicantPhone: verifiedStaff.phone,
         applicantRole: verifiedStaff.role,
         department: verifiedStaff.department,
-        purposeCategory,
-        title: `${purposeCategory} (${room.code})`,
+        purposeCategory: effectivePurpose,
+        title: `${effectivePurpose} (${room.code})`,
         paxCount,
         notes: notes.trim() || undefined
       });
@@ -422,21 +424,64 @@ export const BookingModal: React.FC<BookingModalProps> = ({
         </div>
 
         {/* Multi-Day / Single-Day Option Card */}
-        <div className="bg-slate-50 border border-slate-200 rounded-xl p-3 space-y-2 text-xs">
-          <div className="flex items-center justify-between">
-            <label className="flex items-center gap-2 cursor-pointer font-bold text-slate-800 text-xs">
-              <input
-                type="checkbox"
-                checked={isMultiDay}
-                onChange={(e) => setIsMultiDay(e.target.checked)}
-                className="rounded text-blue-600 focus:ring-blue-500 cursor-pointer"
-              />
-              <span>📅 Tempahan Berbilang Hari</span>
-            </label>
-            {isMultiDay && (
-              <span className="bg-blue-100 text-blue-800 text-[10px] font-bold px-2 py-0.5 rounded-full">
-                {activeDates.length} Hari Terpilih
+        <div className={`rounded-xl p-3 space-y-2.5 text-xs transition-all duration-200 border ${
+          isMultiDay 
+            ? 'bg-blue-50/70 border-blue-300 ring-2 ring-blue-500/20 shadow-xs' 
+            : 'bg-gradient-to-r from-blue-50/60 via-slate-50 to-indigo-50/40 border-blue-200 shadow-2xs'
+        }`}>
+          <div className={`flex items-center justify-between p-2.5 rounded-xl transition-all duration-200 ${
+            isMultiDay
+              ? 'bg-gradient-to-r from-blue-600 via-blue-700 to-indigo-600 text-white shadow-md shadow-blue-600/30 ring-1 ring-blue-400/50'
+              : 'bg-white border-2 border-blue-300 hover:border-blue-500 text-slate-800 shadow-sm hover:shadow'
+          }`}>
+            <label className="flex items-center gap-2.5 cursor-pointer font-extrabold select-none">
+              <span className={`w-5 h-5 rounded-md flex items-center justify-center transition-all ${
+                isMultiDay 
+                  ? 'bg-white text-blue-600 shadow-xs' 
+                  : 'bg-blue-50 border-2 border-blue-400 text-transparent'
+              }`}>
+                <input
+                  type="checkbox"
+                  checked={isMultiDay}
+                  onChange={(e) => setIsMultiDay(e.target.checked)}
+                  className="sr-only"
+                />
+                {isMultiDay ? (
+                  <CheckCircle2 className="w-4 h-4 text-blue-600" />
+                ) : (
+                  <span className="w-2 h-2 rounded-xs bg-transparent" />
+                )}
               </span>
+              <div className="flex flex-col sm:flex-row sm:items-center gap-0.5 sm:gap-2">
+                <span className={`text-xs sm:text-sm font-black tracking-tight ${isMultiDay ? 'text-white' : 'text-slate-900'}`}>
+                  📅 Lebih 1 Hari
+                </span>
+                <span className={`text-[10px] font-extrabold px-2 py-0.5 rounded-full uppercase tracking-wider ${
+                  isMultiDay ? 'bg-white/20 text-white border border-white/30' : 'bg-blue-600 text-white shadow-2xs'
+                }`}>
+                  Multi-Day
+                </span>
+              </div>
+            </label>
+
+            {isMultiDay ? (
+              <div className="flex items-center gap-1.5 shrink-0">
+                <span className="relative flex h-2 w-2">
+                  <span className="animate-ping absolute inline-flex h-full w-full rounded-full bg-emerald-300 opacity-75"></span>
+                  <span className="relative inline-flex rounded-full h-2 w-2 bg-emerald-400"></span>
+                </span>
+                <span className="bg-white text-blue-700 text-[10px] font-black px-2.5 py-1 rounded-full shadow-xs">
+                  {activeDates.length} Hari Aktif
+                </span>
+              </div>
+            ) : (
+              <button
+                type="button"
+                onClick={() => setIsMultiDay(true)}
+                className="text-[11px] font-extrabold text-blue-600 hover:text-blue-800 bg-blue-50 hover:bg-blue-100 px-2.5 py-1 rounded-lg border border-blue-200 transition cursor-pointer"
+              >
+                + Aktifkan Siri
+              </button>
             )}
           </div>
 
@@ -528,7 +573,7 @@ export const BookingModal: React.FC<BookingModalProps> = ({
                 </>
               ) : (
                 <>
-                  <Sun className="w-2.5 h-2.5" /> Sesi Siang (08:30 – 16:30)
+                  <Sun className="w-2.5 h-2.5" /> Sesi Siang (08:30 – 17:30)
                 </>
               )}
             </span>
@@ -764,19 +809,33 @@ export const BookingModal: React.FC<BookingModalProps> = ({
           </div>
 
           <div>
-            <label className="block font-bold text-slate-700 mb-1">Kategori Tujuan:</label>
-            <select
-              value={purposeCategory}
-              onChange={(e) => setPurposeCategory(e.target.value as PurposeCategory)}
-              className="w-full bg-slate-50 border border-slate-300 rounded-xl px-3 py-2 text-slate-900 font-medium outline-none focus:ring-2 focus:ring-blue-500"
-            >
-              <option value="Kelas">Kelas</option>
-              <option value="Kelas Ganti">Kelas Ganti</option>
-              <option value="Konsultasi">Konsultasi</option>
-              <option value="Mesyuarat">Mesyuarat</option>
-              <option value="Aktiviti Pelajar">Aktiviti Pelajar</option>
-              <option value="Lain-lain">Lain-lain</option>
-            </select>
+            <label htmlFor="modal-purpose-input" className="block font-bold text-slate-700 mb-1">
+              Tujuan Tempahan / Kategori:
+            </label>
+            <div className="relative">
+              <input
+                id="modal-purpose-input"
+                type="text"
+                list="purpose-category-suggestions"
+                value={purposeCategory}
+                onChange={(e) => setPurposeCategory(e.target.value)}
+                placeholder="Kelas"
+                className="w-full bg-slate-50 border border-slate-300 rounded-xl px-3 py-2 text-slate-900 font-semibold outline-none focus:ring-2 focus:ring-blue-500 focus:bg-white transition"
+              />
+              <datalist id="purpose-category-suggestions">
+                <option value="Kelas" />
+                <option value="Kelas Ganti" />
+                <option value="Konsultasi" />
+                <option value="Mesyuarat" />
+                <option value="Aktiviti Pelajar" />
+                <option value="Bengkel / Kursus" />
+                <option value="Taklimat / Program" />
+                <option value="Lain-lain" />
+              </datalist>
+            </div>
+            <p className="text-[10px] text-slate-500 mt-1">
+              Boleh ditaip / diisi secara manual mengikut keperluan program atau aktiviti anda.
+            </p>
           </div>
 
           <div>
@@ -785,7 +844,7 @@ export const BookingModal: React.FC<BookingModalProps> = ({
             </label>
             <input
               type="text"
-              placeholder="cth: Memerlukan mikrofon tambahan (jika ada)"
+              placeholder="(jika ada)"
               value={notes}
               onChange={(e) => setNotes(e.target.value)}
               className="w-full bg-slate-50 border border-slate-300 rounded-xl px-3 py-2 text-slate-900 outline-none focus:ring-2 focus:ring-blue-500"
