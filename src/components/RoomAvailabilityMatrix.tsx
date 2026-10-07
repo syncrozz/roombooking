@@ -365,7 +365,7 @@ export const RoomAvailabilityMatrix: React.FC<RoomAvailabilityMatrixProps> = ({
                         <td key={slot.id} className={`p-1.5 text-center ${slot.period === 'NIGHT' ? 'bg-indigo-50/20' : ''}`}>
                           {isAvail && (
                             <button
-                              onClick={() => onOpenBookingModal(room, selectedDate, slot.start, slot.end, 'Penggunaan Pensyarah')}
+                              onClick={() => onOpenBookingModal(room, selectedDate, slot.start, slot.end, 'Kelas')}
                               className={`w-full h-11 rounded-lg border font-bold transition flex flex-col items-center justify-center p-1 group shadow-2xs ${
                                 slot.period === 'NIGHT'
                                   ? 'bg-indigo-50/80 hover:bg-indigo-600 hover:text-white border-indigo-200 text-indigo-900'

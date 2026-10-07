@@ -202,7 +202,7 @@ export const DashboardOverview: React.FC<DashboardOverviewProps> = ({
                 </div>
 
                 <button
-                  onClick={() => onOpenBookingModal(r, todayStr, '08:30', '10:30', 'Penggunaan Pensyarah')}
+                  onClick={() => onOpenBookingModal(r, todayStr, '08:30', '10:30', 'Kelas')}
                   className="px-2.5 py-1 bg-blue-600 hover:bg-blue-700 text-white rounded text-[11px] font-bold transition shadow-2xs"
                 >
                   Tempah

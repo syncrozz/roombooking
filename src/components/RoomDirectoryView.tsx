@@ -206,7 +206,7 @@ export const RoomDirectoryView: React.FC<RoomDirectoryViewProps> = ({
               </button>
 
               <button
-                onClick={() => onOpenBookingModal(room, '2026-08-06', '11:30', '12:30', 'Penggunaan Pensyarah')}
+                onClick={() => onOpenBookingModal(room, '2026-08-06', '11:30', '12:30', 'Kelas')}
                 className="flex-1 bg-emerald-600 hover:bg-emerald-700 text-white text-xs font-bold py-2.5 px-3 rounded-xl shadow-xs transition flex items-center justify-center gap-1"
               >
                 <span>Tempah</span>
@@ -287,7 +287,7 @@ export const RoomDirectoryView: React.FC<RoomDirectoryViewProps> = ({
                 onClick={() => {
                   const r = selectedRoomModal;
                   setSelectedRoomModal(null);
-                  onOpenBookingModal(r, '2026-08-06', '11:30', '12:30', 'Penggunaan Pensyarah');
+                  onOpenBookingModal(r, '2026-08-06', '11:30', '12:30', 'Kelas');
                 }}
                 className="bg-emerald-600 hover:bg-emerald-700 text-white font-bold py-2.5 px-5 rounded-xl text-xs transition shadow-md"
               >

@@ -6,9 +6,9 @@ import {
   AcademicScheduleSlot,
   StaffUser 
 } from '../types';
-import { formatDateMalay } from '../utils/availabilityEngine';
+import { formatDateMalay, exportBookingsToCSV } from '../utils/availabilityEngine';
 import { parseTimetableCSV, exportTimetableToStandardGridCSV } from '../utils/timetableCsvParser';
-import { MASTER_TIMETABLE_CSV, SAMPLE_LOCKED_SLOTS_CSV, STANDARD_GRID_TEMPLATE_CSV } from '../data/initialData';
+import { MASTER_TIMETABLE_CSV, STANDARD_GRID_TEMPLATE_CSV } from '../data/initialData';
 import { CloudSyncModal } from './CloudSyncModal';
 import { updateStaffPinInCloud } from '../lib/firebase';
 import { WhatsAppIcon } from './WhatsAppIcon';
@@ -132,19 +132,6 @@ export const AdminManagementView: React.FC<AdminManagementViewProps> = ({
     document.body.appendChild(link);
     link.click();
     document.body.removeChild(link);
-  };
-
-  // One-click loader for official sample: Surau 1 & Surau 2 locked slots (AFIF & NIZAM)
-  const handleLoadSampleSurauData = () => {
-    setScheduleCsvFile(null);
-    setScheduleSyncSuccessMsg(null);
-    const res = parseTimetableCSV(SAMPLE_LOCKED_SLOTS_CSV, rooms);
-    setParsedScheduleSlots(res.slots);
-    setScheduleParseSummary(res.summary);
-    setScheduleParseErrors(res.errors);
-    setScheduleSyncSuccessMsg(
-      `⚡ Data contoh Surau (AFIF & NIZAM) telah dimuatkan! Sebanyak ${res.slots.length} slot merentasi ${res.summary.roomsAffected.join(', ')} sedia untuk disinkronkan dan dikunci.`
-    );
   };
 
   // Export current active schedule to standard grid CSV
@@ -319,6 +306,29 @@ ST003,Pengajian Am,Cik Siti Sarah Binti Razak,Pensyarah,013-5558899,siti.sarah@k
     document.body.appendChild(link);
     link.click();
     document.body.removeChild(link);
+  };
+
+  // Export Ad-Hoc Bookings to CSV (Full Backup with all 17 fields & UTF-8 BOM)
+  const handleExportBookingsCSV = (filterStatus: 'ALL' | 'CONFIRMED' | 'PENDING' = 'ALL') => {
+    let toExport = bookings;
+    let label = 'semua';
+    if (filterStatus === 'CONFIRMED') {
+      toExport = bookings.filter(b => b.status === 'CONFIRMED');
+      label = 'disahkan';
+    } else if (filterStatus === 'PENDING') {
+      toExport = bookings.filter(b => b.status === 'PENDING');
+      label = 'menunggu';
+    }
+
+    if (toExport.length === 0) {
+      alert(`Tiada rekod tempahan ad-hoc (${label}) untuk dieksport.`);
+      return;
+    }
+
+    const res = exportBookingsToCSV(toExport, `kpmbp_tempahan_adhoc_${label}_backup`);
+    if (res.success) {
+      alert(`✅ Berjaya memuat turun fail sandaran: ${res.filename} (${res.count} rekod tempahan).`);
+    }
   };
 
   // CSV File Handler with Auto-Sync to Firebase
@@ -660,9 +670,20 @@ ST003,Pengajian Am,Cik Siti Sarah Binti Razak,Pensyarah,013-5558899,siti.sarah@k
             <span className="text-slate-400 block font-medium">Institutional Block:</span>
             <strong className="text-xl font-bold text-indigo-300">{institutionalBlocks.length} Block</strong>
           </div>
-          <div className="bg-slate-800/80 p-3 rounded-xl border border-slate-700/80">
-            <span className="text-slate-400 block font-medium">Tempahan Ad-Hoc:</span>
-            <strong className="text-xl font-bold text-emerald-400">{bookings.length} Rekod</strong>
+          <div className="bg-slate-800/80 p-3 rounded-xl border border-slate-700/80 flex flex-col justify-between">
+            <div>
+              <span className="text-slate-400 block font-medium">Tempahan Ad-Hoc:</span>
+              <strong className="text-xl font-bold text-emerald-400">{bookings.length} Rekod</strong>
+            </div>
+            <button
+              type="button"
+              onClick={() => handleExportBookingsCSV('ALL')}
+              className="mt-2 w-full bg-emerald-600 hover:bg-emerald-500 text-white font-bold py-1.5 px-2.5 rounded-lg text-[11px] transition flex items-center justify-center gap-1.5 cursor-pointer shadow-xs active:scale-95"
+              title="Muat turun sandaran CSV semua tempahan adhoc masuk"
+            >
+              <Download className="w-3.5 h-3.5" />
+              <span>Eksport Sandaran CSV</span>
+            </button>
           </div>
           <div className="bg-slate-800/80 p-3 rounded-xl border border-slate-700/80">
             <span className="text-slate-400 block font-medium">Jadual Akademik Aktif:</span>
@@ -690,15 +711,6 @@ ST003,Pengajian Am,Cik Siti Sarah Binti Razak,Pensyarah,013-5558899,siti.sarah@k
 
           {/* Action Buttons */}
           <div className="flex flex-wrap items-center gap-2 shrink-0">
-            <button
-              onClick={handleLoadSampleSurauData}
-              className="bg-amber-50 hover:bg-amber-100 text-amber-900 border border-amber-300 text-xs font-bold py-2 px-3 rounded-xl transition flex items-center gap-1.5 shadow-xs cursor-pointer"
-              title="Muat data contoh Surau 1 & Surau 2 (AFIF & NIZAM) untuk semakan segera"
-            >
-              <Sparkles className="w-3.5 h-3.5 text-amber-600" />
-              <span>Contoh Surau (AFIF &amp; NIZAM)</span>
-            </button>
-
             <button
               onClick={handleDownloadStandardGridTemplate}
               className="bg-indigo-50 hover:bg-indigo-100 text-indigo-800 border border-indigo-300 text-xs font-bold py-2 px-3 rounded-xl transition flex items-center gap-1.5 shadow-xs cursor-pointer"
@@ -1434,6 +1446,64 @@ ST003,Pengajian Am,Cik Siti Sarah Binti Razak,Pensyarah,013-5558899,siti.sarah@k
         </div>
       </div>
 
+      {/* SECTION: AD-HOC BOOKINGS BACKUP & CSV EXPORT */}
+      <div className="bg-white rounded-2xl p-6 shadow-md border border-slate-200 space-y-4">
+        <div className="flex flex-col md:flex-row items-start md:items-center justify-between gap-4 border-b border-slate-100 pb-4">
+          <div>
+            <div className="flex items-center gap-2 text-slate-900 font-extrabold text-lg">
+              <FileSpreadsheet className="w-5 h-5 text-emerald-600" />
+              <h3>Sandaran Data &amp; Eksport CSV Tempahan Ad-Hoc</h3>
+            </div>
+            <p className="text-xs text-slate-500 mt-1">
+              Simpan dan muat turun kesemua rekod tempahan ad-hoc yang telah didaftarkan ke dalam fail spreadsheet CSV bagi tujuan sandaran offline, pelan kontigensi, atau audit institusi.
+            </p>
+          </div>
+
+          <div className="flex flex-wrap items-center gap-2 shrink-0">
+            <button
+              type="button"
+              onClick={() => handleExportBookingsCSV('ALL')}
+              className="bg-emerald-600 hover:bg-emerald-700 text-white font-bold py-2.5 px-4 rounded-xl text-xs transition flex items-center gap-2 shadow-md shadow-emerald-600/20 active:scale-95 cursor-pointer"
+              title="Muat turun semua rekod tempahan ke fail CSV"
+            >
+              <Download className="w-4 h-4" />
+              <span>Muat Turun Sandaran Semua ({bookings.length} Rekod)</span>
+            </button>
+
+            <button
+              type="button"
+              onClick={() => handleExportBookingsCSV('CONFIRMED')}
+              className="bg-slate-100 hover:bg-slate-200 text-slate-800 font-bold py-2.5 px-3 rounded-xl text-xs transition flex items-center gap-1.5 border border-slate-300 cursor-pointer"
+              title="Eksport rekod tempahan yang disahkan sahaja"
+            >
+              <Check className="w-3.5 h-3.5 text-emerald-600" />
+              <span>Disahkan ({bookings.filter(b => b.status === 'CONFIRMED').length})</span>
+            </button>
+
+            <button
+              type="button"
+              onClick={() => handleExportBookingsCSV('PENDING')}
+              className="bg-amber-50 hover:bg-amber-100 text-amber-900 font-bold py-2.5 px-3 rounded-xl text-xs transition flex items-center gap-1.5 border border-amber-300 cursor-pointer"
+              title="Eksport permohonan tempahan menunggu sahaja"
+            >
+              <Clock className="w-3.5 h-3.5 text-amber-600" />
+              <span>Menunggu ({bookings.filter(b => b.status === 'PENDING').length})</span>
+            </button>
+          </div>
+        </div>
+
+        {/* Informative Security & Contingency Callout */}
+        <div className="bg-slate-50 border border-slate-200 rounded-xl p-4 text-xs text-slate-700 space-y-2">
+          <div className="flex items-center gap-2 font-bold text-slate-900">
+            <ShieldCheck className="w-4 h-4 text-emerald-600" />
+            <span>Fungsi Perlindungan &amp; Kesinambungan Data (Business Continuity):</span>
+          </div>
+          <p className="text-slate-600 leading-relaxed text-[11px]">
+            Fail sandaran CSV ini merekodkan 17 medan data penting (ID Tempahan, Kod &amp; Nama Bilik Kuliah, Tarikh, Hari, Slot Masa Mula &amp; Tamat, Nama &amp; E-mel Pemohon, No Telefon Rasmi, Jawatan, Jabatan, Kategori Tujuan, Tajuk Aktiviti, Bilangan Hadirin, Status, Tarikh Dicipta, dan Catatan). Format ini mengandungi pengekodan UTF-8 BOM yang serasi dengan <strong>Microsoft Excel</strong> dan <strong>Google Sheets</strong> untuk kegunaan kecemasan sekiranya berlaku masalah talian atau pelayan awan.
+          </p>
+        </div>
+      </div>
+
       <div className="grid grid-cols-1 lg:grid-cols-2 gap-6">
         
         {/* SECTION 1: PENDING APPROVALS */}
@@ -1466,7 +1536,7 @@ ST003,Pengajian Am,Cik Siti Sarah Binti Razak,Pensyarah,013-5558899,siti.sarah@k
                   <div className="bg-white p-2.5 rounded-lg border border-slate-200 text-xs space-y-1 text-slate-700 font-medium">
                     <div>🏫 Ruang: <strong>{p.roomName} ({p.roomId})</strong></div>
                     <div>📅 Tarikh: <strong>{formatDateMalay(p.date)}</strong></div>
-                    <div>🕐 Masa: <strong>{p.startTime} – {p.endTime}</strong> (👥 {p.paxCount} pax)</div>
+                    <div>🕐 Masa: <strong>{p.startTime} – {p.endTime}</strong></div>
                   </div>
 
                   <div className="flex gap-2 pt-1">

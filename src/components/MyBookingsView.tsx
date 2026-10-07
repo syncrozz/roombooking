@@ -1,6 +1,6 @@
 import React, { useState, useEffect } from 'react';
 import { AdHocBooking, BookingStatus, StaffUser } from '../types';
-import { formatDateMalay, formatWhatsAppMessage, generateWhatsAppLink } from '../utils/availabilityEngine';
+import { formatDateMalay, formatWhatsAppMessage, generateWhatsAppLink, exportBookingsToCSV } from '../utils/availabilityEngine';
 import { verifyStaffCredentialsLocally } from '../lib/firebase';
 import { INITIAL_STAFF_DATA } from '../data/staffData';
 import { getStoredActiveUser, saveActiveUser, clearActiveUser, subscribeToActiveUser, UserProfileHistory } from '../utils/storage';
@@ -27,7 +27,9 @@ import {
   LogIn,
   LogOut,
   UserCheck,
-  Sparkles
+  Sparkles,
+  Download,
+  FileSpreadsheet
 } from 'lucide-react';
 
 interface MyBookingsViewProps {
@@ -378,15 +380,37 @@ export const MyBookingsView: React.FC<MyBookingsViewProps> = ({
             </button>
           </div>
 
-          <div className="relative min-w-[220px]">
-            <Search className="w-3.5 h-3.5 absolute left-3 top-2.5 text-slate-400" />
-            <input
-              type="text"
-              placeholder="Cari ID (BK-2026-...), ruang..."
-              value={searchQuery}
-              onChange={(e) => setSearchQuery(e.target.value)}
-              className="w-full bg-slate-50 border border-slate-300 rounded-xl pl-8 pr-3 py-1.5 text-slate-800 outline-none focus:ring-2 focus:ring-emerald-500"
-            />
+          <div className="flex flex-wrap items-center gap-2">
+            {scopedBookings.length > 0 && (
+              <button
+                type="button"
+                onClick={() => {
+                  const res = exportBookingsToCSV(
+                    filteredBookings.length > 0 ? filteredBookings : scopedBookings,
+                    currentUser ? `kpmbp_tempahan_${(currentUser.staffId || 'staf').toLowerCase()}` : 'kpmbp_tempahan_adhoc'
+                  );
+                  if (res.success) {
+                    alert(`✅ ${res.count} rekod tempahan berjaya dieksport ke fail: ${res.filename}`);
+                  }
+                }}
+                className="px-3 py-1.5 bg-emerald-50 hover:bg-emerald-100 text-emerald-800 border border-emerald-300 font-bold rounded-xl transition flex items-center gap-1.5 cursor-pointer shadow-xs active:scale-95"
+                title="Muat turun senarai tempahan yang dipaparkan ke fail CSV"
+              >
+                <Download className="w-3.5 h-3.5 text-emerald-600" />
+                <span>Eksport CSV ({filteredBookings.length})</span>
+              </button>
+            )}
+
+            <div className="relative min-w-[200px]">
+              <Search className="w-3.5 h-3.5 absolute left-3 top-2.5 text-slate-400" />
+              <input
+                type="text"
+                placeholder="Cari ID (BK-2026-...), ruang..."
+                value={searchQuery}
+                onChange={(e) => setSearchQuery(e.target.value)}
+                className="w-full bg-slate-50 border border-slate-300 rounded-xl pl-8 pr-3 py-1.5 text-slate-800 outline-none focus:ring-2 focus:ring-emerald-500"
+              />
+            </div>
           </div>
         </div>
       </div>
@@ -554,12 +578,11 @@ export const MyBookingsView: React.FC<MyBookingsViewProps> = ({
 
                   {/* Room & Time Details Box */}
                   <div className="bg-slate-50 rounded-xl p-3.5 border border-slate-200 space-y-2 text-xs text-slate-700">
-                    <div className="flex items-center justify-between">
+                    <div>
                       <span className="font-bold text-slate-900 text-sm flex items-center gap-1.5">
                         <Building className="w-4 h-4 text-emerald-600" />
                         {b.roomName} ({b.roomId})
                       </span>
-                      <span className="text-slate-500">👥 {b.paxCount} Hadirin</span>
                     </div>
 
                     <div className="flex flex-wrap items-center justify-between gap-2 pt-1 border-t border-slate-200/60">

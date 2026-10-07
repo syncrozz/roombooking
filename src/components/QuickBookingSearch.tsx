@@ -76,7 +76,7 @@ export const QuickBookingSearch: React.FC<QuickBookingSearchProps> = ({
   const [selectedRoomId, setSelectedRoomId] = useState<string>('ALL'); // default ALL (Semua 33 Ruang)
   const [minCapacity, setMinCapacity] = useState<number>(0);
   const [category, setCategory] = useState<RoomCategory | 'Semua'>('Semua');
-  const [purpose, setPurpose] = useState<PurposeCategory>('Penggunaan Pensyarah');
+  const [purpose, setPurpose] = useState<PurposeCategory>('Kelas');
   const [isAircondOnly, setIsAircondOnly] = useState<boolean>(false);
   const [hasSearched, setHasSearched] = useState<boolean>(true);
   const [selectedPopupCheck, setSelectedPopupCheck] = useState<RoomAvailabilityCheck | null>(null);
@@ -93,9 +93,9 @@ export const QuickBookingSearch: React.FC<QuickBookingSearchProps> = ({
 
   // Purpose options
   const purposeOptions: PurposeCategory[] = [
-    'Penggunaan Pensyarah',
-    'Aktiviti Akademik',
-    'Program',
+    'Kelas',
+    'Kelas Ganti',
+    'Konsultasi',
     'Mesyuarat',
     'Aktiviti Pelajar',
     'Lain-lain'

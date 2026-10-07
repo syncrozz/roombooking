@@ -246,7 +246,6 @@ export function formatWhatsAppMessage(booking: AdHocBooking): string {
 👤 *Pemohon:* ${booking.applicantName} (${booking.applicantRole})${emailLine}
 🏢 *Jabatan:* ${booking.department}
 🎯 *Tujuan:* ${booking.purposeCategory} - ${booking.title}
-👥 *Jumlah Hadirin:* ${booking.paxCount} orang
 ⚡ *Status:* ${statusEmoji}
 ━━━━━━━━━━━━━━━━━━━━━
 _Mesej ini dijana secara automatik oleh Sistem Tempahan Ruang KPMBP SmartHub._`;
@@ -269,4 +268,77 @@ export function formatDateMalay(dateStr: string): string {
   const monthName = months[d.getMonth()];
   const year = d.getFullYear();
   return `${dayName}, ${day} ${monthName} ${year}`;
+}
+
+/**
+ * Export Ad-Hoc Bookings to standard CSV format with UTF-8 BOM for Excel compatibility.
+ */
+export function exportBookingsToCSV(
+  bookings: AdHocBooking[],
+  filenamePrefix: string = 'kpmbp_tempahan_adhoc_backup'
+): { success: boolean; count: number; filename: string } {
+  if (!bookings || bookings.length === 0) {
+    return { success: false, count: 0, filename: '' };
+  }
+
+  const header = [
+    'ID Tempahan',
+    'Kod Ruang',
+    'Nama Ruang',
+    'Tarikh',
+    'Hari',
+    'Masa Mula',
+    'Masa Tamat',
+    'Nama Pemohon',
+    'E-mel Pemohon',
+    'No Telefon',
+    'Jawatan',
+    'Jabatan',
+    'Kategori Tujuan',
+    'Tajuk Aktiviti',
+    'Bilangan Hadirin (Pax)',
+    'Status Tempahan',
+    'Tarikh Dicipta',
+    'Catatan'
+  ].join(',');
+
+  const rows = bookings.map(b => {
+    const day = getMalayDayOfWeek(b.date);
+    return [
+      `"${b.id}"`,
+      `"${b.roomId}"`,
+      `"${(b.roomName || '').replace(/"/g, '""')}"`,
+      `"${b.date}"`,
+      `"${day}"`,
+      `"${b.startTime}"`,
+      `"${b.endTime}"`,
+      `"${(b.applicantName || '').replace(/"/g, '""')}"`,
+      `"${(b.applicantEmail || '').replace(/"/g, '""')}"`,
+      `"${(b.applicantPhone || '').replace(/"/g, '""')}"`,
+      `"${(b.applicantRole || '').replace(/"/g, '""')}"`,
+      `"${(b.department || '').replace(/"/g, '""')}"`,
+      `"${(b.purposeCategory || '').replace(/"/g, '""')}"`,
+      `"${(b.title || '').replace(/"/g, '""')}"`,
+      b.paxCount || 0,
+      `"${b.status}"`,
+      `"${b.createdAt || ''}"`,
+      `"${(b.notes || '').replace(/"/g, '""')}"`
+    ].join(',');
+  });
+
+  // Include UTF-8 BOM (\uFEFF) so Excel displays Malay characters correctly
+  const csvContent = '\uFEFF' + [header, ...rows].join('\r\n');
+  const blob = new Blob([csvContent], { type: 'text/csv;charset=utf-8;' });
+  const url = URL.createObjectURL(blob);
+  const link = document.createElement('a');
+  link.setAttribute('href', url);
+  const dateStr = new Date().toISOString().split('T')[0];
+  const filename = `${filenamePrefix}_${dateStr}.csv`;
+  link.setAttribute('download', filename);
+  document.body.appendChild(link);
+  link.click();
+  document.body.removeChild(link);
+  URL.revokeObjectURL(url);
+
+  return { success: true, count: bookings.length, filename };
 }

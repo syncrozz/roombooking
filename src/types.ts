@@ -32,9 +32,9 @@ export interface AcademicScheduleSlot {
 }
 
 export type PurposeCategory = 
-  | 'Penggunaan Pensyarah'
-  | 'Aktiviti Akademik'
-  | 'Program'
+  | 'Kelas'
+  | 'Kelas Ganti'
+  | 'Konsultasi'
   | 'Mesyuarat'
   | 'Aktiviti Pelajar'
   | 'Lain-lain';

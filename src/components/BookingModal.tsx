@@ -64,10 +64,9 @@ export const BookingModal: React.FC<BookingModalProps> = ({
   const [applicantPhone, setApplicantPhone] = useState<string>('014-5313756');
   const [applicantRole, setApplicantRole] = useState<string>('Pensyarah');
   const [department, setDepartment] = useState<string>('Pengajian Am');
-  const [purposeCategory, setPurposeCategory] = useState<PurposeCategory>(initialPurpose);
-  const [title, setTitle] = useState<string>(`Penggunaan ${room.code} - Sesi Amali / Pengajaran`);
+  const [purposeCategory, setPurposeCategory] = useState<PurposeCategory>(initialPurpose || 'Kelas');
   const [paxCount, setPaxCount] = useState<number>(Math.min(room.capacity, 28));
-  const [notes, setNotes] = useState<string>('Memerlukan projektor & capaian Wi-Fi');
+  const [notes, setNotes] = useState<string>('');
 
   const [verificationError, setVerificationError] = useState<string | null>(null);
 
@@ -169,9 +168,9 @@ export const BookingModal: React.FC<BookingModalProps> = ({
       applicantRole: verifiedStaff.role,
       department: verifiedStaff.department,
       purposeCategory,
-      title,
+      title: `${purposeCategory} (${room.code})`,
       paxCount,
-      notes
+      notes: notes.trim() || undefined
     });
   };
 
@@ -376,10 +375,10 @@ export const BookingModal: React.FC<BookingModalProps> = ({
                 onChange={(e) => setPurposeCategory(e.target.value as PurposeCategory)}
                 className="w-full bg-slate-50 border border-slate-300 rounded-xl px-3 py-2 text-slate-900 font-medium outline-none focus:ring-2 focus:ring-blue-500"
               >
-                <option value="Penggunaan Pensyarah">Penggunaan Pensyarah</option>
-                <option value="Aktiviti Akademik">Aktiviti Akademik</option>
-                <option value="Program">Program / Event</option>
-                <option value="Mesyuarat">Mesyuarat Jabatan</option>
+                <option value="Kelas">Kelas</option>
+                <option value="Kelas Ganti">Kelas Ganti</option>
+                <option value="Konsultasi">Konsultasi</option>
+                <option value="Mesyuarat">Mesyuarat</option>
                 <option value="Aktiviti Pelajar">Aktiviti Pelajar</option>
                 <option value="Lain-lain">Lain-lain</option>
               </select>
@@ -401,22 +400,12 @@ export const BookingModal: React.FC<BookingModalProps> = ({
           </div>
 
           <div>
-            <label className="block font-bold text-slate-700 mb-1">Tajuk / Tujuan Tempahan:</label>
+            <label className="block font-bold text-slate-700 mb-1">
+              Catatan Tambahan <span className="text-slate-400 font-normal text-[11px]">(Pilihan)</span>:
+            </label>
             <input
               type="text"
-              required
-              placeholder="cth: Penggunaan Smart Classroom untuk Amali DIA 4C"
-              value={title}
-              onChange={(e) => setTitle(e.target.value)}
-              className="w-full bg-slate-50 border border-slate-300 rounded-xl px-3 py-2 text-slate-900 font-medium outline-none focus:ring-2 focus:ring-blue-500"
-            />
-          </div>
-
-          <div>
-            <label className="block font-bold text-slate-700 mb-1">Catatan Tambahan:</label>
-            <input
-              type="text"
-              placeholder="cth: Memerlukan mikrofon tambahan"
+              placeholder="cth: Memerlukan mikrofon tambahan (jika ada)"
               value={notes}
               onChange={(e) => setNotes(e.target.value)}
               className="w-full bg-slate-50 border border-slate-300 rounded-xl px-3 py-2 text-slate-900 outline-none focus:ring-2 focus:ring-blue-500"
