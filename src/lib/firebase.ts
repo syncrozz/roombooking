@@ -156,6 +156,9 @@ export async function testFirebaseConnection(): Promise<{
   }
 }
 
+// Test connection on initial application boot
+testFirebaseConnection().catch(() => {});
+
 export function normalizeStaffUser(st: any): StaffUser {
   if (!st) {
     return {
