@@ -14,6 +14,7 @@ import {
 } from './types';
 import { 
   getStoredRooms, 
+  saveStoredRooms,
   getStoredAcademicSchedule, 
   saveStoredAcademicSchedule,
   getStoredAdHocBookings, 
@@ -36,6 +37,8 @@ import {
   subscribeToBlocks, 
   subscribeToStaffUsers,
   subscribeToSchedule,
+  subscribeToRooms,
+  bulkSaveRoomsToCloud,
   seedInitialStaffUsers,
   bulkSaveStaffUsersToCloud,
   bulkSaveScheduleToCloud,
@@ -224,11 +227,19 @@ export default function App() {
       }
     });
 
+    const unsubRooms = subscribeToRooms((cloudRooms) => {
+      if (cloudRooms && cloudRooms.length > 0) {
+        setRooms(cloudRooms);
+        saveStoredRooms(cloudRooms);
+      }
+    });
+
     return () => {
       unsubStaff();
       unsubBookings();
       unsubBlocks();
       unsubSchedule();
+      unsubRooms();
     };
   }, []);
 
@@ -463,6 +474,43 @@ export default function App() {
     }
   };
 
+  // Sync Rooms Directory (Supports 'merge' and 'replace' mode)
+  const handleSyncRooms = async (newRooms: Room[], mode: 'merge' | 'replace' = 'merge') => {
+    let finalRooms: Room[];
+
+    if (mode === 'merge') {
+      const newRoomsMap = new Map<string, Room>();
+      newRooms.forEach(r => {
+        newRoomsMap.set(r.id.toUpperCase(), r);
+        newRoomsMap.set(r.code.toUpperCase(), r);
+      });
+
+      const updatedExisting = rooms.map(existing => {
+        const match = newRoomsMap.get(existing.id.toUpperCase()) || newRoomsMap.get(existing.code.toUpperCase());
+        return match ? { ...existing, ...match } : existing;
+      });
+
+      const existingIds = new Set(rooms.map(r => r.id.toUpperCase()));
+      const existingCodes = new Set(rooms.map(r => r.code.toUpperCase()));
+      const brandNew = newRooms.filter(r => !existingIds.has(r.id.toUpperCase()) && !existingCodes.has(r.code.toUpperCase()));
+
+      finalRooms = [...updatedExisting, ...brandNew];
+    } else {
+      finalRooms = newRooms;
+    }
+
+    setRooms(finalRooms);
+    saveStoredRooms(finalRooms);
+
+    try {
+      await bulkSaveRoomsToCloud(finalRooms);
+      showToast(`🟢 ${newRooms.length} maklumat ruang kuliah berjaya disinkronkan & disimpan ke Cloud!`);
+    } catch (err) {
+      console.error('Error syncing rooms to cloud:', err);
+      showToast(`🟢 Maklumat ruang disimpan secara tempatan.`);
+    }
+  };
+
   // Reset to defaults (Strict Zero Demo Data)
   const handleResetData = async () => {
     resetToDefaults();
@@ -599,6 +647,7 @@ export default function App() {
               onSyncStaffUsers={handleSyncStaffUsers}
               onSyncAcademicSchedule={handleSyncAcademicSchedule}
               onClearAcademicSchedule={handleClearAcademicSchedule}
+              onSyncRooms={handleSyncRooms}
               onLogoutAdmin={handleLogoutAdmin}
             />
           )}

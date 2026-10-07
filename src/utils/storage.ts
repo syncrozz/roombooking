@@ -9,26 +9,14 @@ const INSTITUTIONAL_BLOCKS_KEY = 'kpmbp_institutional_blocks_v1';
 export function getStoredRooms(): Room[] {
   try {
     const data = localStorage.getItem(ROOMS_KEY);
-    let rooms: Room[] = data ? JSON.parse(data) : INITIAL_ROOMS;
-    if (!rooms || rooms.length !== INITIAL_ROOMS.length) {
-      rooms = INITIAL_ROOMS;
-      localStorage.setItem(ROOMS_KEY, JSON.stringify(INITIAL_ROOMS));
-    } else {
-      // Sync names/codes with INITIAL_ROOMS to ensure updated names take effect immediately
-      let hasChanges = false;
-      rooms = rooms.map(r => {
-        const init = INITIAL_ROOMS.find(i => i.id === r.id);
-        if (init && (r.code !== init.code || r.name !== init.name)) {
-          hasChanges = true;
-          return { ...r, code: init.code, name: init.name };
-        }
-        return r;
-      });
-      if (hasChanges) {
-        localStorage.setItem(ROOMS_KEY, JSON.stringify(rooms));
+    if (data) {
+      const parsed = JSON.parse(data);
+      if (Array.isArray(parsed) && parsed.length > 0) {
+        return parsed;
       }
     }
-    return rooms;
+    localStorage.setItem(ROOMS_KEY, JSON.stringify(INITIAL_ROOMS));
+    return INITIAL_ROOMS;
   } catch {
     return INITIAL_ROOMS;
   }
@@ -56,24 +44,33 @@ export function isTargetVenue(room: { code: string; name: string; category?: str
 }
 
 export function formatLevel(level: number | string): string {
+  if (!level) return '';
   const lvlStr = String(level).trim();
-  if (lvlStr === '1' || lvlStr === 'G' || lvlStr === 'g' || lvlStr.toLowerCase() === 'ground floor') {
+  const lower = lvlStr.toLowerCase();
+  if (lower === 'g' || lower === 'ground' || lower === 'ground floor' || lower === '0' || lower === 'aras g' || lower === 'aras bawah') {
     return 'Ground Floor';
   }
-  if (lvlStr === '2' || lvlStr.toLowerCase() === '2nd floor') {
+  if (lower === '1' || lower === '1st' || lower === '1st floor' || lower === 'aras 1' || lower === 'tingkat 1') {
+    return '1st Floor';
+  }
+  if (lower === '2' || lower === '2nd' || lower === '2nd floor' || lower === 'aras 2' || lower === 'tingkat 2') {
     return '2nd Floor';
   }
-  if (lvlStr === '3' || lvlStr.toLowerCase() === '3rd floor') {
+  if (lower === '3' || lower === '3rd' || lower === '3rd floor' || lower === 'aras 3' || lower === 'tingkat 3') {
     return '3rd Floor';
   }
-  if (lvlStr === '4' || lvlStr.toLowerCase() === '4th floor') {
+  if (lower === '4' || lower === '4th' || lower === '4th floor' || lower === 'aras 4' || lower === 'tingkat 4') {
     return '4th Floor';
   }
-  return level ? `${level} Floor` : '';
+  return lvlStr;
 }
 
 export function saveStoredRooms(rooms: Room[]): void {
-  localStorage.setItem(ROOMS_KEY, JSON.stringify(rooms));
+  try {
+    localStorage.setItem(ROOMS_KEY, JSON.stringify(rooms));
+  } catch (err) {
+    console.error('Failed to save rooms to storage:', err);
+  }
 }
 
 export function getStoredAcademicSchedule(): AcademicScheduleSlot[] {

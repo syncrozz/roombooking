@@ -712,3 +712,45 @@ export async function cleanObsoleteDemoRecordsFromCloud(): Promise<void> {
   }
 }
 
+/**
+ * Real-time listener for Rooms Directory in Firestore.
+ */
+export function subscribeToRooms(onUpdate: (rooms: Room[]) => void): () => void {
+  try {
+    const colRef = collection(db, ROOMS_COLLECTION);
+    return onSnapshot(colRef, (snapshot) => {
+      if (!snapshot.empty) {
+        const cloudRooms: Room[] = [];
+        snapshot.forEach((docSnap) => {
+          cloudRooms.push(docSnap.data() as Room);
+        });
+        onUpdate(cloudRooms);
+      }
+    }, (error) => {
+      console.warn('Firestore offline / local storage fallback mode for rooms.');
+    });
+  } catch (err) {
+    return () => {};
+  }
+}
+
+/**
+ * Bulk save or update rooms to Cloud Firestore.
+ */
+export async function bulkSaveRoomsToCloud(rooms: Room[]): Promise<void> {
+  try {
+    const batchSize = 450;
+    for (let i = 0; i < rooms.length; i += batchSize) {
+      const chunk = rooms.slice(i, i + batchSize);
+      const batch = writeBatch(db);
+      chunk.forEach((r) => {
+        const ref = doc(db, ROOMS_COLLECTION, r.id);
+        batch.set(ref, sanitizeForFirestore(r), { merge: true });
+      });
+      await batch.commit();
+    }
+  } catch (err) {
+    console.warn('Rooms saved locally (Cloud sync skipped / quota exceeded).');
+  }
+}
+

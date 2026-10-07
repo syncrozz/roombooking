@@ -39,7 +39,7 @@ export const INITIAL_ROOMS: Room[] = [
     category: 'Bilik Kuliah',
     capacity: 30,
     block: 'Bangunan Akademik',
-    level: 2,
+    level: 'Ground Floor',
     facilities: [
       'Papan Pintar Interaktif (Smartboard)',
       'Pendingin Hawa (Aircond)',
@@ -61,7 +61,7 @@ export const INITIAL_ROOMS: Room[] = [
     category: 'Makmal Komputer',
     capacity: 35,
     block: 'Pusat Komputer & IT',
-    level: 1,
+    level: '1st Floor',
     facilities: ['35x PC Komputer Berprestasi Tinggi', 'Projektor HD & Skrin Bermotor', 'Pendingin Hawa Pusat', 'Rangkaian Gigabit LAN', 'Papan Putih'],
     hasAircond: true,
     notes: 'Makmal komputer utama untuk praktikal pengaturcaraan, perakaunan berkomputer dan peperiksaan online'
@@ -73,7 +73,7 @@ export const INITIAL_ROOMS: Room[] = [
     category: 'Makmal Komputer',
     capacity: 35,
     block: 'Pusat Komputer & IT',
-    level: 1,
+    level: 'Ground Floor',
     facilities: ['35x PC Komputer', 'Projektor HD', 'Pendingin Hawa Pusat', 'Rangkaian Gigabit LAN', 'Papan Putih'],
     hasAircond: true,
     notes: 'Makmal komputer untuk kelas pengkomputeran dan latihan staf'
@@ -85,7 +85,7 @@ export const INITIAL_ROOMS: Room[] = [
     category: 'Makmal Komputer',
     capacity: 35,
     block: 'Pusat Komputer & IT',
-    level: 2,
+    level: 'Ground Floor',
     facilities: ['35x PC Komputer', 'Projektor HD', 'Pendingin Hawa Pusat', 'Rangkaian Gigabit LAN', 'Papan Putih'],
     hasAircond: true,
     notes: 'Makmal komputer multimedia dan sistem maklumat perniagaan'
@@ -97,7 +97,7 @@ export const INITIAL_ROOMS: Room[] = [
     category: 'Makmal Komputer',
     capacity: 35,
     block: 'Pusat Komputer & IT',
-    level: 2,
+    level: '1st Floor',
     facilities: ['35x PC Komputer', 'Projektor HD', 'Pendingin Hawa Pusat', 'Rangkaian Gigabit LAN', 'Papan Putih'],
     hasAircond: true,
     notes: 'Makmal komputer untuk pembangunan perisian dan reka bentuk'
@@ -189,6 +189,18 @@ export const INITIAL_ROOMS: Room[] = [
     facilities: ['Meja Persidangan U-Shape', 'Skrin TV Smart Display 65"', 'Pendingin Hawa', 'Papan Putih Kaca'],
     hasAircond: true,
     notes: 'Direka khas untuk mesyuarat jawatankuasa, pembentangan projek khas, dan bengkel kecil'
+  },
+  {
+    id: 'BILIK_INKUBATOR',
+    code: 'BLK. INKUBATOR',
+    name: 'Bilik Inkubator',
+    category: 'Ruang Khas',
+    capacity: 25,
+    block: 'Bangunan Pentadbiran & Inovasi',
+    level: 'Ground Floor',
+    facilities: ['Meja Perbincangan Kumpulan', 'Pendingin Hawa', 'Papan Putih Kaca', 'Wi-Fi Kelajuan Tinggi', 'Palam Kuasa Komputer'],
+    hasAircond: true,
+    notes: 'Pusat inkubator keusahawanan dan inovasi pelajar/staf'
   },
 
   // Surau (2 surau)

@@ -38,8 +38,17 @@ import {
   Sparkles,
   Layers,
   Cloud,
-  LogOut
+  LogOut,
+  MapPin
 } from 'lucide-react';
+import { 
+  ROOMS_CSV_HEADERS, 
+  SAMPLE_ROOMS_CSV_TEMPLATE, 
+  exportRoomsToCSV, 
+  downloadRoomsCSVTemplate, 
+  parseRoomsCSV 
+} from '../utils/roomsCsvParser';
+import { formatLevel } from '../utils/storage';
 
 interface AdminManagementViewProps {
   bookings: AdHocBooking[];
@@ -55,6 +64,7 @@ interface AdminManagementViewProps {
   onSyncStaffUsers?: (staff: StaffUser[], mode?: 'merge' | 'replace', resetAllPins?: boolean) => Promise<{ written: number; deleted: number } | void>;
   onSyncAcademicSchedule?: (schedule: AcademicScheduleSlot[], mode?: 'merge' | 'replace') => Promise<void> | void;
   onClearAcademicSchedule?: () => Promise<void> | void;
+  onSyncRooms?: (rooms: Room[], mode?: 'merge' | 'replace') => Promise<void> | void;
   onLogoutAdmin?: () => void;
 }
 
@@ -72,6 +82,7 @@ export const AdminManagementView: React.FC<AdminManagementViewProps> = ({
   onSyncStaffUsers,
   onSyncAcademicSchedule,
   onClearAcademicSchedule,
+  onSyncRooms,
   onLogoutAdmin
 }) => {
   const pendingBookings = bookings.filter(b => b.status === 'PENDING');
@@ -107,6 +118,16 @@ export const AdminManagementView: React.FC<AdminManagementViewProps> = ({
   const [showCloudSyncModal, setShowCloudSyncModal] = useState<boolean>(false);
   const [staffSyncMode, setStaffSyncMode] = useState<'merge' | 'replace'>('merge');
   const [resetAllPinsOnSync, setResetAllPinsOnSync] = useState<boolean>(false);
+
+  // Rooms CSV Sync State
+  const [roomCsvFile, setRoomCsvFile] = useState<File | null>(null);
+  const [parsedRoomsList, setParsedRoomsList] = useState<Room[]>([]);
+  const [roomParseSummary, setRoomParseSummary] = useState<{ total: number; updated: number; added: number; roomsAffected: string[] } | null>(null);
+  const [roomParseErrors, setRoomParseErrors] = useState<string[]>([]);
+  const [isSyncingRooms, setIsSyncingRooms] = useState<boolean>(false);
+  const [roomSyncSuccessMsg, setRoomSyncSuccessMsg] = useState<string | null>(null);
+  const [roomSyncMode, setRoomSyncMode] = useState<'merge' | 'replace'>('merge');
+  const [roomSearchTerm, setRoomSearchTerm] = useState<string>('');
 
   // Download Standard Timetable CSV Template (Format Perkara/Hari yang diselaraskan)
   const handleDownloadStandardGridTemplate = () => {
@@ -328,6 +349,87 @@ ST003,Pengajian Am,Cik Siti Sarah Binti Razak,Pensyarah,013-5558899,siti.sarah@k
     const res = exportBookingsToCSV(toExport, `kpmbp_tempahan_adhoc_${label}_backup`);
     if (res.success) {
       alert(`✅ Berjaya memuat turun fail sandaran: ${res.filename} (${res.count} rekod tempahan).`);
+    }
+  };
+
+  // Export current rooms list to CSV
+  const handleExportRoomsListCSV = () => {
+    if (!rooms || rooms.length === 0) {
+      alert('Tiada maklumat ruang untuk dieksport.');
+      return;
+    }
+    const res = exportRoomsToCSV(rooms);
+    if (res.success) {
+      alert(`✅ Berjaya mengeksport ${res.count} ruang ke ${res.filename}`);
+    }
+  };
+
+  // Download sample rooms CSV template
+  const handleDownloadRoomsCSVTemplate = () => {
+    downloadRoomsCSVTemplate();
+  };
+
+  // Handle uploaded rooms CSV file
+  const handleRoomFileChange = (e: React.ChangeEvent<HTMLInputElement>) => {
+    const file = e.target.files?.[0];
+    if (!file) return;
+
+    setRoomCsvFile(file);
+    setRoomParseErrors([]);
+    setRoomSyncSuccessMsg(null);
+
+    const reader = new FileReader();
+    reader.onload = (event) => {
+      const text = event.target?.result as string;
+      if (!text) {
+        setRoomParseErrors(['Fail CSV kosong atau tidak dapat dibaca.']);
+        return;
+      }
+
+      const result = parseRoomsCSV(text, rooms);
+      setParsedRoomsList(result.rooms);
+      setRoomParseSummary(result.summary);
+      setRoomParseErrors(result.errors);
+    };
+
+    reader.onerror = () => {
+      setRoomParseErrors(['Ralat semasa membaca fail CSV.']);
+    };
+
+    reader.readAsText(file);
+  };
+
+  // Execute sync rooms to system and cloud
+  const handleSyncRoomsToSystem = async () => {
+    if (parsedRoomsList.length === 0) {
+      alert('Tiada data ruang yang sah untuk disinkronkan.');
+      return;
+    }
+
+    if (roomSyncMode === 'replace') {
+      const confirmed = window.confirm(
+        `⚠️ AMARAN: Mod 'Ganti Semua' dipilih!\n\nSemua ${rooms.length} ruang sedia ada akan digantikan sepenuhnya dengan ${parsedRoomsList.length} ruang daripada fail CSV.\n\nAdakah anda pasti mahu meneruskan?`
+      );
+      if (!confirmed) return;
+    }
+
+    setIsSyncingRooms(true);
+    setRoomSyncSuccessMsg(null);
+
+    try {
+      if (onSyncRooms) {
+        await onSyncRooms(parsedRoomsList, roomSyncMode);
+      }
+      setRoomSyncSuccessMsg(
+        `✅ Berjaya menyinkronkan ${parsedRoomsList.length} ruang (${roomParseSummary?.updated || 0} dikemaskini, ${roomParseSummary?.added || 0} ditambah) ke sistem!`
+      );
+      setRoomCsvFile(null);
+      setParsedRoomsList([]);
+      setRoomParseSummary(null);
+    } catch (err) {
+      setRoomParseErrors(['Gagal menyinkronkan data ruang ke pangkalan data.']);
+    } finally {
+      setIsSyncingRooms(false);
     }
   };
 
@@ -661,7 +763,7 @@ ST003,Pengajian Am,Cik Siti Sarah Binti Razak,Pensyarah,013-5558899,siti.sarah@k
         </div>
 
         {/* Quick Stats */}
-        <div className="grid grid-cols-1 sm:grid-cols-4 gap-3 mt-4 text-xs">
+        <div className="grid grid-cols-1 sm:grid-cols-5 gap-3 mt-4 text-xs">
           <div className="bg-slate-800/80 p-3 rounded-xl border border-slate-700/80">
             <span className="text-slate-400 block font-medium">Permohonan Menunggu:</span>
             <strong className="text-xl font-bold text-amber-400">{pendingBookings.length} Permohonan</strong>
@@ -683,6 +785,21 @@ ST003,Pengajian Am,Cik Siti Sarah Binti Razak,Pensyarah,013-5558899,siti.sarah@k
             >
               <Download className="w-3.5 h-3.5" />
               <span>Eksport Sandaran CSV</span>
+            </button>
+          </div>
+          <div className="bg-slate-800/80 p-3 rounded-xl border border-slate-700/80 flex flex-col justify-between">
+            <div>
+              <span className="text-slate-400 block font-medium">Direktori Ruang Kuliah:</span>
+              <strong className="text-xl font-bold text-cyan-400">{rooms.length} Ruang &amp; Fasiliti</strong>
+            </div>
+            <button
+              type="button"
+              onClick={handleExportRoomsListCSV}
+              className="mt-2 w-full bg-cyan-700 hover:bg-cyan-600 text-white font-bold py-1.5 px-2.5 rounded-lg text-[11px] transition flex items-center justify-center gap-1.5 cursor-pointer shadow-xs active:scale-95"
+              title="Muat turun data direktori ruang semasa ke fail CSV"
+            >
+              <Download className="w-3.5 h-3.5" />
+              <span>Eksport CSV Ruang</span>
             </button>
           </div>
           <div className="bg-slate-800/80 p-3 rounded-xl border border-slate-700/80">
@@ -1440,6 +1557,395 @@ ST003,Pengajian Am,Cik Siti Sarah Binti Razak,Pensyarah,013-5558899,siti.sarah@k
                     </td>
                   </tr>
                 ))}
+              </tbody>
+            </table>
+          </div>
+        </div>
+      </div>
+
+      {/* SECTION: ROOMS & DIRECTORY CSV TEMPLATE, EXPORT & IMPORT */}
+      <div className="bg-white rounded-2xl p-6 shadow-md border border-slate-200 space-y-5">
+        <div className="flex flex-col md:flex-row items-start md:items-center justify-between gap-4 border-b border-slate-100 pb-4">
+          <div>
+            <div className="inline-flex items-center gap-1.5 bg-cyan-50 text-cyan-800 border border-cyan-200 px-2.5 py-0.5 rounded-full text-xs font-bold mb-1">
+              <Building className="w-3.5 h-3.5 text-cyan-600" />
+              <span>Unit Pengurusan Fasiliti &amp; Ruang KPMBP</span>
+            </div>
+            <div className="flex items-center gap-2 text-slate-900 font-extrabold text-lg">
+              <FileSpreadsheet className="w-5 h-5 text-cyan-600" />
+              <h3>Pengurusan Maklumat Ruang &amp; Aras (Template, Eksport &amp; Import CSV)</h3>
+            </div>
+            <p className="text-xs text-slate-500 mt-1">
+              Ubah suai perincian aras/tingkat (contoh: <strong>Gamma &amp; Alfa - 1st Floor</strong>, <strong>Sigma, Beta &amp; S. Classroom - Ground Floor</strong>, <strong>Bilik Inkubator - Ground Floor</strong>), blok bangunan, kapasiti, dan kemudahan melalui templat CSV atau muat naik fail CSV.
+            </p>
+          </div>
+
+          <div className="flex flex-wrap items-center gap-2 shrink-0">
+            <button
+              onClick={handleExportRoomsListCSV}
+              className="bg-slate-50 hover:bg-slate-100 text-slate-800 border border-slate-300 text-xs font-bold py-2 px-3.5 rounded-xl transition flex items-center gap-2 shadow-xs cursor-pointer"
+              title="Eksport senarai penuh ruang semasa ke fail CSV"
+            >
+              <FileSpreadsheet className="w-4 h-4 text-cyan-600" />
+              <span>Eksport CSV Ruang Semasa (.csv)</span>
+            </button>
+
+            <button
+              onClick={handleDownloadRoomsCSVTemplate}
+              className="bg-cyan-600 hover:bg-cyan-700 text-white text-xs font-bold py-2 px-3.5 rounded-xl transition flex items-center gap-2 shadow-md shadow-cyan-600/20 shrink-0 cursor-pointer"
+              title="Muat turun templat CSV piawai dengan contoh penetapan aras"
+            >
+              <Download className="w-4 h-4" />
+              <span>Muat Turun Templat CSV Ruang (.csv)</span>
+            </button>
+          </div>
+        </div>
+
+        {/* Upload Zone & Guide */}
+        <div className="grid grid-cols-1 lg:grid-cols-3 gap-6">
+          <div className="lg:col-span-1 bg-slate-50 border border-slate-200 rounded-xl p-4 text-xs space-y-3">
+            <h4 className="font-bold text-slate-900 flex items-center gap-1.5 text-sm">
+              <Building className="w-4 h-4 text-cyan-600" />
+              <span>Panduan Format Header CSV Ruang</span>
+            </h4>
+            <p className="text-slate-600 leading-relaxed">
+              Fail CSV mengandungi maklumat direktori ruang bilik kuliah &amp; fasiliti:
+            </p>
+            <div className="bg-slate-900 text-cyan-300 p-2.5 rounded-lg font-mono text-[10.5px] overflow-x-auto border border-slate-800 leading-relaxed">
+              id,code,name,category,capacity,block,level,facilities,hasAircond,isSmartClassroom,notes
+            </div>
+
+            <div className="bg-cyan-50 border border-cyan-200 rounded-lg p-2.5 text-cyan-950 text-[11px] space-y-1.5">
+              <p className="font-bold flex items-center gap-1 text-cyan-900">
+                <Sparkles className="w-3.5 h-3.5 text-cyan-600 shrink-0" />
+                <span>Contoh Penetapan Aras (Level / Floor):</span>
+              </p>
+              <div className="space-y-1 pl-1 text-[11px]">
+                <div className="flex items-center justify-between border-b border-cyan-200/60 pb-1">
+                  <span className="font-semibold text-slate-800">Gamma, Alfa:</span>
+                  <span className="bg-cyan-100 text-cyan-900 px-1.5 py-0.5 rounded font-mono font-bold text-[10px]">1st Floor</span>
+                </div>
+                <div className="flex items-center justify-between border-b border-cyan-200/60 pb-1">
+                  <span className="font-semibold text-slate-800">Sigma, Beta, S. Classroom:</span>
+                  <span className="bg-cyan-100 text-cyan-900 px-1.5 py-0.5 rounded font-mono font-bold text-[10px]">Ground Floor</span>
+                </div>
+                <div className="flex items-center justify-between">
+                  <span className="font-semibold text-slate-800">Bilik Inkubator:</span>
+                  <span className="bg-cyan-100 text-cyan-900 px-1.5 py-0.5 rounded font-mono font-bold text-[10px]">Ground Floor</span>
+                </div>
+              </div>
+            </div>
+
+            <ul className="list-disc list-inside space-y-1 text-slate-600 text-[11px] leading-relaxed">
+              <li><strong>level</strong>: Menerima <code>Ground Floor</code>, <code>1st Floor</code>, <code>2nd Floor</code>, <code>3rd Floor</code>.</li>
+              <li><strong>code / name</strong>: Kod bilik (cth: <code>LAB GAMMA</code>, <code>BK01</code>, <code>BLK. INKUBATOR</code>).</li>
+              <li><strong>facilities</strong>: Kemudahan dipisahkan dengan tanda titik bertindih (<code>;</code>).</li>
+              <li><strong>Tip Admin</strong>: Anda boleh muat turun senarai sedia ada melalui <em>Eksport CSV Ruang Semasa</em>, edit detail aras/tingkat di Excel, dan import semula.</li>
+            </ul>
+          </div>
+
+          <div className="lg:col-span-2 space-y-4">
+            {/* Sync Mode Selection */}
+            <div className="space-y-2">
+              <div className="text-xs font-bold text-slate-700 flex flex-col sm:flex-row sm:items-center justify-between gap-1">
+                <span className="flex items-center gap-1.5">
+                  <Layers className="w-4 h-4 text-cyan-600" />
+                  Pilihan Mod Penyelarasan Ruang:
+                </span>
+                <span className="text-[11px] font-normal text-slate-500">
+                  Ruang sedia ada di sistem: <strong className="text-cyan-900 font-bold">{rooms.length} ruang</strong>
+                </span>
+              </div>
+
+              <div className="grid grid-cols-1 sm:grid-cols-2 gap-3">
+                {/* Option 1: Gabung / Kemaskini */}
+                <div
+                  onClick={() => setRoomSyncMode('merge')}
+                  className={`p-3.5 rounded-xl border-2 cursor-pointer transition flex flex-col justify-between gap-2.5 ${
+                    roomSyncMode === 'merge'
+                      ? 'bg-cyan-50/80 border-cyan-500 shadow-sm ring-2 ring-cyan-400/20'
+                      : 'bg-slate-50 border-slate-200 hover:border-slate-300'
+                  }`}
+                >
+                  <div className="flex items-start justify-between gap-2">
+                    <div className="flex items-center gap-2">
+                      <input
+                        type="radio"
+                        name="roomSyncMode"
+                        value="merge"
+                        checked={roomSyncMode === 'merge'}
+                        onChange={() => setRoomSyncMode('merge')}
+                        className="text-cyan-600 focus:ring-cyan-500 mt-0.5"
+                      />
+                      <div>
+                        <span className="font-extrabold text-slate-900 text-xs block leading-tight">
+                          Gabung &amp; Kemas Kini (Disyorkan)
+                        </span>
+                        <span className="text-[10px] text-cyan-700 font-bold uppercase tracking-wide">
+                          Kemas Kini Ruang Padanan
+                        </span>
+                      </div>
+                    </div>
+                    <span className="px-2 py-0.5 rounded text-[10px] font-bold bg-cyan-100 text-cyan-800 shrink-0">
+                      Lalai (Default)
+                    </span>
+                  </div>
+                  <p className="text-[11px] text-slate-600 leading-relaxed pl-5">
+                    Hanya mengemas kini aras atau perincian bilik yang dinyatakan dalam fail CSV. Ruang lain yang sedia ada akan kekal tidak terjejas.
+                  </p>
+                </div>
+
+                {/* Option 2: Ganti Semua */}
+                <div
+                  onClick={() => setRoomSyncMode('replace')}
+                  className={`p-3.5 rounded-xl border-2 cursor-pointer transition flex flex-col justify-between gap-2.5 ${
+                    roomSyncMode === 'replace'
+                      ? 'bg-rose-50/80 border-rose-500 shadow-sm ring-2 ring-rose-400/20'
+                      : 'bg-slate-50 border-slate-200 hover:border-slate-300'
+                  }`}
+                >
+                  <div className="flex items-start justify-between gap-2">
+                    <div className="flex items-center gap-2">
+                      <input
+                        type="radio"
+                        name="roomSyncMode"
+                        value="replace"
+                        checked={roomSyncMode === 'replace'}
+                        onChange={() => setRoomSyncMode('replace')}
+                        className="text-rose-600 focus:ring-rose-500 mt-0.5"
+                      />
+                      <div>
+                        <span className="font-extrabold text-slate-900 text-xs block leading-tight">
+                          Ganti Semua (Total Replace)
+                        </span>
+                        <span className="text-[10px] text-rose-700 font-bold uppercase tracking-wide">
+                          Format Semula Direktori
+                        </span>
+                      </div>
+                    </div>
+                  </div>
+                  <p className="text-[11px] text-slate-600 leading-relaxed pl-5">
+                    Menggantikan keseluruhan senarai direktori ruang dengan data daripada fail CSV yang dimuat naik.
+                  </p>
+                </div>
+              </div>
+            </div>
+
+            {/* File Upload Zone */}
+            <div className="border-2 border-dashed border-slate-300 hover:border-cyan-500 rounded-2xl p-5 text-center transition bg-slate-50/50 hover:bg-cyan-50/20 group">
+              <input
+                id="rooms-csv-file-input"
+                type="file"
+                accept=".csv"
+                onChange={handleRoomFileChange}
+                className="hidden"
+              />
+              <label htmlFor="rooms-csv-file-input" className="cursor-pointer flex flex-col items-center gap-2">
+                <div className="w-12 h-12 rounded-2xl bg-cyan-100 text-cyan-600 flex items-center justify-center group-hover:scale-105 transition-transform">
+                  <UploadCloud className="w-6 h-6" />
+                </div>
+                <div>
+                  <span className="font-bold text-slate-900 text-sm block">
+                    {roomCsvFile ? roomCsvFile.name : 'Pilih atau Seret Fail CSV Maklumat Ruang'}
+                  </span>
+                  <span className="text-xs text-slate-500 block mt-0.5">
+                    Format: <code>.csv</code> (UTF-8) mengandungi maklumat ID/Kod, Nama, Aras (Level), Blok &amp; Kapasiti
+                  </span>
+                </div>
+                <span className="inline-flex items-center gap-1 text-xs font-bold text-cyan-600 bg-cyan-50 border border-cyan-200 px-3 py-1 rounded-lg mt-1 group-hover:bg-cyan-600 group-hover:text-white transition">
+                  <FileSpreadsheet className="w-3.5 h-3.5" />
+                  {roomCsvFile ? 'Tukar Fail CSV' : 'Semak & Muat Naik Fail CSV'}
+                </span>
+              </label>
+            </div>
+
+            {/* Success Notification */}
+            {roomSyncSuccessMsg && (
+              <div className="p-3 bg-emerald-50 border border-emerald-200 rounded-xl text-emerald-900 text-xs font-semibold flex items-center gap-2">
+                <CheckCircle2 className="w-4 h-4 text-emerald-600 shrink-0" />
+                <span>{roomSyncSuccessMsg}</span>
+              </div>
+            )}
+
+            {/* Parse Errors */}
+            {roomParseErrors.length > 0 && (
+              <div className="p-3 bg-rose-50 border border-rose-200 rounded-xl text-rose-900 text-xs space-y-1">
+                <div className="font-bold flex items-center gap-1.5 text-rose-800">
+                  <AlertTriangle className="w-4 h-4 text-rose-600" />
+                  <span>Ralat memproses fail CSV:</span>
+                </div>
+                <ul className="list-disc list-inside text-rose-700 pl-2 space-y-0.5">
+                  {roomParseErrors.map((err, idx) => (
+                    <li key={idx}>{err}</li>
+                  ))}
+                </ul>
+              </div>
+            )}
+
+            {/* Parsed Preview Table & Confirmation */}
+            {parsedRoomsList.length > 0 && (
+              <div className="border border-slate-200 rounded-xl p-4 bg-white shadow-xs space-y-3">
+                <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-2 border-b border-slate-100 pb-3">
+                  <div>
+                    <h5 className="font-extrabold text-slate-900 text-xs flex items-center gap-1.5">
+                      <Sparkles className="w-4 h-4 text-cyan-600" />
+                      Pratonton Perubahan ({parsedRoomsList.length} ruang dijumpai):
+                    </h5>
+                    <div className="flex items-center gap-2 mt-1 text-[11px] text-slate-600">
+                      <span className="bg-cyan-100 text-cyan-900 font-bold px-2 py-0.5 rounded">
+                        {roomParseSummary?.updated || 0} dikemaskini
+                      </span>
+                      <span className="bg-emerald-100 text-emerald-900 font-bold px-2 py-0.5 rounded">
+                        {roomParseSummary?.added || 0} bilik baharu
+                      </span>
+                    </div>
+                  </div>
+
+                  <div className="flex items-center gap-2">
+                    <button
+                      type="button"
+                      onClick={() => {
+                        setRoomCsvFile(null);
+                        setParsedRoomsList([]);
+                        setRoomParseSummary(null);
+                        setRoomParseErrors([]);
+                      }}
+                      className="px-3 py-1.5 text-xs text-slate-600 hover:text-slate-800 bg-slate-100 hover:bg-slate-200 rounded-lg font-medium transition cursor-pointer"
+                    >
+                      Batal
+                    </button>
+                    <button
+                      type="button"
+                      disabled={isSyncingRooms}
+                      onClick={handleSyncRoomsToSystem}
+                      className="px-4 py-1.5 text-xs bg-cyan-600 hover:bg-cyan-700 disabled:opacity-50 text-white font-bold rounded-lg shadow-sm transition flex items-center gap-1.5 cursor-pointer"
+                    >
+                      {isSyncingRooms ? (
+                        <>
+                          <RefreshCw className="w-3.5 h-3.5 animate-spin" />
+                          <span>Menyimpan ke Cloud...</span>
+                        </>
+                      ) : (
+                        <>
+                          <Check className="w-3.5 h-3.5" />
+                          <span>Sahkan &amp; Sinkronkan ({parsedRoomsList.length} Ruang)</span>
+                        </>
+                      )}
+                    </button>
+                  </div>
+                </div>
+
+                <div className="max-h-56 overflow-y-auto border border-slate-200 rounded-lg text-xs">
+                  <table className="w-full text-left divide-y divide-slate-200">
+                    <thead className="bg-slate-50 text-slate-700 sticky top-0 text-[11px]">
+                      <tr>
+                        <th className="p-2">Kod Ruang</th>
+                        <th className="p-2">Nama Ruang</th>
+                        <th className="p-2">Aras / Tingkat (Level)</th>
+                        <th className="p-2">Blok / Bangunan</th>
+                        <th className="p-2">Kapasiti</th>
+                        <th className="p-2">Kategori</th>
+                      </tr>
+                    </thead>
+                    <tbody className="divide-y divide-slate-100 text-[11px]">
+                      {parsedRoomsList.slice(0, 15).map((rm, idx) => (
+                        <tr key={idx} className="hover:bg-slate-50">
+                          <td className="p-2 font-bold text-slate-900">{rm.code}</td>
+                          <td className="p-2 text-slate-700">{rm.name}</td>
+                          <td className="p-2">
+                            <span className="bg-cyan-50 border border-cyan-200 text-cyan-800 font-bold px-2 py-0.5 rounded text-[10.5px]">
+                              {formatLevel(rm.level)}
+                            </span>
+                          </td>
+                          <td className="p-2 text-slate-600">{rm.block}</td>
+                          <td className="p-2 text-slate-700 font-mono">{rm.capacity} pax</td>
+                          <td className="p-2 text-slate-500">{rm.category}</td>
+                        </tr>
+                      ))}
+                    </tbody>
+                  </table>
+                  {parsedRoomsList.length > 15 && (
+                    <div className="p-2 text-center text-slate-400 text-[11px] bg-slate-50 border-t border-slate-200">
+                      ... dan {parsedRoomsList.length - 15} ruang lagi
+                    </div>
+                  )}
+                </div>
+              </div>
+            )}
+          </div>
+        </div>
+
+        {/* Live Searchable Room Directory Inspection Table */}
+        <div className="border-t border-slate-100 pt-4 space-y-3">
+          <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-2">
+            <div>
+              <h4 className="font-extrabold text-slate-900 text-xs flex items-center gap-1.5">
+                <Building className="w-4 h-4 text-cyan-600" />
+                Senarai Direktori 42 Ruang Semasa dalam Sistem:
+              </h4>
+              <p className="text-[11px] text-slate-500 mt-0.5">
+                Semak aras, blok, dan kapasiti semasa bagi setiap bilik di sini.
+              </p>
+            </div>
+            <div className="relative min-w-[240px]">
+              <Search className="w-3.5 h-3.5 absolute left-3 top-2.5 text-slate-400" />
+              <input
+                type="text"
+                placeholder="Cari cth: Gamma, Alfa, Sigma, BK01..."
+                value={roomSearchTerm}
+                onChange={(e) => setRoomSearchTerm(e.target.value)}
+                className="w-full bg-slate-50 border border-slate-200 rounded-lg pl-8 pr-3 py-1.5 text-xs text-slate-800 outline-none focus:ring-2 focus:ring-cyan-500"
+              />
+            </div>
+          </div>
+
+          <div className="max-h-64 overflow-y-auto border border-slate-200 rounded-xl">
+            <table className="w-full text-left text-xs divide-y divide-slate-200">
+              <thead className="bg-slate-50 text-slate-700 text-[11px] uppercase tracking-wider sticky top-0">
+                <tr>
+                  <th className="p-2.5">Kod Ruang</th>
+                  <th className="p-2.5">Nama Ruang</th>
+                  <th className="p-2.5">Aras / Tingkat</th>
+                  <th className="p-2.5">Blok / Bangunan</th>
+                  <th className="p-2.5">Kategori</th>
+                  <th className="p-2.5 text-center">Kapasiti</th>
+                  <th className="p-2.5 text-center">Aircond</th>
+                </tr>
+              </thead>
+              <tbody className="divide-y divide-slate-100 text-[11px]">
+                {rooms
+                  .filter(r => {
+                    if (!roomSearchTerm.trim()) return true;
+                    const q = roomSearchTerm.toLowerCase();
+                    return (
+                      r.code.toLowerCase().includes(q) ||
+                      r.name.toLowerCase().includes(q) ||
+                      r.block.toLowerCase().includes(q) ||
+                      formatLevel(r.level).toLowerCase().includes(q) ||
+                      r.category.toLowerCase().includes(q)
+                    );
+                  })
+                  .map(r => (
+                    <tr key={r.id} className="hover:bg-slate-50 transition">
+                      <td className="p-2.5 font-bold text-slate-900">{r.code}</td>
+                      <td className="p-2.5 text-slate-700">{r.name}</td>
+                      <td className="p-2.5">
+                        <span className="bg-cyan-50 border border-cyan-200 text-cyan-900 font-bold px-2 py-0.5 rounded text-[10.5px]">
+                          {formatLevel(r.level)}
+                        </span>
+                      </td>
+                      <td className="p-2.5 text-slate-600">{r.block}</td>
+                      <td className="p-2.5 text-slate-500">{r.category}</td>
+                      <td className="p-2.5 text-center font-mono text-slate-700">{r.capacity} pax</td>
+                      <td className="p-2.5 text-center">
+                        {r.hasAircond ? (
+                          <span className="text-cyan-700 font-bold text-[10.5px]">Ya 💠</span>
+                        ) : (
+                          <span className="text-slate-400 text-[10.5px]">-</span>
+                        )}
+                      </td>
+                    </tr>
+                  ))}
               </tbody>
             </table>
           </div>
