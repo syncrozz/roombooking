@@ -20,7 +20,9 @@ import { INITIAL_STAFF_DATA } from '../data/staffData';
 import { 
   getStoredAdHocBookings, 
   getStoredInstitutionalBlocks, 
-  getStoredAcademicSchedule 
+  getStoredAcademicSchedule,
+  getStoredRooms,
+  getStoredStaffUsers
 } from '../utils/storage';
 import firebaseConfig from '../../firebase-applet-config.json';
 
@@ -28,18 +30,18 @@ const app = !getApps().length ? initializeApp(firebaseConfig) : getApp();
 
 export const auth = getAuth(app);
 
-// Set Firestore log level to error to suppress connection retry warnings
+// Suppress Firestore internal diagnostic log warnings to prevent transient connection retry notifications
 try {
-  setLogLevel('error');
+  setLogLevel('silent');
 } catch {}
 
 const databaseId = firebaseConfig.firestoreDatabaseId || '(default)';
 
-// Initialize Firestore with force long polling to reliably handle web proxies and browser iframe environments
+// Initialize Firestore with auto-detect long polling to reliably handle web proxies, browser iframe environments, and WebSockets
 let dbInstance: Firestore;
 try {
   dbInstance = initializeFirestore(app, {
-    experimentalForceLongPolling: true,
+    experimentalAutoDetectLongPolling: true,
   }, databaseId);
 } catch {
   dbInstance = getFirestore(app, databaseId);
@@ -260,8 +262,16 @@ export function subscribeToStaffUsers(onUpdate: (staffList: StaffUser[]) => void
       onUpdate(Array.from(staffMap.values()));
     }, (error) => {
       console.warn('Firestore offline / local fallback mode for staff users.');
+      const localStaff = getStoredStaffUsers();
+      if (localStaff && localStaff.length > 0) {
+        onUpdate(localStaff);
+      }
     });
   } catch (err) {
+    const localStaff = getStoredStaffUsers();
+    if (localStaff && localStaff.length > 0) {
+      onUpdate(localStaff);
+    }
     return () => {};
   }
 }
@@ -696,6 +706,9 @@ async function seedInitialSchedule() {
  * Operational Pilot Environment: Purge obsolete demo records from Cloud Firestore.
  */
 export async function cleanObsoleteDemoRecordsFromCloud(): Promise<void> {
+  if (typeof window !== 'undefined' && sessionStorage.getItem('kpmbp_demo_cleaned') === 'true') {
+    return;
+  }
   try {
     const demoBookingIds = ['BK-2026-000101', 'BK-2026-000102', 'BK-2026-000103'];
     for (const id of demoBookingIds) {
@@ -706,6 +719,9 @@ export async function cleanObsoleteDemoRecordsFromCloud(): Promise<void> {
     for (const id of demoBlockIds) {
       const ref = doc(db, BLOCKS_COLLECTION, id);
       await deleteDoc(ref).catch(() => {});
+    }
+    if (typeof window !== 'undefined') {
+      sessionStorage.setItem('kpmbp_demo_cleaned', 'true');
     }
   } catch (err) {
     // Silent fail
@@ -728,8 +744,10 @@ export function subscribeToRooms(onUpdate: (rooms: Room[]) => void): () => void 
       }
     }, (error) => {
       console.warn('Firestore offline / local storage fallback mode for rooms.');
+      onUpdate(getStoredRooms());
     });
   } catch (err) {
+    onUpdate(getStoredRooms());
     return () => {};
   }
 }

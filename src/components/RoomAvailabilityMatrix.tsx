@@ -502,13 +502,7 @@ export const RoomAvailabilityMatrix: React.FC<RoomAvailabilityMatrixProps> = ({
                     <span className="px-2 py-0.5 rounded bg-rose-200 text-rose-900 text-[10px] font-black uppercase tracking-wider">
                       Jadual Kuliah Semester Rasmi
                     </span>
-                    <span className="text-[11px] font-bold text-rose-700">
-                      Bukan Tempahan & Bukan Demo
-                    </span>
                   </div>
-                  <p className="text-rose-900 text-xs leading-relaxed">
-                    Slot ini <strong>bukan tempahan bilik</strong> dan <strong>bukan data demo</strong>. Ini merupakan jadual waktu perkuliahan rasmi semester (Master Timetable KPMBP) bagi mengelakkan pertindihan bilik semasa kelas akademik berlangsung.
-                  </p>
                   <div className="pt-2 text-xs text-rose-950 space-y-1 border-t border-rose-200">
                     <div><span className="text-slate-500">Subjek:</span> <strong>{(selectedCellInfo.check.academicSlot?.courseCode === 'TERKUNCI' ? 'LOCKED' : selectedCellInfo.check.academicSlot?.courseCode)} - {selectedCellInfo.check.academicSlot?.courseName}</strong></div>
                     <div><span className="text-slate-500">Kelas / Maklumat:</span> <strong>{(() => {
