@@ -141,20 +141,24 @@ export const RoomAvailabilityMatrix: React.FC<RoomAvailabilityMatrixProps> = ({
         {/* Filter Controls Bar */}
         <div className="mt-4 flex flex-wrap items-center justify-between gap-3 text-xs">
           <div className="flex flex-wrap items-center gap-2">
-            <div className="relative min-w-[220px] sm:min-w-[260px]">
-              <Search className="w-4 h-4 absolute left-3 top-2.5 text-emerald-600 pointer-events-none" />
+            <div className="relative min-w-[260px] sm:min-w-[320px] lg:min-w-[360px]">
+              <div className="absolute inset-y-0 left-0 pl-3 flex items-center pointer-events-none">
+                <div className="w-6 h-6 rounded-md bg-emerald-100 text-emerald-700 flex items-center justify-center">
+                  <Search className="w-3.5 h-3.5" />
+                </div>
+              </div>
               <input
                 type="text"
-                placeholder="Cari bilik (cth: BK04, DKA)..."
+                placeholder="Cari ruang / bilik (cth: BK04, DKA, Makmal)..."
                 value={searchQuery}
                 onChange={(e) => setSearchQuery(e.target.value)}
-                className="w-full bg-white border-2 border-slate-300 hover:border-emerald-500 focus:border-emerald-600 rounded-xl pl-9 pr-8 py-2 text-slate-900 font-semibold placeholder:text-slate-400 placeholder:font-normal outline-none focus:ring-4 focus:ring-emerald-500/15 shadow-sm hover:shadow transition-all"
+                className="w-full bg-white border-2 border-emerald-500 hover:border-emerald-600 focus:border-emerald-600 rounded-xl pl-11 pr-9 py-2 text-slate-900 font-semibold text-xs placeholder:text-slate-400 placeholder:font-medium outline-none ring-2 ring-emerald-500/20 focus:ring-4 focus:ring-emerald-500/30 shadow-md shadow-emerald-500/10 hover:shadow-lg transition-all"
               />
               {searchQuery && (
                 <button
                   type="button"
                   onClick={() => setSearchQuery('')}
-                  className="absolute right-2.5 top-2.5 text-slate-400 hover:text-slate-600 p-0.5 rounded-full hover:bg-slate-100 transition cursor-pointer"
+                  className="absolute right-2.5 top-1/2 -translate-y-1/2 text-slate-400 hover:text-slate-600 p-1 rounded-full hover:bg-slate-100 transition cursor-pointer"
                   title="Kosongkan carian"
                 >
                   <X className="w-3.5 h-3.5" />

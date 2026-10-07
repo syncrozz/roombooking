@@ -20,7 +20,6 @@ import {
   KeyRound, 
   AlertTriangle,
   Lock,
-  LogOut,
   ExternalLink
 } from 'lucide-react';
 
@@ -154,18 +153,6 @@ export const LoginUserCard: React.FC<LoginUserCardProps> = ({
             <span>{activeUser ? 'Akaun Staf Aktif' : 'Log Masuk'}</span>
           </span>
           <div className="flex items-center gap-1.5">
-            {activeUser && (
-              <button
-                type="button"
-                id="btn-header-logout"
-                onClick={handleLogout}
-                className="text-[10px] font-bold text-white bg-orange-500 hover:bg-orange-600 active:bg-orange-700 px-2 py-0.5 rounded-md flex items-center gap-1 shadow-sm transition"
-                title="Log keluar dan kembali ke paparan lalai"
-              >
-                <LogOut className="w-3 h-3" />
-                <span>Log Keluar</span>
-              </button>
-            )}
             <button
               type="button"
               onClick={() => setIsEditing(!isEditing)}
@@ -217,20 +204,6 @@ export const LoginUserCard: React.FC<LoginUserCardProps> = ({
               <ShieldCheck className="w-3 h-3 shrink-0" />
               Akaun Staf Aktif &amp; Sah
             </span>
-          </div>
-
-          {/* Action button to log out and return to default view */}
-          <div className="pt-2 border-t border-slate-800">
-            <button
-              type="button"
-              id="btn-logout-orange"
-              onClick={handleLogout}
-              className="w-full py-2 px-3 bg-orange-500 hover:bg-orange-600 active:bg-orange-700 text-white rounded-lg text-xs font-bold flex items-center justify-center gap-2 shadow-md shadow-orange-950/40 transition"
-              title="Log keluar dan kembali ke paparan lalai"
-            >
-              <LogOut className="w-3.5 h-3.5" />
-              <span>Log Keluar (Default View)</span>
-            </button>
           </div>
         </div>
       ) : null}
@@ -328,21 +301,6 @@ export const LoginUserCard: React.FC<LoginUserCardProps> = ({
             <Lock className="w-3.5 h-3.5" />
             <span>Log Masuk</span>
           </button>
-
-          {activeUser && (
-            <div className="pt-2 border-t border-slate-800 flex items-center justify-between">
-              <span className="text-[10px] text-slate-400">Log keluar pengguna semasa:</span>
-              <button
-                type="button"
-                id="btn-form-logout-orange"
-                onClick={handleLogout}
-                className="px-2.5 py-1 bg-orange-500 hover:bg-orange-600 active:bg-orange-700 text-white text-[10px] font-bold rounded flex items-center gap-1 shadow transition"
-              >
-                <LogOut className="w-3 h-3" />
-                <span>Log Keluar</span>
-              </button>
-            </div>
-          )}
         </form>
       )}
     </div>
