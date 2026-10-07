@@ -179,44 +179,7 @@ export const Header: React.FC<HeaderProps> = ({
               <span className="hidden sm:inline">Cloud Sync</span>
             </button>
 
-            {/* Admin Access Button (Paling Hujung Kanan dengan warna khas berbeza) */}
-            <button
-              id="btn-header-admin-access"
-              onClick={() => {
-                if (activeTab === 'admin' && isAdmin) {
-                  if (onLogoutAdmin) {
-                    onLogoutAdmin();
-                  } else {
-                    handleTabClick('dashboard');
-                  }
-                } else {
-                  handleTabClick('admin');
-                }
-              }}
-              className={`px-3 sm:px-3.5 py-1.5 sm:py-2 rounded-lg text-xs font-bold flex items-center gap-1.5 transition-all shadow-sm cursor-pointer border ${
-                activeTab === 'admin'
-                  ? 'bg-amber-400 hover:bg-amber-300 text-slate-950 border-amber-300 ring-2 ring-amber-400/50 shadow-md shadow-amber-900/30'
-                  : 'bg-amber-500 hover:bg-amber-400 text-slate-950 border-amber-400 hover:border-amber-300'
-              }`}
-              title={activeTab === 'admin' && isAdmin ? "Klik untuk log keluar dari access admin mode" : "Akses Kawalan Pentadbir KPMBP"}
-            >
-              {activeTab === 'admin' && isAdmin ? (
-                <>
-                  <LogOut className="w-4 h-4 text-slate-950" />
-                  <span>Logout Admin</span>
-                </>
-              ) : (
-                <>
-                  <ShieldCheck className="w-4 h-4 text-slate-950" />
-                  <span>Admin Access</span>
-                </>
-              )}
-              {pendingCount > 0 && (
-                <span className="ml-1 px-1.5 py-0.2 bg-red-600 text-white font-extrabold rounded-full text-[10px]">
-                  {pendingCount}
-                </span>
-              )}
-            </button>
+            {/* Butang Admin Access telah dipadamkan daripada bar pengepala utama mengikut permintaan, fungsi kawalan pentadbir kekal aktif sepenuhnya */}
 
             {/* Quick Logout Button when staff is active */}
             {currentUser && (
@@ -238,12 +201,38 @@ export const Header: React.FC<HeaderProps> = ({
             {/* Profile Dropdown Toggle */}
             <div className="relative hidden sm:block">
               <button
+                type="button"
                 onClick={() => setUserMenuOpen(!userMenuOpen)}
-                className="p-1.5 rounded-lg bg-slate-800 hover:bg-slate-700 text-slate-300 hover:text-white border border-slate-700 flex items-center gap-1 text-xs"
-                title="Tetapan Akaun Staf"
+                className={`group px-3 py-1.5 rounded-xl border flex items-center gap-2 text-xs font-semibold transition-all duration-150 cursor-pointer shadow-md ${
+                  currentUser
+                    ? 'bg-gradient-to-r from-blue-900/80 via-indigo-900/70 to-slate-900 border-blue-500/50 hover:border-blue-400 text-white shadow-blue-950/40 ring-1 ring-blue-500/30 hover:ring-blue-400/60'
+                    : 'bg-gradient-to-r from-slate-800 via-slate-800 to-blue-950/80 hover:from-slate-700 hover:to-blue-900 text-slate-100 border-blue-500/40 hover:border-blue-400 shadow-slate-950/40 ring-1 ring-blue-500/20 hover:ring-blue-400/50'
+                } ${userMenuOpen ? 'ring-2 ring-blue-400 border-blue-400' : ''}`}
+                title={currentUser ? `Akaun Staf: ${currentUser.applicantName}` : "Tetapan & Log Masuk Akaun Staf"}
               >
-                <User className="w-4 h-4 text-blue-400" />
-                <ChevronDown className="w-3 h-3 text-slate-400" />
+                <div className="relative flex items-center justify-center">
+                  <div className={`w-6 h-6 rounded-lg flex items-center justify-center border transition-colors ${
+                    currentUser 
+                      ? 'bg-blue-600 text-white border-blue-400 shadow-xs' 
+                      : 'bg-blue-500/20 text-blue-300 border-blue-400/40 group-hover:bg-blue-500/30'
+                  }`}>
+                    <User className="w-3.5 h-3.5" />
+                  </div>
+                  {currentUser && (
+                    <span className="absolute -top-0.5 -right-0.5 w-2 h-2 rounded-full bg-emerald-400 ring-2 ring-slate-900" />
+                  )}
+                </div>
+
+                <div className="flex flex-col text-left leading-tight">
+                  <span className="text-[10px] font-bold uppercase tracking-wider text-blue-300/90">
+                    {currentUser ? 'Staf Aktif' : 'Akaun Staf'}
+                  </span>
+                  <span className="text-xs font-extrabold text-white max-w-[130px] sm:max-w-[150px] truncate">
+                    {currentUser ? currentUser.applicantName : 'Log Masuk'}
+                  </span>
+                </div>
+
+                <ChevronDown className={`w-3.5 h-3.5 text-blue-300/80 transition-transform duration-200 ml-0.5 ${userMenuOpen ? 'rotate-180 text-blue-200' : 'group-hover:translate-y-0.5'}`} />
               </button>
 
               {userMenuOpen && (

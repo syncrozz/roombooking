@@ -49,6 +49,7 @@ import {
   Zap,
   KeyRound,
   ShieldCheck,
+  Shield,
   Moon,
   Sun,
   Lock
@@ -64,6 +65,7 @@ interface BookingModalProps {
   academicSchedule?: AcademicScheduleSlot[];
   adhocBookings?: AdHocBooking[];
   institutionalBlocks?: InstitutionalBlock[];
+  isAdmin?: boolean;
   onClose: () => void;
   onSubmitBooking: (bookingData: Omit<AdHocBooking, 'id' | 'status' | 'createdAt'> | Omit<AdHocBooking, 'id' | 'status' | 'createdAt'>[]) => void;
   onRequirePinChange?: (staff: StaffUser) => void;
@@ -79,6 +81,7 @@ export const BookingModal: React.FC<BookingModalProps> = ({
   academicSchedule = [],
   adhocBookings = [],
   institutionalBlocks = [],
+  isAdmin = false,
   onClose,
   onSubmitBooking,
   onRequirePinChange
@@ -151,6 +154,11 @@ export const BookingModal: React.FC<BookingModalProps> = ({
   const [paxCount, setPaxCount] = useState<number>(Math.min(room.capacity, 28));
   const [notes, setNotes] = useState<string>('');
 
+  // Admin booking on behalf of staff state
+  const [isAdminBooking, setIsAdminBooking] = useState<boolean>(isAdmin);
+  const [isAdminAuthenticated, setIsAdminAuthenticated] = useState<boolean>(isAdmin);
+  const [adminPasscodeInput, setAdminPasscodeInput] = useState<string>('');
+
   const [verificationError, setVerificationError] = useState<string | null>(null);
 
   // Load active user profile on mount
@@ -186,6 +194,34 @@ export const BookingModal: React.FC<BookingModalProps> = ({
       setApplicantRole(match.role);
       setDepartment(match.department);
       setApplicantPhone(match.phone);
+    }
+  };
+
+  const handleStaffNameChange = (val: string) => {
+    setApplicantName(val);
+    setVerificationError(null);
+    if (!val.trim()) return;
+
+    // Auto-match staff metadata if typing a known lecturer's name (e.g. Tahira)
+    const clean = val.trim().toLowerCase();
+    const match = staffList.find(s => 
+      s.name.toLowerCase() === clean || 
+      s.name.toLowerCase().includes(clean)
+    );
+    if (match) {
+      if (match.email) setApplicantEmail(match.email);
+      if (match.phone) setApplicantPhone(match.phone);
+      if (match.role) setApplicantRole(match.role);
+      if (match.department) setDepartment(match.department);
+    }
+  };
+
+  const handleVerifyAdminPasscode = () => {
+    if (adminPasscodeInput.trim() === '5313') {
+      setIsAdminAuthenticated(true);
+      setVerificationError(null);
+    } else {
+      setVerificationError('Passcode Pentadbir tidak sah.');
     }
   };
 
@@ -331,39 +367,74 @@ export const BookingModal: React.FC<BookingModalProps> = ({
       }
     }
 
-    // Verify combination of Email and 4-digit PIN in Firebase staff database
-    const verifyResult = verifyStaffCredentialsLocally(applicantEmail, pinInput, staffList);
+    let finalApplicantName = applicantName.trim();
+    let finalApplicantEmail = applicantEmail.trim();
+    let finalApplicantPhone = applicantPhone.trim();
+    let finalApplicantRole = applicantRole.trim() || 'Pensyarah';
+    let finalDepartment = department.trim() || 'Pengajian Am';
 
-    if (!verifyResult.success || !verifyResult.staff) {
-      setVerificationError(
-        verifyResult.errorMsg || 
-        'Email atau PIN tidak sah.'
-      );
-      return;
-    }
-
-    const verifiedStaff = verifyResult.staff;
-
-    // Check mandatory PIN change if still on default PIN 1234
-    if (verifiedStaff.pinStatus === 'DEFAULT' || verifiedStaff.pin === '1234') {
-      if (onRequirePinChange) {
-        onRequirePinChange(verifiedStaff);
+    if (isAdminBooking) {
+      // 1. Verify Admin Access
+      if (!isAdminAuthenticated) {
+        if (adminPasscodeInput.trim() === '5313') {
+          setIsAdminAuthenticated(true);
+        } else {
+          setVerificationError('Sila masukkan Passcode Pentadbir yang sah untuk mengesahkan tempahan.');
+          return;
+        }
       }
-      return;
-    }
 
-    // Save active user profile
-    saveActiveUser({
-      staffId: verifiedStaff.id,
-      applicantName: verifiedStaff.name,
-      applicantEmail: verifiedStaff.email,
-      applicantPhone: verifiedStaff.phone,
-      applicantRole: verifiedStaff.role,
-      department: verifiedStaff.department,
-      pinStatus: verifiedStaff.pinStatus
-    });
+      if (!finalApplicantName) {
+        setVerificationError('Sila masukkan nama pensyarah / staf yang ingin ditempah (contoh: Tahira).');
+        return;
+      }
+
+      if (!finalApplicantEmail) {
+        finalApplicantEmail = `${finalApplicantName.toLowerCase().replace(/[^a-z0-9]/g, '') || 'staf'}@mara.gov.my`;
+      }
+    } else {
+      // 2. Standard Staff PIN Verification
+      const verifyResult = verifyStaffCredentialsLocally(applicantEmail, pinInput, staffList);
+
+      if (!verifyResult.success || !verifyResult.staff) {
+        setVerificationError(
+          verifyResult.errorMsg || 
+          'Email atau PIN tidak sah.'
+        );
+        return;
+      }
+
+      const verifiedStaff = verifyResult.staff;
+
+      // Check mandatory PIN change if still on default PIN 1234
+      if (verifiedStaff.pinStatus === 'DEFAULT' || verifiedStaff.pin === '1234') {
+        if (onRequirePinChange) {
+          onRequirePinChange(verifiedStaff);
+        }
+        return;
+      }
+
+      finalApplicantName = verifiedStaff.name;
+      finalApplicantEmail = verifiedStaff.email;
+      finalApplicantPhone = verifiedStaff.phone;
+      finalApplicantRole = verifiedStaff.role;
+      finalDepartment = verifiedStaff.department;
+
+      // Save active user profile
+      saveActiveUser({
+        staffId: verifiedStaff.id,
+        applicantName: verifiedStaff.name,
+        applicantEmail: verifiedStaff.email,
+        applicantPhone: verifiedStaff.phone,
+        applicantRole: verifiedStaff.role,
+        department: verifiedStaff.department,
+        pinStatus: verifiedStaff.pinStatus
+      });
+    }
 
     const effectivePurpose = purposeCategory.trim() || 'Kelas';
+    const adminTag = isAdminBooking ? '[Ditempah oleh Pentadbir]' : '';
+    const consolidatedNotes = [notes.trim(), adminTag].filter(Boolean).join(' ');
 
     if (isMultiDay && activeDates.length > 1) {
       const seriesBookings = activeDates.map((d, index) => ({
@@ -372,16 +443,16 @@ export const BookingModal: React.FC<BookingModalProps> = ({
         date: d,
         startTime: selectedStartTime,
         endTime: selectedEndTime,
-        applicantName: verifiedStaff.name,
-        applicantEmail: verifiedStaff.email,
-        applicantPhone: verifiedStaff.phone,
-        applicantRole: verifiedStaff.role,
-        department: verifiedStaff.department,
+        applicantName: finalApplicantName,
+        applicantEmail: finalApplicantEmail,
+        applicantPhone: finalApplicantPhone,
+        applicantRole: finalApplicantRole,
+        department: finalDepartment,
         purposeCategory: effectivePurpose,
         title: `${effectivePurpose} (${room.code}) - Siri ${index + 1}/${activeDates.length}`,
         paxCount,
-        notes: notes.trim()
-          ? `${notes.trim()} [Siri Hari ${index + 1}/${activeDates.length}]`
+        notes: consolidatedNotes
+          ? `${consolidatedNotes} [Siri Hari ${index + 1}/${activeDates.length}]`
           : `Siri Tempahan ${activeDates.length} Hari (${formatDateMalay(startDate)} - ${formatDateMalay(endDate)})`
       }));
       onSubmitBooking(seriesBookings);
@@ -392,15 +463,15 @@ export const BookingModal: React.FC<BookingModalProps> = ({
         date: activeDates[0] || date,
         startTime: selectedStartTime,
         endTime: selectedEndTime,
-        applicantName: verifiedStaff.name,
-        applicantEmail: verifiedStaff.email,
-        applicantPhone: verifiedStaff.phone,
-        applicantRole: verifiedStaff.role,
-        department: verifiedStaff.department,
+        applicantName: finalApplicantName,
+        applicantEmail: finalApplicantEmail,
+        applicantPhone: finalApplicantPhone,
+        applicantRole: finalApplicantRole,
+        department: finalDepartment,
         purposeCategory: effectivePurpose,
         title: `${effectivePurpose} (${room.code})`,
         paxCount,
-        notes: notes.trim() || undefined
+        notes: consolidatedNotes || undefined
       });
     }
   };
@@ -697,58 +768,159 @@ export const BookingModal: React.FC<BookingModalProps> = ({
         {/* Form */}
         <form onSubmit={handleSubmit} className="space-y-3 text-xs">
           
-          {/* Authentication Block: Log Masuk */}
-          <div className="bg-slate-50 border border-slate-200 rounded-xl p-3 space-y-2.5">
-            <div className="flex items-center text-slate-800 font-bold border-b border-slate-200 pb-1.5">
-              <span className="flex items-center gap-1.5 text-slate-900 text-xs">
-                <Lock className="w-3.5 h-3.5 text-blue-600" />
-                Log Masuk
+          {/* Authentication Block: Log Masuk & Mod Admin */}
+          <div className={`rounded-xl p-3 space-y-2.5 transition-all border ${
+            isAdminBooking 
+              ? 'bg-amber-50/70 border-amber-300 ring-2 ring-amber-500/20' 
+              : 'bg-slate-50 border-slate-200'
+          }`}>
+            <div className="flex items-center justify-between border-b border-slate-200/80 pb-1.5">
+              <span className="flex items-center gap-1.5 text-slate-900 text-xs font-bold">
+                {isAdminBooking ? (
+                  <>
+                    <ShieldCheck className="w-4 h-4 text-amber-600" />
+                    <span>Mod Tempahan Admin</span>
+                  </>
+                ) : (
+                  <>
+                    <Lock className="w-3.5 h-3.5 text-blue-600" />
+                    <span>Log Masuk Staf</span>
+                  </>
+                )}
               </span>
+
+              {/* Admin Booking Checkbox Button */}
+              <label 
+                className={`inline-flex items-center gap-1.5 px-2.5 py-1 rounded-lg border text-[11px] font-bold cursor-pointer transition select-none ${
+                  isAdminBooking 
+                    ? 'bg-amber-400 text-slate-950 border-amber-500 shadow-2xs ring-1 ring-amber-300' 
+                    : 'bg-white hover:bg-slate-100 border-slate-300 text-slate-700'
+                }`}
+                title="Pilih untuk membuat tempahan sebagai Pentadbir bagi pihak staf/pensyarah"
+              >
+                <input
+                  type="checkbox"
+                  checked={isAdminBooking}
+                  onChange={(e) => {
+                    const checked = e.target.checked;
+                    setIsAdminBooking(checked);
+                    setVerificationError(null);
+                    if (checked && !isAdmin) {
+                      setIsAdminAuthenticated(false);
+                      setAdminPasscodeInput('');
+                    } else if (checked && isAdmin) {
+                      setIsAdminAuthenticated(true);
+                    }
+                  }}
+                  className="rounded text-amber-600 focus:ring-amber-500 cursor-pointer w-3.5 h-3.5"
+                />
+                <ShieldCheck className="w-3.5 h-3.5" />
+                <span>Tempah sebagai Admin</span>
+              </label>
             </div>
 
-            <div className="grid grid-cols-1 sm:grid-cols-2 gap-2.5">
-              <div>
-                <label className="block font-bold text-slate-700 mb-1">
-                  E-mel
-                </label>
-                <div className="relative">
-                  <Mail className="w-3.5 h-3.5 text-slate-400 absolute left-2.5 top-2.5" />
-                  <input
-                    type="email"
-                    required
-                    placeholder="nama@mara.gov.my"
-                    value={applicantEmail}
-                    onChange={(e) => handleEmailInputChange(e.target.value)}
-                    className="w-full bg-white border border-slate-300 rounded-lg pl-8 pr-2 py-1.5 text-slate-900 font-bold outline-none focus:ring-2 focus:ring-blue-500"
-                  />
+            {isAdminBooking ? (
+              // Admin Access Verification or Verified Status
+              !isAdminAuthenticated ? (
+                <div className="bg-amber-100/70 border border-amber-300 rounded-lg p-2.5 space-y-2">
+                  <div className="flex items-center gap-1.5 text-amber-950 font-bold text-xs">
+                    <KeyRound className="w-4 h-4 text-amber-700" />
+                    <span>Sila Masukkan Passcode Akses Pentadbir</span>
+                  </div>
+                  <p className="text-[11px] text-amber-900 leading-relaxed">
+                    Masukkan PIN/Passcode keselamatan Pentadbir untuk mengesahkan hak tempahan bagi pihak pensyarah.
+                  </p>
+                  <div className="flex items-center gap-2">
+                    <div className="relative flex-1">
+                      <KeyRound className="w-3.5 h-3.5 text-slate-400 absolute left-2.5 top-2.5" />
+                      <input
+                        type="password"
+                        inputMode="numeric"
+                        placeholder="••••"
+                        value={adminPasscodeInput}
+                        onChange={(e) => {
+                          setAdminPasscodeInput(e.target.value);
+                          setVerificationError(null);
+                        }}
+                        onKeyDown={(e) => {
+                          if (e.key === 'Enter') {
+                            e.preventDefault();
+                            handleVerifyAdminPasscode();
+                          }
+                        }}
+                        className="w-full bg-white border border-amber-400 rounded-lg pl-8 pr-2 py-1.5 text-slate-900 font-mono font-bold text-xs outline-none focus:ring-2 focus:ring-amber-500"
+                      />
+                    </div>
+                    <button
+                      type="button"
+                      onClick={handleVerifyAdminPasscode}
+                      className="bg-amber-500 hover:bg-amber-600 active:bg-amber-700 text-slate-950 font-bold px-3.5 py-1.5 rounded-lg text-xs shadow-xs transition cursor-pointer shrink-0"
+                    >
+                      Sahkan
+                    </button>
+                  </div>
                 </div>
-              </div>
-
-              <div>
-                <div className="flex items-center justify-between mb-1">
-                  <label className="block font-bold text-slate-700">
-                    PIN
+              ) : (
+                <div className="bg-emerald-50 border border-emerald-300 rounded-lg p-2 flex items-center justify-between text-emerald-900 text-[11px] font-bold">
+                  <div className="flex items-center gap-1.5">
+                    <ShieldCheck className="w-4 h-4 text-emerald-600 shrink-0" />
+                    <span>Akses Pentadbir Disahkan. Taip atau pilih pensyarah yang dikehendaki di bawah.</span>
+                  </div>
+                  <button
+                    type="button"
+                    onClick={() => setIsAdminAuthenticated(false)}
+                    className="text-[10px] text-slate-500 hover:text-slate-800 underline font-normal cursor-pointer ml-2"
+                  >
+                    Kunci Semula
+                  </button>
+                </div>
+              )
+            ) : (
+              // Standard Staff User Login
+              <div className="grid grid-cols-1 sm:grid-cols-2 gap-2.5">
+                <div>
+                  <label className="block font-bold text-slate-700 mb-1">
+                    E-mel
                   </label>
-                  <ForgotPinHelp />
+                  <div className="relative">
+                    <Mail className="w-3.5 h-3.5 text-slate-400 absolute left-2.5 top-2.5" />
+                    <input
+                      type="email"
+                      required
+                      placeholder="nama@mara.gov.my"
+                      value={applicantEmail}
+                      onChange={(e) => handleEmailInputChange(e.target.value)}
+                      className="w-full bg-white border border-slate-300 rounded-lg pl-8 pr-2 py-1.5 text-slate-900 font-bold outline-none focus:ring-2 focus:ring-blue-500"
+                    />
+                  </div>
                 </div>
-                <div className="relative">
-                  <KeyRound className="w-3.5 h-3.5 text-slate-400 absolute left-2.5 top-2.5" />
-                  <input
-                    type="password"
-                    inputMode="numeric"
-                    maxLength={4}
-                    required
-                    placeholder="••••"
-                    value={pinInput}
-                    onChange={(e) => {
-                      setPinInput(e.target.value.replace(/\D/g, '').slice(0, 4));
-                      setVerificationError(null);
-                    }}
-                    className="w-full bg-white border border-slate-300 rounded-lg pl-8 pr-2 py-1.5 text-slate-900 font-mono font-bold tracking-widest outline-none focus:ring-2 focus:ring-blue-500"
-                  />
+
+                <div>
+                  <div className="flex items-center justify-between mb-1">
+                    <label className="block font-bold text-slate-700">
+                      PIN
+                    </label>
+                    <ForgotPinHelp />
+                  </div>
+                  <div className="relative">
+                    <KeyRound className="w-3.5 h-3.5 text-slate-400 absolute left-2.5 top-2.5" />
+                    <input
+                      type="password"
+                      inputMode="numeric"
+                      maxLength={4}
+                      required
+                      placeholder="••••"
+                      value={pinInput}
+                      onChange={(e) => {
+                        setPinInput(e.target.value.replace(/\D/g, '').slice(0, 4));
+                        setVerificationError(null);
+                      }}
+                      className="w-full bg-white border border-slate-300 rounded-lg pl-8 pr-2 py-1.5 text-slate-900 font-mono font-bold tracking-widest outline-none focus:ring-2 focus:ring-blue-500"
+                    />
+                  </div>
                 </div>
               </div>
-            </div>
+            )}
 
             {verificationError && (
               <div className="text-[11px] text-red-700 bg-red-50 p-2.5 rounded-lg border border-red-200 font-semibold space-y-1.5 animate-fadeIn">
@@ -756,55 +928,111 @@ export const BookingModal: React.FC<BookingModalProps> = ({
                   <AlertCircle className="w-4 h-4 text-red-600 shrink-0 mt-0.5" />
                   <span>{verificationError}</span>
                 </div>
-                <div className="pt-1 border-t border-red-200/60">
-                  <ForgotPinHelp />
-                </div>
+                {!isAdminBooking && (
+                  <div className="pt-1 border-t border-red-200/60">
+                    <ForgotPinHelp />
+                  </div>
+                )}
               </div>
             )}
           </div>
 
-          <div className="grid grid-cols-2 gap-2">
+          {/* Details Pemohon / Pensyarah */}
+          <div className="grid grid-cols-1 sm:grid-cols-2 gap-2">
             <div>
-              <label className="block font-bold text-slate-700 mb-1">Nama Pemohon / Staff:</label>
-              <input
-                type="text"
-                required
-                readOnly
-                value={applicantName}
-                className="w-full bg-slate-100 border border-slate-200 rounded-xl px-3 py-2 text-slate-800 font-semibold outline-none cursor-not-allowed"
-              />
+              <label className="block font-bold text-slate-700 mb-1">
+                {isAdminBooking ? 'Nama Pensyarah / Staf:' : 'Nama Pemohon / Staff:'}
+              </label>
+              {isAdminBooking ? (
+                <>
+                  <input
+                    type="text"
+                    required
+                    list="staff-name-datalist"
+                    placeholder="cth: Tahira / En. Ahmad Khairi (taip nama)"
+                    value={applicantName}
+                    onChange={(e) => handleStaffNameChange(e.target.value)}
+                    className="w-full bg-white border-2 border-amber-300 focus:border-amber-500 rounded-xl px-3 py-2 text-slate-900 font-bold outline-none focus:ring-2 focus:ring-amber-400/30 shadow-2xs"
+                  />
+                  <datalist id="staff-name-datalist">
+                    {staffList.map((s) => (
+                      <option key={s.id} value={s.name}>
+                        {s.name} ({s.department} — {s.role})
+                      </option>
+                    ))}
+                  </datalist>
+                </>
+              ) : (
+                <input
+                  type="text"
+                  required
+                  readOnly
+                  value={applicantName}
+                  className="w-full bg-slate-100 border border-slate-200 rounded-xl px-3 py-2 text-slate-800 font-semibold outline-none cursor-not-allowed"
+                />
+              )}
             </div>
 
             <div>
               <label className="block font-bold text-slate-700 mb-1">No. Telefon / WhatsApp:</label>
-              <input
-                type="text"
-                readOnly
-                value={applicantPhone}
-                className="w-full bg-slate-100 border border-slate-200 rounded-xl px-3 py-2 text-slate-800 font-medium outline-none cursor-not-allowed"
-              />
+              {isAdminBooking ? (
+                <input
+                  type="text"
+                  value={applicantPhone}
+                  onChange={(e) => setApplicantPhone(e.target.value)}
+                  placeholder="cth: 014-5313756"
+                  className="w-full bg-white border border-slate-300 focus:border-amber-500 rounded-xl px-3 py-2 text-slate-900 font-medium outline-none focus:ring-1 focus:ring-amber-500"
+                />
+              ) : (
+                <input
+                  type="text"
+                  readOnly
+                  value={applicantPhone}
+                  className="w-full bg-slate-100 border border-slate-200 rounded-xl px-3 py-2 text-slate-800 font-medium outline-none cursor-not-allowed"
+                />
+              )}
             </div>
           </div>
 
-          <div className="grid grid-cols-2 gap-2">
+          <div className="grid grid-cols-1 sm:grid-cols-2 gap-2">
             <div>
               <label className="block font-bold text-slate-700 mb-1">Jawatan / Peranan:</label>
-              <input
-                type="text"
-                readOnly
-                value={applicantRole}
-                className="w-full bg-slate-100 border border-slate-200 rounded-xl px-3 py-2 text-slate-800 font-medium outline-none cursor-not-allowed"
-              />
+              {isAdminBooking ? (
+                <input
+                  type="text"
+                  value={applicantRole}
+                  onChange={(e) => setApplicantRole(e.target.value)}
+                  placeholder="cth: Pensyarah DIA"
+                  className="w-full bg-white border border-slate-300 focus:border-amber-500 rounded-xl px-3 py-2 text-slate-900 font-medium outline-none focus:ring-1 focus:ring-amber-500"
+                />
+              ) : (
+                <input
+                  type="text"
+                  readOnly
+                  value={applicantRole}
+                  className="w-full bg-slate-100 border border-slate-200 rounded-xl px-3 py-2 text-slate-800 font-medium outline-none cursor-not-allowed"
+                />
+              )}
             </div>
 
             <div>
               <label className="block font-bold text-slate-700 mb-1">Jabatan / Unit:</label>
-              <input
-                type="text"
-                readOnly
-                value={department}
-                className="w-full bg-slate-100 border border-slate-200 rounded-xl px-3 py-2 text-slate-800 font-medium outline-none cursor-not-allowed"
-              />
+              {isAdminBooking ? (
+                <input
+                  type="text"
+                  value={department}
+                  onChange={(e) => setDepartment(e.target.value)}
+                  placeholder="cth: Jabatan Perdagangan"
+                  className="w-full bg-white border border-slate-300 focus:border-amber-500 rounded-xl px-3 py-2 text-slate-900 font-medium outline-none focus:ring-1 focus:ring-amber-500"
+                />
+              ) : (
+                <input
+                  type="text"
+                  readOnly
+                  value={department}
+                  className="w-full bg-slate-100 border border-slate-200 rounded-xl px-3 py-2 text-slate-800 font-medium outline-none cursor-not-allowed"
+                />
+              )}
             </div>
           </div>
 

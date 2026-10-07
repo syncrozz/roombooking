@@ -636,14 +636,11 @@ export default function App() {
           {activeTab === 'admin' && (
             <AdminManagementView
               bookings={adhocBookings}
-              institutionalBlocks={institutionalBlocks}
               rooms={rooms}
               staffList={staffUsers}
               academicSchedule={academicSchedule}
               onApproveBooking={handleApproveBooking}
               onRejectBooking={handleRejectBooking}
-              onAddBlock={handleAddBlock}
-              onDeleteBlock={handleDeleteBlock}
               onResetData={handleResetData}
               onSyncStaffUsers={handleSyncStaffUsers}
               onSyncAcademicSchedule={handleSyncAcademicSchedule}
@@ -719,6 +716,7 @@ export default function App() {
           academicSchedule={academicSchedule}
           adhocBookings={adhocBookings}
           institutionalBlocks={institutionalBlocks}
+          isAdmin={isAdminUnlocked}
           onClose={() => setBookingModalInfo(null)}
           onSubmitBooking={handleSubmitBooking}
           onRequirePinChange={(st) => setMandatoryPinChangeStaff(st)}
