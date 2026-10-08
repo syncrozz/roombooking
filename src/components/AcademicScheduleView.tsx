@@ -2,6 +2,7 @@ import React, { useState } from 'react';
 import { AcademicScheduleSlot, Room, DayOfWeek } from '../types';
 import { MALAY_DAYS } from '../utils/availabilityEngine';
 import { exportTimetableToStandardGridCSV } from '../utils/timetableCsvParser';
+import { parseTimeMinutes } from '../utils/timeSlots';
 import { 
   BookOpen, 
   Search, 
@@ -10,6 +11,16 @@ import {
   Lock,
   Download
 } from 'lucide-react';
+
+const DAY_ORDER: Record<string, number> = {
+  'Isnin': 1,
+  'Selasa': 2,
+  'Rabu': 3,
+  'Khamis': 4,
+  'Jumaat': 5,
+  'Sabtu': 6,
+  'Ahad': 7,
+};
 
 interface AcademicScheduleViewProps {
   schedule: AcademicScheduleSlot[];
@@ -38,22 +49,49 @@ export const AcademicScheduleView: React.FC<AcademicScheduleViewProps> = ({
     document.body.removeChild(link);
   };
 
-  // Filter schedule slots
-  const filteredSlots = schedule.filter(slot => {
-    if (selectedDay !== 'Semua' && slot.dayOfWeek !== selectedDay) return false;
-    if (roomFilter !== 'Semua' && slot.roomId !== roomFilter) return false;
-    if (searchQuery.trim() !== '') {
-      const q = searchQuery.toLowerCase();
-      return (
-        slot.courseCode.toLowerCase().includes(q) ||
-        slot.courseName.toLowerCase().includes(q) ||
-        slot.className.toLowerCase().includes(q) ||
-        slot.lecturerName.toLowerCase().includes(q) ||
-        slot.department.toLowerCase().includes(q)
-      );
-    }
-    return true;
-  });
+  // Filter and sort schedule slots chronologically (pagi -> tengahari -> malam)
+  // Yang paling awal dipaparkan sebelah kiri, slot paling lewat di sebelah kanan
+  const filteredSlots = schedule
+    .filter(slot => {
+      if (selectedDay !== 'Semua' && slot.dayOfWeek !== selectedDay) return false;
+      if (roomFilter !== 'Semua' && slot.roomId !== roomFilter) return false;
+      if (searchQuery.trim() !== '') {
+        const q = searchQuery.toLowerCase();
+        return (
+          slot.courseCode.toLowerCase().includes(q) ||
+          slot.courseName.toLowerCase().includes(q) ||
+          slot.className.toLowerCase().includes(q) ||
+          slot.lecturerName.toLowerCase().includes(q) ||
+          slot.department.toLowerCase().includes(q)
+        );
+      }
+      return true;
+    })
+    .sort((a, b) => {
+      // 1. Sekiranya pilihan adalah 'Semua Hari', susun mengikut turutan hari dahulu
+      if (selectedDay === 'Semua' && a.dayOfWeek !== b.dayOfWeek) {
+        const orderA = DAY_ORDER[a.dayOfWeek] || 99;
+        const orderB = DAY_ORDER[b.dayOfWeek] || 99;
+        if (orderA !== orderB) return orderA - orderB;
+      }
+
+      // 2. Susun mengikut masa mula menaik (pagi -> tengahari -> petang -> malam)
+      const startA = parseTimeMinutes(a.startTime);
+      const startB = parseTimeMinutes(b.startTime);
+      if (startA !== startB) {
+        return startA - startB;
+      }
+
+      // 3. Sekiranya masa mula sama, susun mengikut masa tamat menaik
+      const endA = parseTimeMinutes(a.endTime);
+      const endB = parseTimeMinutes(b.endTime);
+      if (endA !== endB) {
+        return endA - endB;
+      }
+
+      // 4. Susunan sekunder mengikut kod ruang
+      return (a.roomId || '').localeCompare(b.roomId || '');
+    });
 
   return (
     <div className="space-y-6">
