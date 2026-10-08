@@ -83,7 +83,7 @@ export const AcademicScheduleView: React.FC<AcademicScheduleViewProps> = ({
               <span>Eksport CSV</span>
             </button>
             <div className="bg-blue-900 text-white p-3 rounded-xl text-center min-w-[150px] shadow-sm">
-              <div className="text-[11px] text-blue-200 font-medium">Jumlah Slot Waktu Rasmi</div>
+              <div className="text-[11px] text-blue-200 font-medium">Jumlah Slot Rasmi</div>
               <div className="text-xl font-bold text-blue-300 mt-0.5">{schedule.length} Slot</div>
             </div>
           </div>
@@ -133,7 +133,7 @@ export const AcademicScheduleView: React.FC<AcademicScheduleViewProps> = ({
             <Search className="w-3.5 h-3.5 absolute left-3 top-2.5 text-slate-400" />
             <input
               type="text"
-              placeholder="Cari subjek, kelas (DIA 4C), pensyarah..."
+              placeholder="Cari Pensyarah..."
               value={searchQuery}
               onChange={(e) => setSearchQuery(e.target.value)}
               className="w-full bg-slate-50 border border-slate-300 rounded-xl pl-8 pr-3 py-1.5 text-slate-800 outline-none focus:ring-2 focus:ring-emerald-500"
@@ -175,40 +175,42 @@ export const AcademicScheduleView: React.FC<AcademicScheduleViewProps> = ({
             return (
               <div
                 key={slot.id}
-                className="bg-white rounded-2xl p-4 sm:p-5 shadow-xs border border-slate-200 hover:border-blue-300 hover:shadow-sm transition-all space-y-3 flex flex-col justify-between"
+                className="bg-white rounded-xl p-3 sm:p-3.5 shadow-xs border border-slate-200 hover:border-blue-300 hover:shadow-sm transition-all space-y-2 flex flex-col justify-between"
               >
-                {/* 1. Booker Identity & Day (Header) */}
-                <div className="flex items-center justify-between gap-2 border-b border-slate-100 pb-2.5">
-                  <span className="font-extrabold text-slate-900 text-sm sm:text-base tracking-tight truncate">
+                {/* 1. Booker Identity & Day + Lock Icon (Header) */}
+                <div className="flex items-center justify-between gap-2 border-b border-slate-100 pb-2">
+                  <span className="font-extrabold text-slate-900 text-sm tracking-tight truncate">
                     {bookerName}
                   </span>
-                  <span className="text-xs font-bold text-slate-700 bg-slate-100 px-2.5 py-1 rounded-lg shrink-0 border border-slate-200">
-                    {slot.dayOfWeek}
-                  </span>
+                  <div className="flex items-center gap-1.5 shrink-0">
+                    <span className="text-[11px] font-bold text-slate-700 bg-slate-100 px-2 py-0.5 rounded-md border border-slate-200">
+                      {slot.dayOfWeek}
+                    </span>
+                    {isLocked && (
+                      <div className="inline-flex items-center justify-center p-1 rounded-md bg-amber-50 border border-amber-200/80 text-amber-600 shadow-2xs" title="Slot Terkunci">
+                        <Lock className="w-3.5 h-3.5 text-amber-600 shrink-0" />
+                      </div>
+                    )}
+                  </div>
                 </div>
 
-                {/* 2. Status */}
-                <div>
-                  {isLocked ? (
-                    <div className="flex items-center gap-1.5 text-xs sm:text-sm font-bold text-amber-800 bg-amber-50 border border-amber-200/80 px-2.5 py-1 rounded-lg w-fit">
-                      <Lock className="w-3.5 h-3.5 text-amber-600 shrink-0" />
-                      <span>Slot Terkunci</span>
-                    </div>
-                  ) : (
+                {/* 2. Course Details (for non-locked academic classes) */}
+                {!isLocked && (
+                  <div>
                     <div className="text-xs sm:text-sm font-bold text-slate-800 truncate" title={`${slot.courseCode} — ${slot.courseName}`}>
                       {slot.courseCode} — {slot.courseName}
                     </div>
-                  )}
-                </div>
+                  </div>
+                )}
 
                 {/* 3. Room & Time */}
-                <div className="bg-slate-50 rounded-xl p-3 border border-slate-200/80 space-y-1.5 text-xs">
-                  <div className="flex items-center gap-2 font-bold text-slate-900">
+                <div className="bg-slate-50 rounded-xl px-2.5 py-1.5 border border-slate-200/80 flex items-center justify-between gap-2 text-xs">
+                  <div className="flex items-center gap-1.5 font-bold text-blue-700 truncate">
                     <Building className="w-3.5 h-3.5 text-blue-600 shrink-0" />
-                    <span className="truncate">{roomCode}</span>
+                    <span className="truncate text-blue-700">{roomCode}</span>
                   </div>
 
-                  <div className="flex items-center gap-2 font-bold text-emerald-700">
+                  <div className="flex items-center gap-1.5 font-bold text-emerald-700 shrink-0">
                     <Clock className="w-3.5 h-3.5 text-emerald-600 shrink-0" />
                     <span className="font-mono text-xs">{slot.startTime} – {slot.endTime}</span>
                   </div>

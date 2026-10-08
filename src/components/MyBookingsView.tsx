@@ -268,12 +268,6 @@ export const MyBookingsView: React.FC<MyBookingsViewProps> = ({
                 {scopedBookings.filter(b => b.status === 'CONFIRMED').length}
               </div>
             </div>
-            <div className="bg-amber-900 text-white px-4 py-2.5 rounded-xl text-center shadow-xs">
-              <div className="text-[10px] text-amber-300 uppercase tracking-wider font-semibold">Menunggu</div>
-              <div className="text-lg font-bold">
-                {scopedBookings.filter(b => b.status === 'PENDING').length}
-              </div>
-            </div>
           </div>
         </div>
 
@@ -369,14 +363,6 @@ export const MyBookingsView: React.FC<MyBookingsViewProps> = ({
               }`}
             >
               🟢 Disahkan ({scopedBookings.filter(b => b.status === 'CONFIRMED').length})
-            </button>
-            <button
-              onClick={() => setStatusFilter('PENDING')}
-              className={`px-3 py-1.5 rounded-lg font-bold transition ${
-                statusFilter === 'PENDING' ? 'bg-amber-500 text-white shadow-xs' : 'text-slate-600 hover:text-slate-900'
-              }`}
-            >
-              🟡 Menunggu ({scopedBookings.filter(b => b.status === 'PENDING').length})
             </button>
           </div>
 

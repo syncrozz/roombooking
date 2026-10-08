@@ -725,11 +725,7 @@ ST003,Pengajian Am,Cik Siti Sarah Binti Razak,Pensyarah,013-5558899,siti.sarah@k
         </div>
 
         {/* Quick Stats */}
-        <div className="grid grid-cols-1 sm:grid-cols-4 gap-3 mt-4 text-xs">
-          <div className="bg-slate-800/80 p-3 rounded-xl border border-slate-700/80">
-            <span className="text-slate-400 block font-medium">Permohonan Menunggu:</span>
-            <strong className="text-xl font-bold text-amber-400">{pendingBookings.length} Permohonan</strong>
-          </div>
+        <div className="grid grid-cols-1 sm:grid-cols-3 gap-3 mt-4 text-xs">
           <div className="bg-slate-800/80 p-3 rounded-xl border border-slate-700/80 flex flex-col justify-between">
             <div>
               <span className="text-slate-400 block font-medium">Tempahan Ad-Hoc:</span>
@@ -1097,7 +1093,7 @@ ST003,Pengajian Am,Cik Siti Sarah Binti Razak,Pensyarah,013-5558899,siti.sarah@k
           <div>
             <div className="flex items-center gap-2 text-slate-900 font-extrabold text-lg">
               <FileSpreadsheet className="w-5 h-5 text-emerald-600" />
-              <h3>Import & Sinkronisasi E-mel Staf (Bundle CSV)</h3>
+              <h3>Staf & Pensyarah</h3>
             </div>
             <p className="text-xs text-slate-500 mt-1">
               Muat naik fail CSV untuk menambah atau mengemaskini senarai e-mel staf berdaftar bagi pengesahan automatik tempahan.
@@ -1916,7 +1912,7 @@ ST003,Pengajian Am,Cik Siti Sarah Binti Razak,Pensyarah,013-5558899,siti.sarah@k
           <div>
             <div className="flex items-center gap-2 text-slate-900 font-extrabold text-lg">
               <FileSpreadsheet className="w-5 h-5 text-emerald-600" />
-              <h3>Sandaran Data &amp; Eksport CSV Tempahan Ad-Hoc</h3>
+              <h3>Tempahan Ad-hoc</h3>
             </div>
             <p className="text-xs text-slate-500 mt-1">
               Simpan dan muat turun kesemua rekod tempahan ad-hoc yang telah didaftarkan ke dalam fail spreadsheet CSV bagi tujuan sandaran offline, pelan kontigensi, atau audit institusi.
@@ -1943,16 +1939,6 @@ ST003,Pengajian Am,Cik Siti Sarah Binti Razak,Pensyarah,013-5558899,siti.sarah@k
               <Check className="w-3.5 h-3.5 text-emerald-600" />
               <span>Disahkan ({bookings.filter(b => b.status === 'CONFIRMED').length})</span>
             </button>
-
-            <button
-              type="button"
-              onClick={() => handleExportBookingsCSV('PENDING')}
-              className="bg-amber-50 hover:bg-amber-100 text-amber-900 font-bold py-2.5 px-3 rounded-xl text-xs transition flex items-center gap-1.5 border border-amber-300 cursor-pointer"
-              title="Eksport permohonan tempahan menunggu sahaja"
-            >
-              <Clock className="w-3.5 h-3.5 text-amber-600" />
-              <span>Menunggu ({bookings.filter(b => b.status === 'PENDING').length})</span>
-            </button>
           </div>
         </div>
 
@@ -1966,67 +1952,6 @@ ST003,Pengajian Am,Cik Siti Sarah Binti Razak,Pensyarah,013-5558899,siti.sarah@k
             Fail sandaran CSV ini merekodkan 17 medan data penting (ID Tempahan, Kod &amp; Nama Bilik Kuliah, Tarikh, Hari, Slot Masa Mula &amp; Tamat, Nama &amp; E-mel Pemohon, No Telefon Rasmi, Jawatan, Jabatan, Kategori Tujuan, Tajuk Aktiviti, Bilangan Hadirin, Status, Tarikh Dicipta, dan Catatan). Format ini mengandungi pengekodan UTF-8 BOM yang serasi dengan <strong>Microsoft Excel</strong> dan <strong>Google Sheets</strong> untuk kegunaan kecemasan sekiranya berlaku masalah talian atau pelayan awan.
           </p>
         </div>
-      </div>
-
-      {/* SECTION: PENDING APPROVALS */}
-      <div className="bg-white rounded-2xl p-6 shadow-md border border-slate-200 space-y-4">
-        <div className="flex items-center justify-between border-b border-slate-100 pb-3">
-          <h3 className="text-lg font-bold text-slate-900 flex items-center gap-2">
-            <CheckCircle2 className="w-5 h-5 text-amber-500" />
-            <span>Kelulusan Permohonan Menunggu ({pendingBookings.length})</span>
-          </h3>
-        </div>
-
-        {pendingBookings.length > 0 ? (
-          <div className="space-y-3">
-            {pendingBookings.map(p => (
-              <div key={p.id} className="bg-slate-50 border border-slate-200 rounded-xl p-4 space-y-3">
-                <div className="flex items-center justify-between text-xs">
-                  <span className="font-mono font-bold bg-slate-900 text-amber-400 px-2 py-0.5 rounded">
-                    {p.id}
-                  </span>
-                  <span className="text-slate-500 font-medium">{p.purposeCategory}</span>
-                </div>
-
-                <div>
-                  <h4 className="font-bold text-slate-900 text-sm">{p.title}</h4>
-                  <div className="text-xs text-slate-600 mt-0.5">
-                    Pemohon: <strong>{p.applicantName}</strong> ({p.applicantRole} - {p.department})
-                  </div>
-                </div>
-
-                <div className="bg-white p-2.5 rounded-lg border border-slate-200 text-xs space-y-1 text-slate-700 font-medium">
-                  <div>🏫 Ruang: <strong>{p.roomName} ({p.roomId})</strong></div>
-                  <div>📅 Tarikh: <strong>{formatDateMalay(p.date)}</strong></div>
-                  <div>🕐 Masa: <strong>{p.startTime} – {p.endTime}</strong></div>
-                </div>
-
-                <div className="flex gap-2 pt-1">
-                  <button
-                    onClick={() => onApproveBooking(p.id)}
-                    className="flex-1 bg-emerald-600 hover:bg-emerald-700 text-white font-bold py-2 px-3 rounded-lg text-xs transition flex items-center justify-center gap-1 shadow-xs"
-                  >
-                    <CheckCircle2 className="w-3.5 h-3.5" />
-                    <span>Luluskan</span>
-                  </button>
-                  <button
-                    onClick={() => onRejectBooking(p.id)}
-                    className="flex-1 bg-rose-600 hover:bg-rose-700 text-white font-bold py-2 px-3 rounded-lg text-xs transition flex items-center justify-center gap-1 shadow-xs"
-                  >
-                    <XCircle className="w-3.5 h-3.5" />
-                    <span>Tolak</span>
-                  </button>
-                </div>
-              </div>
-            ))}
-          </div>
-        ) : (
-          <div className="p-8 text-center text-slate-500 text-xs bg-slate-50 rounded-xl border border-dashed border-slate-300 space-y-1">
-            <CheckCircle2 className="w-8 h-8 text-slate-300 mx-auto mb-1.5" />
-            <p className="font-bold text-slate-700">Tiada permohonan menunggu kelulusan lagi.</p>
-            <p className="text-slate-400">Sebarang permohonan baharu yang memerlukan kelulusan pentadbir akan dipaparkan di sini secara automatik.</p>
-          </div>
-        )}
       </div>
 
       {/* Cloud Sync Status & Multi-Device Details Modal */}
