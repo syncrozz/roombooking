@@ -263,31 +263,31 @@ export const RoomAvailabilityMatrix: React.FC<RoomAvailabilityMatrixProps> = ({
 
       {/* MATRIX TABLE CONTAINER */}
       <div className="bg-white rounded-2xl shadow-md border border-slate-200 overflow-hidden">
-        <div className="overflow-x-auto">
+        <div className="overflow-auto max-h-[calc(100vh-220px)] min-h-[460px] relative">
           <table className="w-full text-left border-collapse">
-            <thead>
+            <thead className="bg-white">
               {periodFilter === 'ALL' ? (
                 <>
-                  <tr className="border-b border-slate-200">
-                    <th rowSpan={2} className="py-2.5 px-2.5 sm:py-3 sm:px-4 font-bold sticky left-0 z-20 bg-slate-100 text-slate-800 text-xs uppercase tracking-wider min-w-[120px] sm:min-w-[160px] border-r border-slate-200">
+                  <tr className="border-b border-slate-200 h-9">
+                    <th rowSpan={2} className="py-2 px-3 sm:px-4 font-bold sticky left-0 top-0 z-30 bg-slate-100 text-slate-800 text-xs uppercase tracking-wider min-w-[120px] sm:min-w-[160px] border-r border-slate-200 shadow-sm">
                       Ruang Kuliah
                     </th>
-                    <th colSpan={DAY_TIME_SLOTS.length} className="py-2 px-3 font-bold text-center bg-amber-50 text-amber-900 border-r border-slate-200 text-xs tracking-wider">
+                    <th colSpan={DAY_TIME_SLOTS.length} className="py-2 px-3 font-bold text-center bg-amber-100/90 text-amber-950 border-r border-slate-200 text-xs tracking-wider sticky top-0 z-20 shadow-xs">
                       ☀️ WAKTU SIANG (08:30 – 17:30)
                     </th>
-                    <th colSpan={NIGHT_TIME_SLOTS.length} className="py-2 px-3 font-bold text-center bg-indigo-900 text-indigo-100 text-xs tracking-wider">
+                    <th colSpan={NIGHT_TIME_SLOTS.length} className="py-2 px-3 font-bold text-center bg-indigo-900 text-indigo-100 text-xs tracking-wider sticky top-0 z-20 shadow-xs">
                       🌙 WAKTU MALAM (20:00 – 23:00)
                     </th>
                   </tr>
-                  <tr className="bg-slate-50 text-slate-700 text-xs border-b border-slate-200 divide-x divide-slate-200">
+                  <tr className="bg-slate-50 text-slate-700 text-xs border-b border-slate-200 divide-x divide-slate-200 h-9">
                     {DAY_TIME_SLOTS.map(slot => (
-                      <th key={slot.id} className="py-2 px-2 font-bold text-center min-w-[105px] bg-amber-50/40">
-                        <div className="text-slate-800 font-mono text-[11px]">{slot.start}</div>
+                      <th key={slot.id} className="py-2 px-2 font-bold text-center min-w-[105px] bg-amber-50 text-slate-900 sticky top-9 z-20 border-b border-slate-300 shadow-xs">
+                        <div className="text-slate-900 font-mono text-[11px] font-bold">{slot.start}</div>
                       </th>
                     ))}
                     {NIGHT_TIME_SLOTS.map(slot => (
-                      <th key={slot.id} className="py-2 px-2 font-bold text-center min-w-[105px] bg-indigo-950 text-indigo-100">
-                        <div className="text-indigo-200 font-mono text-[11px] flex items-center justify-center gap-1">
+                      <th key={slot.id} className="py-2 px-2 font-bold text-center min-w-[105px] bg-indigo-950 text-indigo-100 sticky top-9 z-20 border-b border-indigo-900 shadow-xs">
+                        <div className="text-indigo-200 font-mono text-[11px] flex items-center justify-center gap-1 font-bold">
                           <Moon className="w-2.5 h-2.5 text-indigo-300" />
                           <span>{slot.start}</span>
                         </div>
@@ -296,18 +296,18 @@ export const RoomAvailabilityMatrix: React.FC<RoomAvailabilityMatrixProps> = ({
                   </tr>
                 </>
               ) : (
-                <tr className="bg-slate-50 text-slate-700 text-xs uppercase tracking-wider border-b border-slate-200 divide-x divide-slate-200">
-                  <th className="py-2.5 px-2.5 sm:py-3 sm:px-4 font-bold sticky left-0 z-20 bg-slate-50 min-w-[120px] sm:min-w-[160px]">
+                <tr className="bg-slate-50 text-slate-700 text-xs uppercase tracking-wider border-b border-slate-200 divide-x divide-slate-200 h-10">
+                  <th className="py-2.5 px-2.5 sm:py-3 sm:px-4 font-bold sticky left-0 top-0 z-30 bg-slate-100 min-w-[120px] sm:min-w-[160px] border-r border-slate-200 shadow-sm">
                     Ruang Kuliah
                   </th>
                   {activeSlots.map(slot => (
                     <th 
                       key={slot.id} 
-                      className={`py-3 px-3 font-bold text-center min-w-[115px] ${
-                        slot.period === 'NIGHT' ? 'bg-indigo-900 text-indigo-100' : 'bg-slate-50 text-slate-800'
+                      className={`py-2.5 px-3 font-bold text-center min-w-[115px] sticky top-0 z-20 border-b border-slate-300 shadow-xs ${
+                        slot.period === 'NIGHT' ? 'bg-indigo-900 text-indigo-100' : 'bg-amber-100/90 text-slate-900'
                       }`}
                     >
-                      <div className="flex items-center justify-center gap-1 font-mono">
+                      <div className="flex items-center justify-center gap-1 font-mono font-bold">
                         {slot.period === 'NIGHT' && <Moon className="w-3 h-3 text-indigo-300" />}
                         <span>{slot.start} – {slot.end}</span>
                       </div>
@@ -321,7 +321,7 @@ export const RoomAvailabilityMatrix: React.FC<RoomAvailabilityMatrixProps> = ({
                 return (
                   <tr key={room.id} className="hover:bg-slate-50 transition divide-x divide-slate-100">
                     {/* Room Info Sticky Cell */}
-                    <td className="py-2.5 px-2.5 sm:py-3 sm:px-4 sticky left-0 z-10 bg-white font-medium shadow-r">
+                    <td className="py-2.5 px-2.5 sm:py-3 sm:px-4 sticky left-0 z-10 bg-white font-medium border-r border-slate-200 shadow-sm">
                       <div className="flex items-center w-full">
                         <button
                           onClick={() => onViewRoomDetails(room)}
@@ -386,9 +386,9 @@ export const RoomAvailabilityMatrix: React.FC<RoomAvailabilityMatrixProps> = ({
                                   ? 'bg-indigo-50/80 hover:bg-indigo-600 hover:text-white border-indigo-200 text-indigo-900'
                                   : 'bg-emerald-50 hover:bg-emerald-500 hover:text-white border-emerald-300/80 text-emerald-800'
                               }`}
-                              title={`Klik untuk Tempah ${room.code} (${slot.label})`}
+                              title={`Klik untuk Tempah ${room.code} | Slot: ${slot.start} – ${slot.end}`}
                             >
-                              <span className="text-[11px] flex items-center gap-1">
+                              <span className="text-[11px] flex items-center gap-1 font-bold">
                                 {slot.period === 'NIGHT' ? (
                                   <Moon className="w-3 h-3 text-indigo-600 group-hover:text-white" />
                                 ) : (
@@ -396,7 +396,9 @@ export const RoomAvailabilityMatrix: React.FC<RoomAvailabilityMatrixProps> = ({
                                 )}
                                 Kosong
                               </span>
-                              <span className="text-[9px] opacity-80 font-normal group-hover:text-white">Tempah +</span>
+                              <span className="text-[9px] opacity-80 font-mono group-hover:text-white font-medium">
+                                {slot.start} +
+                              </span>
                             </button>
                           )}
 
