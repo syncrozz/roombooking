@@ -280,16 +280,10 @@ export const RoomAvailabilityMatrix: React.FC<RoomAvailabilityMatrixProps> = ({
                 <span className="text-slate-700 font-medium">🔴 Jadual Kuliah</span>
               </div>
               <div className="flex items-center gap-1.5">
-                <span className="hidden w-3.5 h-3.5 rounded bg-amber-400 border border-amber-500"></span>
                 <span className="text-slate-700 font-medium">🟨 Tempahan Ad-Hoc</span>
               </div>
               <div className="flex items-center gap-1.5">
-                <span className="hidden w-3.5 h-3.5 rounded bg-rose-950 border border-rose-800"></span>
-                <span className="text-slate-700 font-medium">🔒 Peperiksaan Akhir</span>
-              </div>
-              <div className="flex items-center gap-1.5">
-                <span className="hidden w-3.5 h-3.5 rounded bg-slate-900 border border-slate-950"></span>
-                <span className="text-slate-700 font-medium">⚫ Sekatan Institusi</span>
+                <span className="text-slate-700 font-medium">⚫ Sekatan Institusi / Peperiksaan</span>
               </div>
             </div>
 
@@ -424,7 +418,7 @@ export const RoomAvailabilityMatrix: React.FC<RoomAvailabilityMatrixProps> = ({
                           {isAvail && (
                             <button
                               onClick={() => onOpenBookingModal(room, selectedDate, slot.start, slot.end, 'Kelas')}
-                              className={`w-full h-11 rounded-lg border font-bold transition flex flex-col items-center justify-center p-1 group shadow-2xs ${
+                              className={`w-full h-11 rounded-xl border font-bold transition flex flex-col items-center justify-center p-1 group shadow-2xs ${
                                 slot.period === 'NIGHT'
                                   ? 'bg-indigo-50/80 hover:bg-indigo-600 hover:text-white border-indigo-200 text-indigo-900'
                                   : 'bg-emerald-50 hover:bg-emerald-500 hover:text-white border-emerald-300/80 text-emerald-800'
@@ -506,38 +500,20 @@ export const RoomAvailabilityMatrix: React.FC<RoomAvailabilityMatrixProps> = ({
 
                           {isBlocked && (() => {
                             const block = check.institutionalBlock;
-                            const isExam = block?.category === 'EXAM' || block?.title?.toLowerCase().includes('peperiksaan');
-
-                            if (isExam) {
-                              return (
-                                <button
-                                  onClick={() => setSelectedCellInfo({ room, startTime: slot.start, endTime: slot.end, check })}
-                                  className="w-full h-11 rounded-lg bg-rose-950 hover:bg-rose-900 border border-rose-800 text-white font-semibold transition p-1 text-center flex flex-col items-center justify-center overflow-hidden shadow-2xs group cursor-pointer"
-                                  title={check.conflictReason}
-                                >
-                                  <div className="text-[10px] font-extrabold truncate max-w-full text-rose-300 flex items-center gap-0.5">
-                                    <Lock className="w-2.5 h-2.5 text-rose-400 shrink-0" />
-                                    <span>PEPERIKSAAN</span>
-                                  </div>
-                                  <div className="text-[9px] truncate max-w-full text-rose-200/90 font-medium">
-                                    {block?.title || 'Peperiksaan Akhir'}
-                                  </div>
-                                </button>
-                              );
-                            }
+                            const blockLabel = block?.title || (block?.category === 'EXAM' ? 'Peperiksaan Akhir' : 'Program Kolej');
 
                             return (
                               <button
                                 onClick={() => setSelectedCellInfo({ room, startTime: slot.start, endTime: slot.end, check })}
-                                className="w-full h-11 rounded-lg bg-slate-900 hover:bg-slate-800 border border-slate-700 text-white font-semibold transition p-1 text-center flex flex-col items-center justify-center overflow-hidden shadow-2xs cursor-pointer"
+                                className="w-full h-11 rounded-xl bg-[#0b1329] hover:bg-[#131d38] border border-slate-800/90 text-white font-semibold transition p-1 text-center flex flex-col items-center justify-center overflow-hidden shadow-2xs cursor-pointer group"
                                 title={check.conflictReason}
                               >
-                                <div className="text-[10px] font-bold truncate max-w-full text-amber-300 flex items-center gap-0.5">
-                                  <Lock className="w-2.5 h-2.5 text-amber-400 shrink-0" />
-                                  <span>BLOCKED</span>
+                                <div className="text-[10px] font-extrabold truncate max-w-full text-amber-400 flex items-center justify-center gap-1.5 leading-tight">
+                                  <span className="text-[11px] leading-none shrink-0 select-none">⚫</span>
+                                  <span className="tracking-wide">BLOCKED</span>
                                 </div>
-                                <div className="text-[9px] truncate max-w-full text-slate-300">
-                                  {block?.title || 'Program Kolej'}
+                                <div className="text-[10px] font-bold text-white truncate max-w-full leading-tight mt-0.5">
+                                  {blockLabel}
                                 </div>
                               </button>
                             );
@@ -624,54 +600,30 @@ export const RoomAvailabilityMatrix: React.FC<RoomAvailabilityMatrixProps> = ({
 
               {selectedCellInfo.check.status === 'BLOCKED' && (() => {
                 const block = selectedCellInfo.check.institutionalBlock;
-                const isExam = block?.category === 'EXAM' || block?.title?.toLowerCase().includes('peperiksaan');
-
-                if (isExam) {
-                  return (
-                    <div className="p-4 bg-rose-950 text-white rounded-xl border border-rose-800 space-y-2.5">
-                      <div className="flex items-center gap-2">
-                        <span className="px-2.5 py-0.5 rounded bg-rose-500 text-white text-[10px] font-black uppercase tracking-wider flex items-center gap-1">
-                          <Lock className="w-3 h-3 text-white" />
-                          Peperiksaan Akhir Rasmi Kolej
-                        </span>
-                      </div>
-                      <div className="text-xs space-y-1">
-                        <div className="text-sm font-bold text-rose-200">{block?.title || 'Peperiksaan Akhir Semester'}</div>
-                        {block?.reason && (
-                          <div className="text-slate-300 text-[11px] leading-relaxed pt-1">{block.reason}</div>
-                        )}
-                        <div className="pt-2 text-[11px] text-rose-300 flex flex-wrap gap-x-4 gap-y-1 border-t border-rose-900/80">
-                          {block?.endDate && (
-                            <div><span className="text-slate-400">Tempoh:</span> <strong>{block.date} &rarr; {block.endDate}</strong></div>
-                          )}
-                          <div><span className="text-slate-400">Waktu:</span> <strong>{block?.startTime} – {block?.endTime}</strong></div>
-                          {block?.createdBy && (
-                            <div><span className="text-slate-400">Unit:</span> <strong>{block.createdBy}</strong></div>
-                          )}
-                        </div>
-                      </div>
-                      <div className="text-[10px] text-rose-300/80 italic pt-1">
-                        * Ruang ini dikunci sepenuhnya bagi kelancaran peperiksaan akhir berpusat. Sebarang tempahan adhoc atau kelas ganti tidak dibenarkan sepanjang tempoh ini.
-                      </div>
-                    </div>
-                  );
-                }
-
                 return (
-                  <div className="p-3.5 bg-slate-900 text-slate-100 rounded-xl space-y-1.5 border border-slate-800">
+                  <div className="p-3.5 bg-[#0b1329] text-slate-100 rounded-xl space-y-2 border border-slate-800">
                     <div className="flex items-center gap-2">
-                      <span className="px-2 py-0.5 rounded bg-amber-400 text-slate-950 text-[10px] font-black uppercase tracking-wider flex items-center gap-1">
-                        <Lock className="w-3 h-3 text-slate-950" />
+                      <span className="px-2 py-0.5 rounded bg-amber-400 text-slate-950 text-[10px] font-black uppercase tracking-wider flex items-center gap-1.5">
+                        <span className="text-[11px] leading-none">⚫</span>
                         Sekatan Institusi / Kolej
                       </span>
                     </div>
-                    <div className="text-xs font-bold text-white">{block?.title}</div>
+                    <div className="text-sm font-bold text-white">{block?.title || 'Program Kolej'}</div>
                     <p className="text-slate-300 text-xs leading-relaxed">
                       {selectedCellInfo.check.conflictReason}
                     </p>
-                    {block?.createdBy && (
-                      <div className="text-[10.5px] text-slate-400 pt-1">Disediakan oleh: <strong>{block.createdBy}</strong></div>
+                    {block?.reason && (
+                      <div className="text-slate-400 text-[11px] leading-relaxed pt-0.5">{block.reason}</div>
                     )}
+                    <div className="pt-2 text-[11px] text-slate-300 flex flex-wrap gap-x-4 gap-y-1 border-t border-slate-800">
+                      {block?.endDate && (
+                        <div><span className="text-slate-400">Tempoh:</span> <strong>{block.date} &rarr; {block.endDate}</strong></div>
+                      )}
+                      <div><span className="text-slate-400">Waktu:</span> <strong>{block?.startTime} – {block?.endTime}</strong></div>
+                      {block?.createdBy && (
+                        <div><span className="text-slate-400">Disediakan Oleh:</span> <strong>{block.createdBy}</strong></div>
+                      )}
+                    </div>
                   </div>
                 );
               })()}
