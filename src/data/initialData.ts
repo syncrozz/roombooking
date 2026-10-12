@@ -492,7 +492,64 @@ export const INITIAL_ACADEMIC_SCHEDULE: AcademicScheduleSlot[] = parseTimetableC
 export const INITIAL_ADHOC_BOOKINGS: AdHocBooking[] = [];
 
 // Operational Pilot Environment: Zero Demo Institutional Blocks (Real Admin Locks Only)
-export const INITIAL_INSTITUTIONAL_BLOCKS: InstitutionalBlock[] = [];
+export const INITIAL_INSTITUTIONAL_BLOCKS: InstitutionalBlock[] = [
+  {
+    id: 'EXAM-2026-DEWAN-BESAR',
+    roomId: 'DEWAN_BESAR',
+    date: '2026-11-02',
+    endDate: '2026-11-16',
+    startTime: '08:00',
+    endTime: '24:00',
+    title: 'Peperiksaan Akhir Semester Nov 2026',
+    category: 'EXAM',
+    createdBy: 'Unit Peperiksaan & Penilaian Kolej',
+    reason: 'Peperiksaan Akhir Semester di Dewan Besar, Sri Penawar, Dewan Seminar & Mini Seminar (8:00 AM - 12:00 AM Midnight).',
+    batchId: 'BATCH-EXAM-NOV-2026',
+    isAllDay: true
+  },
+  {
+    id: 'EXAM-2026-SRI-PENAWAR',
+    roomId: 'SRI_PENAWAR',
+    date: '2026-11-02',
+    endDate: '2026-11-16',
+    startTime: '08:00',
+    endTime: '24:00',
+    title: 'Peperiksaan Akhir Semester Nov 2026',
+    category: 'EXAM',
+    createdBy: 'Unit Peperiksaan & Penilaian Kolej',
+    reason: 'Peperiksaan Akhir Semester di Dewan Besar, Sri Penawar, Dewan Seminar & Mini Seminar (8:00 AM - 12:00 AM Midnight).',
+    batchId: 'BATCH-EXAM-NOV-2026',
+    isAllDay: true
+  },
+  {
+    id: 'EXAM-2026-DEWAN-SEMINAR',
+    roomId: 'DEWAN_SEMINAR',
+    date: '2026-11-02',
+    endDate: '2026-11-16',
+    startTime: '08:00',
+    endTime: '24:00',
+    title: 'Peperiksaan Akhir Semester Nov 2026',
+    category: 'EXAM',
+    createdBy: 'Unit Peperiksaan & Penilaian Kolej',
+    reason: 'Peperiksaan Akhir Semester di Dewan Besar, Sri Penawar, Dewan Seminar & Mini Seminar (8:00 AM - 12:00 AM Midnight).',
+    batchId: 'BATCH-EXAM-NOV-2026',
+    isAllDay: true
+  },
+  {
+    id: 'EXAM-2026-MINI-SEMINAR',
+    roomId: 'MINI_SEMINAR',
+    date: '2026-11-02',
+    endDate: '2026-11-16',
+    startTime: '08:00',
+    endTime: '24:00',
+    title: 'Peperiksaan Akhir Semester Nov 2026',
+    category: 'EXAM',
+    createdBy: 'Unit Peperiksaan & Penilaian Kolej',
+    reason: 'Peperiksaan Akhir Semester di Dewan Besar, Sri Penawar, Dewan Seminar & Mini Seminar (8:00 AM - 12:00 AM Midnight).',
+    batchId: 'BATCH-EXAM-NOV-2026',
+    isAllDay: true
+  }
+];
 
 // Official Standard Sample CSV for Locking Slots (Admin Sync Specification)
 export const SAMPLE_LOCKED_SLOTS_CSV = `Perkara,Hari,"1

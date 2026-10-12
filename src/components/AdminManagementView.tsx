@@ -106,29 +106,18 @@ export const AdminManagementView: React.FC<AdminManagementViewProps> = ({
     'MINI_SEMINAR'
   ]);
   const [blockStartDate, setBlockStartDate] = useState<string>(() => {
-    const today = new Date().toISOString().split('T')[0];
-    return today > '2026-11-16' ? today : '2026-11-02';
+    return new Date().toISOString().split('T')[0];
   });
   const [blockEndDate, setBlockEndDate] = useState<string>(() => {
-    const today = new Date();
-    const todayStr = today.toISOString().split('T')[0];
-    if (todayStr > '2026-11-16') {
-      const nextWeek = new Date(today);
-      nextWeek.setDate(nextWeek.getDate() + 7);
-      return nextWeek.toISOString().split('T')[0];
-    }
-    return '2026-11-16';
+    return new Date().toISOString().split('T')[0];
   });
   const [isAllDayBlock, setIsAllDayBlock] = useState<boolean>(true);
   const [blockStartTime, setBlockStartTime] = useState<string>('08:00');
   const [blockEndTime, setBlockEndTime] = useState<string>('24:00');
-  const [blockTitle, setBlockTitle] = useState<string>(() => {
-    const today = new Date().toISOString().split('T')[0];
-    return today > '2026-11-16' ? 'Peperiksaan Akhir Semester' : 'Peperiksaan Akhir Semester Nov 2026';
-  });
+  const [blockTitle, setBlockTitle] = useState<string>('Peperiksaan Akhir / Program Institusi');
   const [blockCategory, setBlockCategory] = useState<'EXAM' | 'INSTITUTIONAL' | 'MAINTENANCE'>('EXAM');
   const [blockCreatedBy, setBlockCreatedBy] = useState<string>('Unit Peperiksaan & Penilaian Kolej');
-  const [blockReason, setBlockReason] = useState<string>('Peperiksaan Akhir Semester di Dewan Besar, Sri Penawar, Dewan Seminar & Mini Seminar.');
+  const [blockReason, setBlockReason] = useState<string>('Sekatan rasmi kolej / peperiksaan bagi dewan terpilih.');
   const [isSubmittingBlock, setIsSubmittingBlock] = useState<boolean>(false);
   const [blockSuccessMsg, setBlockSuccessMsg] = useState<string | null>(null);
   const [blockSearchTerm, setBlockSearchTerm] = useState<string>('');

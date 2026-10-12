@@ -69,11 +69,37 @@ import { SetPinModal } from './components/SetPinModal';
 import { Building2, Shield, Heart, Sparkles, CheckCircle2, Lock, X, KeyRound, ShieldCheck, AlertCircle } from 'lucide-react';
 
 export default function App() {
-  const [activeTab, setActiveTab] = useState<ActiveTab>('matrix');
+  const [isAdminUnlocked, setIsAdminUnlocked] = useState<boolean>(() => {
+    if (typeof window !== 'undefined') {
+      return sessionStorage.getItem('kpmbp_admin_unlocked') === 'true';
+    }
+    return false;
+  });
+
+  const [activeTab, setActiveTab] = useState<ActiveTab>(() => {
+    if (typeof window !== 'undefined') {
+      const hash = window.location.hash.replace('#', '') as ActiveTab;
+      const validTabs: ActiveTab[] = ['dashboard', 'matrix', 'academic', 'mybookings', 'directory', 'admin'];
+      if (validTabs.includes(hash)) {
+        if (hash === 'admin' && sessionStorage.getItem('kpmbp_admin_unlocked') !== 'true') {
+          return 'matrix';
+        }
+        return hash;
+      }
+      const saved = localStorage.getItem('kpmbp_active_tab') as ActiveTab;
+      if (validTabs.includes(saved)) {
+        if (saved === 'admin' && sessionStorage.getItem('kpmbp_admin_unlocked') !== 'true') {
+          return 'matrix';
+        }
+        return saved;
+      }
+    }
+    return 'matrix';
+  });
+
   const [isSupportOpen, setIsSupportOpen] = useState<boolean>(false);
 
   // Admin PIN verification state
-  const [isAdminUnlocked, setIsAdminUnlocked] = useState<boolean>(false);
   const [showAdminPinModal, setShowAdminPinModal] = useState<boolean>(false);
   const [adminPinInput, setAdminPinInput] = useState<string>('');
   const [adminPinError, setAdminPinError] = useState<string | null>(null);
@@ -85,6 +111,10 @@ export default function App() {
       setAdminPinInput('');
     } else {
       setActiveTab(tab);
+      if (typeof window !== 'undefined') {
+        localStorage.setItem('kpmbp_active_tab', tab);
+        window.location.hash = tab;
+      }
     }
   };
 
@@ -92,6 +122,11 @@ export default function App() {
     e.preventDefault();
     if (adminPinInput.trim() === '5313') {
       setIsAdminUnlocked(true);
+      if (typeof window !== 'undefined') {
+        sessionStorage.setItem('kpmbp_admin_unlocked', 'true');
+        localStorage.setItem('kpmbp_active_tab', 'admin');
+        window.location.hash = 'admin';
+      }
       setActiveTab('admin');
       setShowAdminPinModal(false);
       setAdminPinInput('');
@@ -104,6 +139,11 @@ export default function App() {
 
   const handleLogoutAdmin = () => {
     setIsAdminUnlocked(false);
+    if (typeof window !== 'undefined') {
+      sessionStorage.removeItem('kpmbp_admin_unlocked');
+      localStorage.setItem('kpmbp_active_tab', 'matrix');
+      window.location.hash = 'matrix';
+    }
     setActiveTab('matrix');
     setShowAdminPinModal(false);
     setAdminPinInput('');

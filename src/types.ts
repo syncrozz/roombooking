@@ -74,6 +74,7 @@ export interface InstitutionalBlock {
   createdBy: string;      // e.g. 'Unit Peperiksaan & Penilaian Kolej'
   category?: 'EXAM' | 'INSTITUTIONAL' | 'MAINTENANCE';
   batchId?: string;       // ID kelompok untuk sekatan berbilang bilik/hari
+  isAllDay?: boolean;
 }
 
 export type AvailabilityStatus = 'AVAILABLE' | 'OCCUPIED_ACADEMIC' | 'OCCUPIED_BOOKING' | 'PENDING_BOOKING' | 'BLOCKED';

@@ -106,6 +106,48 @@ export const DashboardOverview: React.FC<DashboardOverviewProps> = ({
         </div>
       </div>
 
+      {/* Official Exam / Institutional Lock Announcement Banner */}
+      {institutionalBlocks.length > 0 && (
+        <div className="bg-gradient-to-r from-rose-950 via-rose-900 to-slate-900 text-white rounded-xl p-4 border border-rose-800 shadow-sm flex flex-col sm:flex-row sm:items-center justify-between gap-3">
+          <div className="flex items-start sm:items-center gap-3">
+            <div className="p-2.5 bg-rose-600 rounded-lg text-white shrink-0 mt-0.5 sm:mt-0 shadow-sm">
+              <Lock className="w-5 h-5 text-white" />
+            </div>
+            <div>
+              <div className="flex items-center gap-2">
+                <span className="px-2 py-0.5 rounded bg-rose-500/30 text-rose-200 border border-rose-400/30 text-[10px] font-extrabold uppercase tracking-wide">
+                  Peperiksaan Akhir Kolej
+                </span>
+                <span className="text-xs text-rose-300 font-medium">
+                  {institutionalBlocks.length} ruang dikunci
+                </span>
+              </div>
+              <h3 className="text-sm font-bold text-white mt-0.5">
+                Peperiksaan Akhir: 2 Nov – 16 Nov 2026 (08:00 AM – 12:00 AM)
+              </h3>
+              <p className="text-xs text-rose-200/90 mt-0.5">
+                Dewan Besar, Sri Penawar, Dewan Seminar &amp; Mini Seminar ditutup untuk tempahan biasa.
+              </p>
+            </div>
+          </div>
+          <div className="flex items-center gap-2 shrink-0">
+            <button
+              onClick={() => onNavigateTab('matrix')}
+              className="px-3.5 py-1.5 bg-rose-600 hover:bg-rose-500 text-white rounded-lg text-xs font-bold transition flex items-center gap-1.5 shadow-sm cursor-pointer"
+            >
+              <span>Semak di Jadual</span>
+              <ArrowRight className="w-3.5 h-3.5" />
+            </button>
+            <button
+              onClick={() => onNavigateTab('admin')}
+              className="px-3 py-1.5 bg-slate-800 hover:bg-slate-700 text-slate-200 border border-slate-700 rounded-lg text-xs font-semibold transition cursor-pointer"
+            >
+              Urus Sekatan
+            </button>
+          </div>
+        </div>
+      )}
+
       {/* 2. Compact 2-Column Split: Ruang Ringkas & Tempahan Pantas Hari Ini */}
       <div className="grid grid-cols-1 lg:grid-cols-12 gap-4">
         

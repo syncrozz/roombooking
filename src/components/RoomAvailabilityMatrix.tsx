@@ -105,6 +105,44 @@ export const RoomAvailabilityMatrix: React.FC<RoomAvailabilityMatrixProps> = ({
 
   return (
     <div className="space-y-6">
+      {/* Exam Notice & Quick Jump Bar */}
+      {institutionalBlocks.length > 0 && (
+        <div className="bg-rose-50 border border-rose-200 rounded-xl p-3 sm:p-3.5 flex flex-col sm:flex-row sm:items-center justify-between gap-3 text-xs shadow-2xs">
+          <div className="flex items-center gap-2.5 text-rose-950">
+            <span className="p-1.5 bg-rose-200 text-rose-900 rounded-lg shrink-0">
+              <Lock className="w-4 h-4" />
+            </span>
+            <div>
+              <div className="font-extrabold text-rose-950 flex items-center gap-1.5">
+                <span>Peperiksaan Akhir Semester: 2 Nov – 16 Nov 2026</span>
+                <span className="text-[10px] bg-rose-200 text-rose-800 px-1.5 py-0.2 rounded font-bold">8:00 AM – 12:00 AM</span>
+              </div>
+              <div className="text-rose-800 text-[11px] mt-0.5">
+                Dewan Besar, Sri Penawar, Dewan Seminar &amp; Mini Seminar dikunci sepenuhnya bagi peperiksaan berpusat.
+              </div>
+            </div>
+          </div>
+          <div className="flex items-center gap-2 shrink-0">
+            {selectedDate >= '2026-11-02' && selectedDate <= '2026-11-16' ? (
+              <span className="px-3 py-1 bg-rose-200 text-rose-900 rounded-lg font-bold text-xs flex items-center gap-1 border border-rose-300">
+                <CheckCircle2 className="w-3.5 h-3.5 text-rose-700" />
+                <span>Tarikh Peperiksaan Sedang Dipaparkan</span>
+              </span>
+            ) : (
+              <button
+                type="button"
+                onClick={() => setSelectedDate('2026-11-02')}
+                className="px-3.5 py-1.5 bg-rose-600 hover:bg-rose-700 text-white rounded-lg font-bold text-xs transition cursor-pointer shadow-sm flex items-center gap-1.5 active:scale-95"
+                title="Papar jadual matriks bagi tarikh peperiksaan bermula 2 Nov 2026"
+              >
+                <Calendar className="w-3.5 h-3.5" />
+                <span>Lihat Tarikh Peperiksaan (02 Nov)</span>
+              </button>
+            )}
+          </div>
+        </div>
+      )}
+
       {/* Header Banner */}
       <div className="bg-white rounded-2xl p-6 shadow-md border border-slate-200">
         <div className="flex flex-col md:flex-row items-start md:items-center justify-between gap-4 border-b border-slate-100 pb-5">

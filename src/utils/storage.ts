@@ -135,9 +135,20 @@ export function saveStoredAdHocBookings(bookings: AdHocBooking[]): void {
 export function getStoredInstitutionalBlocks(): InstitutionalBlock[] {
   try {
     const data = localStorage.getItem(INSTITUTIONAL_BLOCKS_KEY);
-    const list: InstitutionalBlock[] = data ? JSON.parse(data) : INITIAL_INSTITUTIONAL_BLOCKS;
+    let list: InstitutionalBlock[] = data ? JSON.parse(data) : [];
     // Strict Zero Demo Data Filter
-    return list.filter(b => b.id !== 'BLK-001' && b.id !== 'BLK-002');
+    list = list.filter(b => b.id !== 'BLK-001' && b.id !== 'BLK-002');
+    
+    // Ensure official exam blocks for 2 Nov - 16 Nov are merged in if missing
+    const hasExamNov = list.some(b => 
+      b.batchId === 'BATCH-EXAM-NOV-2026' || 
+      (b.title?.toLowerCase().includes('peperiksaan') && b.date === '2026-11-02')
+    );
+    if (!hasExamNov) {
+      list = [...INITIAL_INSTITUTIONAL_BLOCKS, ...list];
+      localStorage.setItem(INSTITUTIONAL_BLOCKS_KEY, JSON.stringify(list));
+    }
+    return list;
   } catch {
     return INITIAL_INSTITUTIONAL_BLOCKS;
   }

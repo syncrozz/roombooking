@@ -9,16 +9,17 @@ createRoot(document.getElementById('root')!).render(
   </StrictMode>,
 );
 
-// Register Service Worker for PWA compliance and offline support
-if (typeof window !== 'undefined' && 'serviceWorker' in navigator && process.env.NODE_ENV === 'production') {
-  window.addEventListener('load', () => {
-    navigator.serviceWorker.register('/sw.js').catch((err) => {
-      console.warn('ServiceWorker registration error:', err);
+// Clear stale service worker registrations and caches in development/preview
+if (typeof window !== 'undefined' && 'serviceWorker' in navigator) {
+  // Purge any registered service workers in development environment
+  navigator.serviceWorker.getRegistrations().then((registrations) => {
+    for (const registration of registrations) {
+      registration.unregister();
+    }
+  });
+  if ('caches' in window) {
+    caches.keys().then((keys) => {
+      keys.forEach((key) => caches.delete(key));
     });
-  });
-} else if (typeof window !== 'undefined' && 'serviceWorker' in navigator) {
-  // Also register in dev/preview if service worker is supported
-  window.addEventListener('load', () => {
-    navigator.serviceWorker.register('/sw.js').catch(() => {});
-  });
+  }
 }
