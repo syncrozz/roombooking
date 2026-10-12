@@ -502,7 +502,7 @@ export const INITIAL_INSTITUTIONAL_BLOCKS: InstitutionalBlock[] = [
     endTime: '24:00',
     title: 'Peperiksaan Akhir Semester Nov 2026',
     category: 'EXAM',
-    createdBy: 'Unit Peperiksaan & Penilaian Kolej',
+    createdBy: 'UPPK',
     reason: 'Peperiksaan Akhir Semester di Dewan Besar, Sri Penawar, Dewan Seminar & Mini Seminar (8:00 AM - 12:00 AM Midnight).',
     batchId: 'BATCH-EXAM-NOV-2026',
     isAllDay: true
@@ -516,7 +516,7 @@ export const INITIAL_INSTITUTIONAL_BLOCKS: InstitutionalBlock[] = [
     endTime: '24:00',
     title: 'Peperiksaan Akhir Semester Nov 2026',
     category: 'EXAM',
-    createdBy: 'Unit Peperiksaan & Penilaian Kolej',
+    createdBy: 'UPPK',
     reason: 'Peperiksaan Akhir Semester di Dewan Besar, Sri Penawar, Dewan Seminar & Mini Seminar (8:00 AM - 12:00 AM Midnight).',
     batchId: 'BATCH-EXAM-NOV-2026',
     isAllDay: true
@@ -530,7 +530,7 @@ export const INITIAL_INSTITUTIONAL_BLOCKS: InstitutionalBlock[] = [
     endTime: '24:00',
     title: 'Peperiksaan Akhir Semester Nov 2026',
     category: 'EXAM',
-    createdBy: 'Unit Peperiksaan & Penilaian Kolej',
+    createdBy: 'UPPK',
     reason: 'Peperiksaan Akhir Semester di Dewan Besar, Sri Penawar, Dewan Seminar & Mini Seminar (8:00 AM - 12:00 AM Midnight).',
     batchId: 'BATCH-EXAM-NOV-2026',
     isAllDay: true
@@ -544,7 +544,7 @@ export const INITIAL_INSTITUTIONAL_BLOCKS: InstitutionalBlock[] = [
     endTime: '24:00',
     title: 'Peperiksaan Akhir Semester Nov 2026',
     category: 'EXAM',
-    createdBy: 'Unit Peperiksaan & Penilaian Kolej',
+    createdBy: 'UPPK',
     reason: 'Peperiksaan Akhir Semester di Dewan Besar, Sri Penawar, Dewan Seminar & Mini Seminar (8:00 AM - 12:00 AM Midnight).',
     batchId: 'BATCH-EXAM-NOV-2026',
     isAllDay: true

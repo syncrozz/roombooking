@@ -114,9 +114,9 @@ export const AdminManagementView: React.FC<AdminManagementViewProps> = ({
   const [isAllDayBlock, setIsAllDayBlock] = useState<boolean>(true);
   const [blockStartTime, setBlockStartTime] = useState<string>('08:00');
   const [blockEndTime, setBlockEndTime] = useState<string>('24:00');
-  const [blockTitle, setBlockTitle] = useState<string>('Peperiksaan Akhir / Program Institusi');
+  const [blockTitle, setBlockTitle] = useState<string>('Exam');
   const [blockCategory, setBlockCategory] = useState<'EXAM' | 'INSTITUTIONAL' | 'MAINTENANCE'>('EXAM');
-  const [blockCreatedBy, setBlockCreatedBy] = useState<string>('Unit Peperiksaan & Penilaian Kolej');
+  const [blockCreatedBy, setBlockCreatedBy] = useState<string>('UPPK');
   const [blockReason, setBlockReason] = useState<string>('Sekatan rasmi kolej / peperiksaan bagi dewan terpilih.');
   const [isSubmittingBlock, setIsSubmittingBlock] = useState<boolean>(false);
   const [blockSuccessMsg, setBlockSuccessMsg] = useState<string | null>(null);
@@ -730,7 +730,7 @@ ST003,Pengajian Am,Cik Siti Sarah Binti Razak,Pensyarah,013-5558899,siti.sarah@k
       endTime: '24:00',
       title: 'Peperiksaan Akhir Semester Nov 2026',
       reason: 'Penggunaan Rasmi Peperiksaan Akhir Semester KPM Bandar Penawar',
-      createdBy: 'Unit Peperiksaan & Penilaian Kolej',
+      createdBy: 'UPPK',
       category: 'EXAM',
       batchId: 'BATCH-EXAM-NOV-2026'
     }));
@@ -813,7 +813,7 @@ ST003,Pengajian Am,Cik Siti Sarah Binti Razak,Pensyarah,013-5558899,siti.sarah@k
       endTime: actualEnd,
       title: blockTitle.trim(),
       reason: blockReason.trim(),
-      createdBy: blockCreatedBy.trim() || 'Unit Peperiksaan & Penilaian Kolej',
+      createdBy: blockCreatedBy.trim() || 'UPPK',
       category: blockCategory,
       batchId
     }));
@@ -876,11 +876,9 @@ ST003,Pengajian Am,Cik Siti Sarah Binti Razak,Pensyarah,013-5558899,siti.sarah@k
               Mod Pentadbir KPMBP
             </div>
             <h2 className="text-2xl font-extrabold tracking-tight text-white">
-              Kawalan Pentadbir & Kelulusan Tempahan
+              Kawalan Pentadbir
             </h2>
-            <p className="text-slate-300 text-xs sm:text-sm mt-0.5">
-              Luluskan permohonan tempahan ad-hoc dan kemas kini senarai staf serta jadual via CSV.
-            </p>
+
           </div>
 
           <div className="flex flex-wrap items-center gap-2">
@@ -921,18 +919,7 @@ ST003,Pengajian Am,Cik Siti Sarah Binti Razak,Pensyarah,013-5558899,siti.sarah@k
               <span>Reset Data Asal</span>
             </button>
 
-            <button
-              onClick={() => {
-                if (confirm('Adakah anda pasti mahu membersihkan sebarang sisa data demo daripada peranti dan pangkalan data Cloud?')) {
-                  onResetData();
-                }
-              }}
-              className="bg-rose-950/40 hover:bg-rose-900/60 text-rose-300 hover:text-rose-100 border border-rose-800/80 text-xs font-semibold py-2 px-3.5 rounded-xl transition flex items-center gap-2 cursor-pointer"
-              title="Pembersihan sifar data demo"
-            >
-              <ShieldCheck className="w-3.5 h-3.5 text-rose-400" />
-              <span>Sahkan Sifar Data Demo</span>
-            </button>
+
           </div>
         </div>
 
@@ -981,19 +968,6 @@ ST003,Pengajian Am,Cik Siti Sarah Binti Razak,Pensyarah,013-5558899,siti.sarah@k
             <div>
               <span className="text-slate-400 block font-medium">Sekatan Peperiksaan &amp; Institusi:</span>
               <strong className="text-xl font-bold text-rose-400">{institutionalBlocks.length} Sekatan Ruang</strong>
-            </div>
-            <div className="mt-2">
-              {isExamNovLocked ? (
-                <span className="inline-flex items-center gap-1 text-[11px] font-bold text-emerald-300 bg-emerald-950/60 border border-emerald-700/60 px-2 py-0.5 rounded-md">
-                  <Lock className="w-3 h-3 text-emerald-400" />
-                  Peperiksaan Nov 2026 Aktif
-                </span>
-              ) : (
-                <span className="inline-flex items-center gap-1 text-[11px] font-medium text-amber-300 bg-amber-950/60 border border-amber-700/60 px-2 py-0.5 rounded-md">
-                  <ShieldAlert className="w-3 h-3 text-amber-400" />
-                  Belum Dikunci (2-16 Nov)
-                </span>
-              )}
             </div>
           </div>
         </div>
@@ -2154,23 +2128,9 @@ ST003,Pengajian Am,Cik Siti Sarah Binti Razak,Pensyarah,013-5558899,siti.sarah@k
               <Lock className="w-5 h-5 text-rose-600" />
               <h3>Pengurusan Sekatan Institusi &amp; Peperiksaan Akhir</h3>
             </div>
-            <p className="text-xs text-slate-500 mt-1 max-w-3xl">
-              Kunci dewan utama dan ruang kuliah bagi Peperiksaan Akhir Semester (contoh: 2 Nov – 16 Nov 2026), Minggu Mesra Siswa (MMS), atau majlis kolej merentasi pelbagai hari dan bilik serentak. Slot yang dikunci akan ditutup sepenuhnya daripada sebarang tempahan biasa.
-            </p>
           </div>
 
           <div className="flex items-center gap-2 shrink-0">
-            {isExamNovLocked ? (
-              <span className="bg-emerald-50 text-emerald-800 border border-emerald-300 font-bold text-xs px-3 py-1.5 rounded-xl flex items-center gap-1.5 shadow-2xs">
-                <CheckCircle2 className="w-4 h-4 text-emerald-600" />
-                <span>4 Dewan Peperiksaan Nov 2026 Aktif Dikunci</span>
-              </span>
-            ) : (
-              <span className="bg-amber-50 text-amber-900 border border-amber-300 font-bold text-xs px-3 py-1.5 rounded-xl flex items-center gap-1.5 shadow-2xs">
-                <Clock className="w-4 h-4 text-amber-600" />
-                <span>Peperiksaan Nov 2026: Belum Dikunci</span>
-              </span>
-            )}
           </div>
         </div>
 
@@ -2213,13 +2173,6 @@ ST003,Pengajian Am,Cik Siti Sarah Binti Razak,Pensyarah,013-5558899,siti.sarah@k
                   <span>Pilih Ruang / Dewan ({selectedBlockRooms.length} dipilih):</span>
                 </label>
                 <div className="flex items-center gap-1.5 text-[11px]">
-                  <button
-                    type="button"
-                    onClick={() => setSelectedBlockRooms(['DEWAN_BESAR', 'SRI_PENAWAR', 'DEWAN_SEMINAR', 'MINI_SEMINAR'])}
-                    className="px-2 py-0.5 bg-rose-100 hover:bg-rose-200 text-rose-800 rounded font-bold transition cursor-pointer"
-                  >
-                    4 Dewan Peperiksaan
-                  </button>
                   <button
                     type="button"
                     onClick={() => setSelectedBlockRooms(rooms.filter(r => r.category === 'Dewan Kuliah' || r.category === 'Ruang Khas').map(r => r.id))}
@@ -2272,93 +2225,9 @@ ST003,Pengajian Am,Cik Siti Sarah Binti Razak,Pensyarah,013-5558899,siti.sarah@k
             </div>
 
             {/* 2. Date Range & Time Configuration */}
-            {/* Quick Date Presets Toolbar */}
-            <div className="flex flex-wrap items-center justify-between gap-2 p-2.5 bg-white border border-slate-200 rounded-xl text-xs">
-              <span className="text-slate-600 font-bold flex items-center gap-1.5 text-[11px]">
-                <CalendarRange className="w-3.5 h-3.5 text-rose-600 shrink-0" />
-                <span>Pilihan Tarikh Pantas:</span>
-              </span>
-              <div className="flex flex-wrap items-center gap-1.5 text-[11px]">
-                <button
-                  type="button"
-                  onClick={() => {
-                    setBlockStartDate('2026-11-02');
-                    setBlockEndDate('2026-11-16');
-                    setBlockTitle('Peperiksaan Akhir Semester Nov 2026');
-                    setBlockCategory('EXAM');
-                  }}
-                  className={`px-2.5 py-1 rounded-lg font-bold transition cursor-pointer border ${
-                    blockStartDate === '2026-11-02' && blockEndDate === '2026-11-16'
-                      ? 'bg-rose-100 text-rose-900 border-rose-300'
-                      : 'bg-slate-50 hover:bg-slate-100 text-slate-700 border-slate-200'
-                  }`}
-                  title="Tetapkan tarikh Peperiksaan Akhir 2 Nov - 16 Nov 2026"
-                >
-                  📅 Peperiksaan Nov 2026 (02/11 – 16/11)
-                </button>
-                <button
-                  type="button"
-                  onClick={() => {
-                    const todayStr = new Date().toISOString().split('T')[0];
-                    setBlockStartDate(todayStr);
-                    setBlockEndDate(todayStr);
-                  }}
-                  className={`px-2.5 py-1 rounded-lg font-medium transition cursor-pointer border ${
-                    blockStartDate === todayDateStr && blockEndDate === todayDateStr
-                      ? 'bg-blue-100 text-blue-900 border-blue-300 font-bold'
-                      : 'bg-slate-50 hover:bg-slate-100 text-slate-700 border-slate-200'
-                  }`}
-                  title="Tetapkan tarikh hari ini"
-                >
-                  📍 Hari Ini ({todayDateStr})
-                </button>
-                <button
-                  type="button"
-                  onClick={() => {
-                    const today = new Date();
-                    const startStr = today.toISOString().split('T')[0];
-                    const nextWeek = new Date(today);
-                    nextWeek.setDate(nextWeek.getDate() + 7);
-                    setBlockStartDate(startStr);
-                    setBlockEndDate(nextWeek.toISOString().split('T')[0]);
-                  }}
-                  className="px-2.5 py-1 bg-slate-50 hover:bg-slate-100 text-slate-700 border border-slate-200 rounded-lg font-medium transition cursor-pointer"
-                  title="Tetapkan julat 7 hari dari sekarang"
-                >
-                  ⏱️ +7 Hari (1 Minggu)
-                </button>
-                <button
-                  type="button"
-                  onClick={() => {
-                    const today = new Date();
-                    const startStr = today.toISOString().split('T')[0];
-                    const next2Weeks = new Date(today);
-                    next2Weeks.setDate(next2Weeks.getDate() + 14);
-                    setBlockStartDate(startStr);
-                    setBlockEndDate(next2Weeks.toISOString().split('T')[0]);
-                  }}
-                  className="px-2.5 py-1 bg-slate-50 hover:bg-slate-100 text-slate-700 border border-slate-200 rounded-lg font-medium transition cursor-pointer"
-                  title="Tetapkan julat 14 hari dari sekarang"
-                >
-                  ⏱️ +14 Hari (2 Minggu)
-                </button>
-              </div>
-            </div>
-
             <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-3 text-xs">
               <div>
-                <div className="flex items-center justify-between mb-1">
-                  <label className="block font-bold text-slate-700">Tarikh Mula:</label>
-                  {blockStartDate === '2026-11-02' ? (
-                    <span className="text-[10px] bg-rose-50 text-rose-700 border border-rose-200 px-1.5 py-0.2 rounded font-semibold">
-                      Default Preset
-                    </span>
-                  ) : (
-                    <span className="text-[10px] bg-blue-50 text-blue-700 border border-blue-200 px-1.5 py-0.2 rounded font-semibold">
-                      Dinamik
-                    </span>
-                  )}
-                </div>
+                <label className="block font-bold text-slate-700 mb-1">Tarikh Mula:</label>
                 <input
                   type="date"
                   value={blockStartDate}
@@ -2375,18 +2244,7 @@ ST003,Pengajian Am,Cik Siti Sarah Binti Razak,Pensyarah,013-5558899,siti.sarah@k
               </div>
 
               <div>
-                <div className="flex items-center justify-between mb-1">
-                  <label className="block font-bold text-slate-700">Tarikh Tamat:</label>
-                  {blockEndDate === '2026-11-16' ? (
-                    <span className="text-[10px] bg-rose-50 text-rose-700 border border-rose-200 px-1.5 py-0.2 rounded font-semibold">
-                      Default Preset
-                    </span>
-                  ) : (
-                    <span className="text-[10px] bg-blue-50 text-blue-700 border border-blue-200 px-1.5 py-0.2 rounded font-semibold">
-                      Dinamik
-                    </span>
-                  )}
-                </div>
+                <label className="block font-bold text-slate-700 mb-1">Tarikh Tamat:</label>
                 <input
                   type="date"
                   value={blockEndDate}
@@ -2482,7 +2340,7 @@ ST003,Pengajian Am,Cik Siti Sarah Binti Razak,Pensyarah,013-5558899,siti.sarah@k
                   type="text"
                   value={blockCreatedBy}
                   onChange={(e) => setBlockCreatedBy(e.target.value)}
-                  placeholder="Cth: Unit Peperiksaan & Penilaian Kolej"
+                  placeholder="Cth: UPPK"
                   className="w-full bg-white border border-slate-200 rounded-lg p-2 text-xs text-slate-800 outline-none focus:ring-2 focus:ring-rose-500"
                   required
                 />
@@ -2490,12 +2348,14 @@ ST003,Pengajian Am,Cik Siti Sarah Binti Razak,Pensyarah,013-5558899,siti.sarah@k
             </div>
 
             <div>
-              <label className="block font-bold text-slate-700 mb-1 text-xs">Sebab / Catatan Tambahan:</label>
+              <label className="block font-bold text-slate-700 mb-1 text-xs">
+                Sebab / Catatan Tambahan <span className="text-slate-400 font-normal">(Pilihan / Tidak wajib)</span>:
+              </label>
               <input
                 type="text"
                 value={blockReason}
                 onChange={(e) => setBlockReason(e.target.value)}
-                placeholder="Cth: Dewan ditutup bagi persediaan dan pelaksanaan peperiksaan akhir."
+                placeholder="Cth: Dewan ditutup bagi persediaan dan pelaksanaan peperiksaan akhir (pilihan)."
                 className="w-full bg-white border border-slate-200 rounded-lg p-2 text-xs text-slate-800 outline-none focus:ring-2 focus:ring-rose-500"
               />
             </div>
