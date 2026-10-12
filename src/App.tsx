@@ -47,6 +47,8 @@ import {
   deleteBookingFromCloud, 
   saveBlockToCloud, 
   deleteBlockFromCloud,
+  bulkSaveBlocksToCloud,
+  bulkDeleteBlocksFromCloud,
   cleanObsoleteDemoRecordsFromCloud
 } from './lib/firebase';
 import { INITIAL_STAFF_DATA } from './data/staffData';
@@ -399,6 +401,28 @@ export default function App() {
     showToast(`⚫ Lock Ruang ${blockData.roomId} berjaya ditambah.`);
   };
 
+  const handleBatchAddBlocks = async (blocksData: Omit<InstitutionalBlock, 'id'>[]) => {
+    const timestamp = Date.now();
+    const batchId = `BATCH-${timestamp}`;
+    const newBlocks: InstitutionalBlock[] = blocksData.map((b, index) => ({
+      ...b,
+      id: `BLK-${timestamp}-${index + 1}`,
+      batchId: b.batchId || batchId
+    }));
+
+    const updated = [...newBlocks, ...institutionalBlocks];
+    setInstitutionalBlocks(updated);
+    saveStoredInstitutionalBlocks(updated);
+
+    try {
+      await bulkSaveBlocksToCloud(newBlocks);
+    } catch (err) {
+      console.error('Cloud sync error on batch blocks:', err);
+    }
+
+    showToast(`🔒 ${newBlocks.length} Sekatan Ruang Peperiksaan/Institusi berjaya dikunci & disimpan.`);
+  };
+
   const handleDeleteBlock = async (id: string) => {
     const updated = institutionalBlocks.filter(b => b.id !== id);
     setInstitutionalBlocks(updated);
@@ -411,6 +435,21 @@ export default function App() {
     }
 
     showToast(`Lock Ruang telah dipadam.`);
+  };
+
+  const handleDeleteBatchBlocks = async (batchIdOrIds: string[]) => {
+    const idSet = new Set(batchIdOrIds);
+    const updated = institutionalBlocks.filter(b => !idSet.has(b.id) && (!b.batchId || !idSet.has(b.batchId)));
+    setInstitutionalBlocks(updated);
+    saveStoredInstitutionalBlocks(updated);
+
+    try {
+      await bulkDeleteBlocksFromCloud(batchIdOrIds);
+    } catch (err) {
+      console.error('Cloud sync error on batch delete blocks:', err);
+    }
+
+    showToast(`🔓 Sekatan Ruang telah dinyahkunci.`);
   };
 
   // Staff sync (Supports 'merge' and 'replace' mode)
@@ -639,6 +678,7 @@ export default function App() {
               rooms={rooms}
               staffList={staffUsers}
               academicSchedule={academicSchedule}
+              institutionalBlocks={institutionalBlocks}
               onApproveBooking={handleApproveBooking}
               onRejectBooking={handleRejectBooking}
               onResetData={handleResetData}
@@ -646,6 +686,10 @@ export default function App() {
               onSyncAcademicSchedule={handleSyncAcademicSchedule}
               onClearAcademicSchedule={handleClearAcademicSchedule}
               onSyncRooms={handleSyncRooms}
+              onAddBlock={handleAddBlock}
+              onBatchAddBlocks={handleBatchAddBlocks}
+              onDeleteBlock={handleDeleteBlock}
+              onDeleteBatchBlocks={handleDeleteBatchBlocks}
               onLogoutAdmin={handleLogoutAdmin}
             />
           )}

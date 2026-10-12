@@ -138,6 +138,26 @@ export const INITIAL_ROOMS: Room[] = [
     notes: 'Dewan Utama serbaguna untuk majlis rasmi, seminar kebangsaan, peperiksaan berpusat, taklimat kolej, dan program petang & malam (4pm-11pm)'
   },
   {
+    id: 'SRI_PENAWAR',
+    code: 'SRI PENAWAR',
+    name: 'Dewan Sri Penawar',
+    category: 'Dewan Kuliah',
+    capacity: 150,
+    block: 'Bangunan Akademik Utama',
+    level: 1,
+    facilities: [
+      'Dual Projektor HD',
+      'Sistem Audio Mikrofon Berwayar & Tanpa Wayar',
+      'Pendingin Hawa Pusat (Central Aircond)',
+      'Meja & Kerusi Susunan Peperiksaan / Seminar',
+      'Papan Putih Kaca',
+      'Capaian Wi-Fi KPMBP'
+    ],
+    hasAircond: true,
+    allowNightBooking: true,
+    notes: 'Dewan serbaguna peperiksaan akhir, kuliah gabungan, dan seminar akademik'
+  },
+  {
     id: 'DKA',
     code: 'DKA',
     name: 'DKA',

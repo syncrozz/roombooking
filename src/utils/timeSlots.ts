@@ -23,15 +23,15 @@ export interface TimeOption {
   period: TimeSlotPeriod;
 }
 
-// Operating Hours Configuration
+// Operating Hours Configuration (Extended to 08:00 - 24:00 to support Examination & Institutional Hall Blocks)
 export const OPERATING_HOURS = {
-  EARLIEST_BOOKING_START: '08:30',
-  DAYTIME_START: '08:30',
+  EARLIEST_BOOKING_START: '08:00',
+  DAYTIME_START: '08:00',
   DAYTIME_STANDARD_END: '17:30',
   DAYTIME_MAX_END: '18:30',
   NIGHT_START: '20:00',
   NIGHT_END: '23:00',
-  LATEST_BOOKING_END: '23:00',
+  LATEST_BOOKING_END: '24:00',
 } as const;
 
 export const EARLIEST_BOOKING_START = OPERATING_HOURS.EARLIEST_BOOKING_START;
@@ -39,12 +39,17 @@ export const LATEST_BOOKING_END = OPERATING_HOURS.LATEST_BOOKING_END;
 export const NIGHT_START = OPERATING_HOURS.NIGHT_START;
 export const NIGHT_END = OPERATING_HOURS.NIGHT_END;
 
-// Parse HH:MM to total minutes
+// Parse HH:MM to total minutes (Handles 24:00, 23:59, 12:00 AM midnight as 1440 minutes)
 export function parseTimeMinutes(timeStr: string): number {
   if (!timeStr) return 0;
+  const clean = timeStr.trim().toLowerCase();
+  if (clean === '24:00' || clean === '24.00' || clean === '23:59' || clean === '12:00 am') {
+    return 1440;
+  }
   const parts = timeStr.replace('.', ':').split(':').map(Number);
   const h = parts[0] || 0;
   const m = parts[1] || 0;
+  if (h === 24) return 1440;
   return h * 60 + m;
 }
 
@@ -83,6 +88,8 @@ export const ALL_BOOKING_TIME_SLOTS: TimeSlot[] = [
 
 // Quick Booking & Filter: Start Time Options
 export const BOOKING_START_OPTIONS: TimeOption[] = [
+  // Sesi Awal Pagi / Peperiksaan & Majlis
+  { value: '08:00', label: '08:00 AM (Awal Pagi / Peperiksaan)', period: 'DAY' },
   // Sesi Pagi & Siang
   { value: '08:30', label: '08:30 AM (Pagi)', period: 'DAY' },
   { value: '09:30', label: '09:30 AM (Pagi)', period: 'DAY' },
@@ -121,12 +128,13 @@ export const BOOKING_END_OPTIONS: TimeOption[] = [
   { value: '17:30', label: '05:30 PM', period: 'DAY' },
   { value: '18:00', label: '06:00 PM', period: 'DAY' },
   { value: '18:30', label: '06:30 PM', period: 'DAY' },
-  // Sesi Malam (19:00 - 23:00 max)
+  // Sesi Malam
   { value: '19:00', label: '07:00 PM (Malam)', period: 'NIGHT' },
   { value: '20:00', label: '08:00 PM (Malam)', period: 'NIGHT' },
   { value: '21:00', label: '09:00 PM (Malam)', period: 'NIGHT' },
   { value: '22:00', label: '10:00 PM (Malam)', period: 'NIGHT' },
-  { value: '23:00', label: '11:00 PM (Malam - Had Maksimum)', period: 'NIGHT' },
+  { value: '23:00', label: '11:00 PM (Malam)', period: 'NIGHT' },
+  { value: '24:00', label: '12:00 AM (Tengah Malam / 24 Jam)', period: 'NIGHT' },
 ];
 
 /**
@@ -147,18 +155,16 @@ export function isTimeRangeNight(startTime: string, endTime: string): boolean {
   const startMin = parseTimeMinutes(startTime);
   const endMin = parseTimeMinutes(endTime);
   const nightStartMin = parseTimeMinutes(OPERATING_HOURS.NIGHT_START); // 1200 (20:00)
-  const nightEndMin = parseTimeMinutes(OPERATING_HOURS.NIGHT_END);     // 1380 (23:00)
+  const nightEndMin = parseTimeMinutes('24:00');                       // 1440 (24:00)
 
-  // Overlaps with [20:00, 23:00]
   return startMin < nightEndMin && endMin > nightStartMin;
 }
 
 /**
  * Core validation function for booking time range:
- * - Rejects end time after 23:00
+ * - Allows start from 08:00 (supporting exam morning sessions)
+ * - Allows end up to 24:00 (12:00 midnight)
  * - Rejects end time <= start time
- * - Rejects start time before 08:30
- * - Rejects bookings that cross the evening break (e.g. 17:30 to 20:30)
  */
 export function validateBookingTime(
   startTime: string,
@@ -170,10 +176,8 @@ export function validateBookingTime(
 
   const startMin = parseTimeMinutes(startTime);
   const endMin = parseTimeMinutes(endTime);
-  const earliestMin = parseTimeMinutes(OPERATING_HOURS.EARLIEST_BOOKING_START); // 08:30 -> 510
-  const latestMin = parseTimeMinutes(OPERATING_HOURS.LATEST_BOOKING_END);       // 23:00 -> 1380
-  const nightStartMin = parseTimeMinutes(OPERATING_HOURS.NIGHT_START);         // 20:00 -> 1200
-  const daytimeMaxEndMin = parseTimeMinutes(OPERATING_HOURS.DAYTIME_MAX_END);  // 18:30 -> 1110
+  const earliestMin = parseTimeMinutes(OPERATING_HOURS.EARLIEST_BOOKING_START); // 08:00 -> 480
+  const latestMin = parseTimeMinutes(OPERATING_HOURS.LATEST_BOOKING_END);       // 24:00 -> 1440
 
   // 1. End time must be strictly after start time
   if (endMin <= startMin) {
@@ -183,30 +187,29 @@ export function validateBookingTime(
     };
   }
 
-  // 2. Hard Ceiling: Rejects booking ending after 23:00
+  // 2. Hard Ceiling: Rejects booking ending after 24:00 (12:00 AM)
   if (endMin > latestMin) {
     return {
       isValid: false,
-      errorMsg: `Tempahan tidak dibenarkan melebihi jam 23:00 (11:00 PM). Had operasi maksimum kolej adalah jam 23:00.`
+      errorMsg: `Tempahan tidak dibenarkan melebihi jam 24:00 (12:00 AM Tengah Malam). Had operasi maksimum kolej adalah jam 24:00.`
     };
   }
 
-  // 3. Earliest permissible start: 08:30
+  // 3. Earliest permissible start: 08:00 AM
   if (startMin < earliestMin) {
     return {
       isValid: false,
-      errorMsg: `Waktu tempahan paling awal kolej bermula pada jam 08:30 AM.`
+      errorMsg: `Waktu tempahan paling awal kolej bermula pada jam 08:00 AM.`
     };
   }
 
-  // 4. Booking cannot start after closing hours (after 23:00)
+  // 4. Booking cannot start after closing hours (after 24:00)
   if (startMin >= latestMin) {
     return {
       isValid: false,
-      errorMsg: `Waktu mula tidak boleh melebihi jam 23:00 (11:00 PM).`
+      errorMsg: `Waktu mula tidak boleh melebihi jam 24:00 (12:00 AM).`
     };
   }
 
-  // Extended sessions (e.g. 16:00 - 23:00 / 4:00 PM - 11:00 PM untuk Dewan / Aktiviti Pensyarah) adalah sah sepenuhnya
   return { isValid: true };
 }

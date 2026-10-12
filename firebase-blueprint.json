@@ -71,6 +71,9 @@
         "date": { "type": "string" },
         "startTime": { "type": "string" },
         "endTime": { "type": "string" },
+        "endDate": { "type": "string" },
+        "category": { "type": "string", "enum": ["EXAM", "INSTITUTIONAL", "MAINTENANCE"] },
+        "batchId": { "type": "string" },
         "title": { "type": "string" },
         "reason": { "type": "string" },
         "createdBy": { "type": "string" }

@@ -65,12 +65,15 @@ export interface AdHocBooking {
 export interface InstitutionalBlock {
   id: string;
   roomId: string;
-  date: string;           // YYYY-MM-DD
-  startTime: string;
-  endTime: string;
-  title: string;          // e.g. 'Minggu Mesra Siswa (MMS)'
-  reason: string;         // e.g. 'Penggunaan Rasmi Kolej'
-  createdBy: string;
+  date: string;           // YYYY-MM-DD (Tarikh Mula)
+  endDate?: string;       // YYYY-MM-DD (Tarikh Tamat untuk julat multi-tarikh)
+  startTime: string;      // e.g. '08:00'
+  endTime: string;        // e.g. '24:00'
+  title: string;          // e.g. 'Peperiksaan Akhir Semester Nov 2026'
+  reason: string;         // e.g. 'Penggunaan Rasmi Peperiksaan Kolej'
+  createdBy: string;      // e.g. 'Unit Peperiksaan & Penilaian Kolej'
+  category?: 'EXAM' | 'INSTITUTIONAL' | 'MAINTENANCE';
+  batchId?: string;       // ID kelompok untuk sekatan berbilang bilik/hari
 }
 
 export type AvailabilityStatus = 'AVAILABLE' | 'OCCUPIED_ACADEMIC' | 'OCCUPIED_BOOKING' | 'PENDING_BOOKING' | 'BLOCKED';

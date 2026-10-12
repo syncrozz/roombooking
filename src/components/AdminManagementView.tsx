@@ -3,7 +3,8 @@ import {
   AdHocBooking, 
   Room, 
   AcademicScheduleSlot,
-  StaffUser 
+  StaffUser,
+  InstitutionalBlock
 } from '../types';
 import { formatDateMalay, exportBookingsToCSV } from '../utils/availabilityEngine';
 import { parseTimetableCSV, exportTimetableToStandardGridCSV } from '../utils/timetableCsvParser';
@@ -14,6 +15,7 @@ import { WhatsAppIcon } from './WhatsAppIcon';
 import { 
   ShieldCheck, 
   Lock, 
+  Unlock,
   CheckCircle2, 
   XCircle, 
   Plus, 
@@ -22,6 +24,7 @@ import {
   AlertTriangle,
   Building,
   Calendar,
+  CalendarRange,
   Clock,
   User,
   FileSpreadsheet,
@@ -38,7 +41,9 @@ import {
   Layers,
   Cloud,
   LogOut,
-  MapPin
+  MapPin,
+  GraduationCap,
+  ShieldAlert
 } from 'lucide-react';
 import { 
   ROOMS_CSV_HEADERS, 
@@ -54,6 +59,7 @@ interface AdminManagementViewProps {
   rooms: Room[];
   staffList?: StaffUser[];
   academicSchedule?: AcademicScheduleSlot[];
+  institutionalBlocks?: InstitutionalBlock[];
   onApproveBooking: (id: string) => void;
   onRejectBooking: (id: string) => void;
   onResetData: () => void;
@@ -61,6 +67,10 @@ interface AdminManagementViewProps {
   onSyncAcademicSchedule?: (schedule: AcademicScheduleSlot[], mode?: 'merge' | 'replace') => Promise<void> | void;
   onClearAcademicSchedule?: () => Promise<void> | void;
   onSyncRooms?: (rooms: Room[], mode?: 'merge' | 'replace') => Promise<void> | void;
+  onAddBlock?: (block: Omit<InstitutionalBlock, 'id'>) => Promise<void> | void;
+  onBatchAddBlocks?: (blocks: Omit<InstitutionalBlock, 'id'>[]) => Promise<void> | void;
+  onDeleteBlock?: (id: string) => Promise<void> | void;
+  onDeleteBatchBlocks?: (batchIdOrIds: string[]) => Promise<void> | void;
   onLogoutAdmin?: () => void;
 }
 
@@ -69,6 +79,7 @@ export const AdminManagementView: React.FC<AdminManagementViewProps> = ({
   rooms,
   staffList = [],
   academicSchedule = [],
+  institutionalBlocks = [],
   onApproveBooking,
   onRejectBooking,
   onResetData,
@@ -76,9 +87,52 @@ export const AdminManagementView: React.FC<AdminManagementViewProps> = ({
   onSyncAcademicSchedule,
   onClearAcademicSchedule,
   onSyncRooms,
+  onAddBlock,
+  onBatchAddBlocks,
+  onDeleteBlock,
+  onDeleteBatchBlocks,
   onLogoutAdmin
 }) => {
   const pendingBookings = bookings.filter(b => b.status === 'PENDING');
+
+  // Institutional & Exam Blocks State (Dynamic Default View: Nov 2026 as initial view, auto-switches to current/upcoming date once Nov 2026 passes)
+  const todayDateStr = new Date().toISOString().split('T')[0];
+  const isNov2026Passed = todayDateStr > '2026-11-16';
+
+  const [selectedBlockRooms, setSelectedBlockRooms] = useState<string[]>([
+    'DEWAN_BESAR',
+    'SRI_PENAWAR',
+    'DEWAN_SEMINAR',
+    'MINI_SEMINAR'
+  ]);
+  const [blockStartDate, setBlockStartDate] = useState<string>(() => {
+    const today = new Date().toISOString().split('T')[0];
+    return today > '2026-11-16' ? today : '2026-11-02';
+  });
+  const [blockEndDate, setBlockEndDate] = useState<string>(() => {
+    const today = new Date();
+    const todayStr = today.toISOString().split('T')[0];
+    if (todayStr > '2026-11-16') {
+      const nextWeek = new Date(today);
+      nextWeek.setDate(nextWeek.getDate() + 7);
+      return nextWeek.toISOString().split('T')[0];
+    }
+    return '2026-11-16';
+  });
+  const [isAllDayBlock, setIsAllDayBlock] = useState<boolean>(true);
+  const [blockStartTime, setBlockStartTime] = useState<string>('08:00');
+  const [blockEndTime, setBlockEndTime] = useState<string>('24:00');
+  const [blockTitle, setBlockTitle] = useState<string>(() => {
+    const today = new Date().toISOString().split('T')[0];
+    return today > '2026-11-16' ? 'Peperiksaan Akhir Semester' : 'Peperiksaan Akhir Semester Nov 2026';
+  });
+  const [blockCategory, setBlockCategory] = useState<'EXAM' | 'INSTITUTIONAL' | 'MAINTENANCE'>('EXAM');
+  const [blockCreatedBy, setBlockCreatedBy] = useState<string>('Unit Peperiksaan & Penilaian Kolej');
+  const [blockReason, setBlockReason] = useState<string>('Peperiksaan Akhir Semester di Dewan Besar, Sri Penawar, Dewan Seminar & Mini Seminar.');
+  const [isSubmittingBlock, setIsSubmittingBlock] = useState<boolean>(false);
+  const [blockSuccessMsg, setBlockSuccessMsg] = useState<string | null>(null);
+  const [blockSearchTerm, setBlockSearchTerm] = useState<string>('');
+  const [blockFilterCategory, setBlockFilterCategory] = useState<'ALL' | 'EXAM' | 'INSTITUTIONAL' | 'MAINTENANCE'>('ALL');
 
   // Timetable CSV Sync State
   const [scheduleCsvFile, setScheduleCsvFile] = useState<File | null>(null);
@@ -653,6 +707,175 @@ ST003,Pengajian Am,Cik Siti Sarah Binti Razak,Pensyarah,013-5558899,siti.sarah@k
     s.email.toLowerCase().includes(staffSearchTerm.toLowerCase())
   );
 
+  // Targeted 4 Exam Venues for Nov 2026
+  const TARGET_EXAM_ROOM_IDS = ['DEWAN_BESAR', 'SRI_PENAWAR', 'DEWAN_SEMINAR', 'MINI_SEMINAR'];
+
+  // Check if November 2026 exam block is active for all 4 rooms
+  const isExamNovLocked = TARGET_EXAM_ROOM_IDS.every(roomId =>
+    institutionalBlocks.some(b =>
+      b.roomId === roomId &&
+      (b.date === '2026-11-02' || (b.endDate && '2026-11-02' >= b.date && '2026-11-16' <= b.endDate) || b.batchId === 'BATCH-EXAM-NOV-2026')
+    )
+  );
+
+  // Quick 1-Click Lock for 2 Nov - 16 Nov 2026 (08:00 AM - 12:00 AM)
+  const handleQuickLockExamNovember = async () => {
+    if (!onBatchAddBlocks) {
+      alert('Fungsi sekatan institusi tidak tersedia.');
+      return;
+    }
+
+    const confirmLock = window.confirm(
+      'PENGESAHAN KUNCI PEPERIKSAAN AKHIR:\n\nAdakah anda pasti ingin mengunci 4 dewan utama:\n1. Dewan Besar\n2. Dewan Sri Penawar\n3. Dewan Seminar\n4. Mini Seminar\n\nTarikh: 2 Nov 2026 – 16 Nov 2026 (15 Hari Berturut-turut)\nWaktu: 08:00 AM – 12:00 AM (Sepanjang Hari / 24 Jam)\nTujuan: Peperiksaan Akhir Semester Nov 2026\n\nSemua slot dewan ini akan disekat sepenuhnya daripada sebarang tempahan biasa dalam sistem.'
+    );
+    if (!confirmLock) return;
+
+    setIsSubmittingBlock(true);
+    setBlockSuccessMsg(null);
+
+    const blocksToCreate: Omit<InstitutionalBlock, 'id'>[] = TARGET_EXAM_ROOM_IDS.map(roomId => ({
+      roomId,
+      date: '2026-11-02',
+      endDate: '2026-11-16',
+      startTime: '08:00',
+      endTime: '24:00',
+      title: 'Peperiksaan Akhir Semester Nov 2026',
+      reason: 'Penggunaan Rasmi Peperiksaan Akhir Semester KPM Bandar Penawar',
+      createdBy: 'Unit Peperiksaan & Penilaian Kolej',
+      category: 'EXAM',
+      batchId: 'BATCH-EXAM-NOV-2026'
+    }));
+
+    try {
+      await onBatchAddBlocks(blocksToCreate);
+      setBlockSuccessMsg(
+        '🔒 Berjaya Mengunci 4 Dewan Peperiksaan (2 Nov – 16 Nov 2026, 08:00 AM – 12:00 AM) ke Cloud Firestore!'
+      );
+    } catch (err) {
+      alert('Ralat semasa mengunci dewan peperiksaan.');
+    } finally {
+      setIsSubmittingBlock(false);
+    }
+  };
+
+  // Quick 1-Click Unlock for Nov 2026 Exam
+  const handleQuickUnlockExamNovember = async () => {
+    if (!onDeleteBatchBlocks) return;
+
+    const confirmUnlock = window.confirm(
+      'Adakah anda pasti mahu membuka kunci (nyahkunci) sekatan Peperiksaan Akhir bagi 4 dewan tersebut?\n\nRuang akan dibuka semula untuk tempahan pensyarah.'
+    );
+    if (!confirmUnlock) return;
+
+    const matchingIds = institutionalBlocks
+      .filter(b => 
+        b.batchId === 'BATCH-EXAM-NOV-2026' ||
+        (TARGET_EXAM_ROOM_IDS.includes(b.roomId) && (b.category === 'EXAM' || b.title.toLowerCase().includes('peperiksaan')) && (b.date === '2026-11-02' || b.endDate === '2026-11-16'))
+      )
+      .map(b => b.id);
+
+    if (matchingIds.length === 0) {
+      alert('Tiada sekatan peperiksaan ditemui.');
+      return;
+    }
+
+    try {
+      await onDeleteBatchBlocks(matchingIds);
+      setBlockSuccessMsg('🔓 Sekatan Peperiksaan Akhir telah berjaya dibuka semula.');
+    } catch (err) {
+      alert('Ralat semasa membuka kunci ruang.');
+    }
+  };
+
+  // Custom Multi-Room / Multi-Day Block creation
+  const handleCustomCreateBlocks = async (e: React.FormEvent) => {
+    e.preventDefault();
+    if (selectedBlockRooms.length === 0) {
+      alert('Sila pilih sekurang-kurangnya satu bilik/dewan.');
+      return;
+    }
+    if (!blockStartDate || !blockEndDate) {
+      alert('Sila pilih tarikh mula dan tarikh tamat.');
+      return;
+    }
+    if (blockStartDate > blockEndDate) {
+      alert('Tarikh mula mestilah sebelum atau sama dengan tarikh tamat.');
+      return;
+    }
+    if (!blockTitle.trim()) {
+      alert('Sila masukkan tajuk sekatan.');
+      return;
+    }
+
+    if (!onBatchAddBlocks) return;
+
+    setIsSubmittingBlock(true);
+    setBlockSuccessMsg(null);
+
+    const actualStart = isAllDayBlock ? '08:00' : blockStartTime;
+    const actualEnd = isAllDayBlock ? '24:00' : blockEndTime;
+    const batchId = `BATCH-${Date.now()}`;
+
+    const newBlocks: Omit<InstitutionalBlock, 'id'>[] = selectedBlockRooms.map(roomId => ({
+      roomId,
+      date: blockStartDate,
+      endDate: blockEndDate,
+      startTime: actualStart,
+      endTime: actualEnd,
+      title: blockTitle.trim(),
+      reason: blockReason.trim(),
+      createdBy: blockCreatedBy.trim() || 'Unit Peperiksaan & Penilaian Kolej',
+      category: blockCategory,
+      batchId
+    }));
+
+    try {
+      await onBatchAddBlocks(newBlocks);
+      setBlockSuccessMsg(
+        `🔒 Berjaya menambah ${newBlocks.length} sekatan ruang bagi tarikh ${blockStartDate} hingga ${blockEndDate}!`
+      );
+    } catch (err) {
+      alert('Ralat semasa menyimpan sekatan.');
+    } finally {
+      setIsSubmittingBlock(false);
+    }
+  };
+
+  // Delete single block
+  const handleDeleteSingleBlock = async (id: string, title: string, roomCode: string) => {
+    if (!onDeleteBlock) return;
+    const ok = window.confirm(`Padam sekatan "${title}" untuk ruang ${roomCode}?`);
+    if (!ok) return;
+
+    try {
+      await onDeleteBlock(id);
+    } catch (err) {
+      alert('Ralat memadam sekatan.');
+    }
+  };
+
+  // Filtered institutional blocks
+  const filteredBlocks = institutionalBlocks.filter(b => {
+    const matchesSearch = 
+      b.title.toLowerCase().includes(blockSearchTerm.toLowerCase()) ||
+      b.roomId.toLowerCase().includes(blockSearchTerm.toLowerCase()) ||
+      b.createdBy.toLowerCase().includes(blockSearchTerm.toLowerCase()) ||
+      (b.reason && b.reason.toLowerCase().includes(blockSearchTerm.toLowerCase()));
+
+    if (!matchesSearch) return false;
+
+    if (blockFilterCategory === 'EXAM') {
+      return b.category === 'EXAM' || b.title.toLowerCase().includes('peperiksaan');
+    }
+    if (blockFilterCategory === 'INSTITUTIONAL') {
+      return b.category === 'INSTITUTIONAL' || (!b.category && !b.title.toLowerCase().includes('peperiksaan'));
+    }
+    if (blockFilterCategory === 'MAINTENANCE') {
+      return b.category === 'MAINTENANCE' || b.title.toLowerCase().includes('penyenggaraan');
+    }
+    return true;
+  });
+
   return (
     <div className="space-y-6">
       {/* Banner */}
@@ -725,7 +948,7 @@ ST003,Pengajian Am,Cik Siti Sarah Binti Razak,Pensyarah,013-5558899,siti.sarah@k
         </div>
 
         {/* Quick Stats */}
-        <div className="grid grid-cols-1 sm:grid-cols-3 gap-3 mt-4 text-xs">
+        <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-3 mt-4 text-xs">
           <div className="bg-slate-800/80 p-3 rounded-xl border border-slate-700/80 flex flex-col justify-between">
             <div>
               <span className="text-slate-400 block font-medium">Tempahan Ad-Hoc:</span>
@@ -756,9 +979,33 @@ ST003,Pengajian Am,Cik Siti Sarah Binti Razak,Pensyarah,013-5558899,siti.sarah@k
               <span>Eksport CSV Ruang</span>
             </button>
           </div>
-          <div className="bg-slate-800/80 p-3 rounded-xl border border-slate-700/80">
-            <span className="text-slate-400 block font-medium">Jadual Akademik Aktif:</span>
-            <strong className="text-xl font-bold text-blue-400">{academicSchedule.length} Slot Terkunci</strong>
+          <div className="bg-slate-800/80 p-3 rounded-xl border border-slate-700/80 flex flex-col justify-between">
+            <div>
+              <span className="text-slate-400 block font-medium">Jadual Akademik Aktif:</span>
+              <strong className="text-xl font-bold text-blue-400">{academicSchedule.length} Slot Terkunci</strong>
+            </div>
+            <div className="mt-2 py-1 text-[11px] text-slate-300 font-medium">
+              Sesi Rasmi Kolej
+            </div>
+          </div>
+          <div className="bg-slate-800/80 p-3 rounded-xl border border-slate-700/80 flex flex-col justify-between">
+            <div>
+              <span className="text-slate-400 block font-medium">Sekatan Peperiksaan &amp; Institusi:</span>
+              <strong className="text-xl font-bold text-rose-400">{institutionalBlocks.length} Sekatan Ruang</strong>
+            </div>
+            <div className="mt-2">
+              {isExamNovLocked ? (
+                <span className="inline-flex items-center gap-1 text-[11px] font-bold text-emerald-300 bg-emerald-950/60 border border-emerald-700/60 px-2 py-0.5 rounded-md">
+                  <Lock className="w-3 h-3 text-emerald-400" />
+                  Peperiksaan Nov 2026 Aktif
+                </span>
+              ) : (
+                <span className="inline-flex items-center gap-1 text-[11px] font-medium text-amber-300 bg-amber-950/60 border border-amber-700/60 px-2 py-0.5 rounded-md">
+                  <ShieldAlert className="w-3 h-3 text-amber-400" />
+                  Belum Dikunci (2-16 Nov)
+                </span>
+              )}
+            </div>
           </div>
         </div>
       </div>
@@ -1903,6 +2150,526 @@ ST003,Pengajian Am,Cik Siti Sarah Binti Razak,Pensyarah,013-5558899,siti.sarah@k
               </tbody>
             </table>
           </div>
+        </div>
+      </div>
+
+      {/* SECTION: PENGURUSAN SEKATAN INSTITUSI & PEPERIKSAAN AKHIR (CADANGAN 1) */}
+      <div id="section-admin-blocks" className="bg-white rounded-2xl p-6 shadow-md border border-slate-200 space-y-6">
+        <div className="flex flex-col lg:flex-row items-start lg:items-center justify-between gap-4 border-b border-slate-100 pb-4">
+          <div>
+            <div className="inline-flex items-center gap-1.5 bg-rose-50 text-rose-700 border border-rose-200 px-2.5 py-0.5 rounded-full text-xs font-bold mb-1">
+              <GraduationCap className="w-3.5 h-3.5 text-rose-600" />
+              Sekatan Rasmi Kolej &amp; Peperiksaan
+            </div>
+            <div className="flex items-center gap-2 text-slate-900 font-extrabold text-xl">
+              <Lock className="w-5 h-5 text-rose-600" />
+              <h3>Pengurusan Sekatan Institusi &amp; Peperiksaan Akhir</h3>
+            </div>
+            <p className="text-xs text-slate-500 mt-1 max-w-3xl">
+              Kunci dewan utama dan ruang kuliah bagi Peperiksaan Akhir Semester (contoh: 2 Nov – 16 Nov 2026), Minggu Mesra Siswa (MMS), atau majlis kolej merentasi pelbagai hari dan bilik serentak. Slot yang dikunci akan ditutup sepenuhnya daripada sebarang tempahan biasa.
+            </p>
+          </div>
+
+          <div className="flex items-center gap-2 shrink-0">
+            {isExamNovLocked ? (
+              <span className="bg-emerald-50 text-emerald-800 border border-emerald-300 font-bold text-xs px-3 py-1.5 rounded-xl flex items-center gap-1.5 shadow-2xs">
+                <CheckCircle2 className="w-4 h-4 text-emerald-600" />
+                <span>4 Dewan Peperiksaan Nov 2026 Aktif Dikunci</span>
+              </span>
+            ) : (
+              <span className="bg-amber-50 text-amber-900 border border-amber-300 font-bold text-xs px-3 py-1.5 rounded-xl flex items-center gap-1.5 shadow-2xs">
+                <Clock className="w-4 h-4 text-amber-600" />
+                <span>Peperiksaan Nov 2026: Belum Dikunci</span>
+              </span>
+            )}
+          </div>
+        </div>
+
+        {/* FEEDBACK SUCCESS MESSAGE */}
+        {blockSuccessMsg && (
+          <div className="p-3.5 bg-emerald-50 border border-emerald-300 rounded-xl flex items-center justify-between gap-2 text-xs font-semibold text-emerald-900 animate-in fade-in">
+            <div className="flex items-center gap-2">
+              <CheckCircle2 className="w-4 h-4 text-emerald-600 shrink-0" />
+              <span>{blockSuccessMsg}</span>
+            </div>
+            <button
+              onClick={() => setBlockSuccessMsg(null)}
+              className="text-emerald-700 hover:text-emerald-900 font-bold p-1"
+            >
+              ✕
+            </button>
+          </div>
+        )}
+
+
+
+        {/* CUSTOM MULTI-DAY / MULTI-ROOM BLOCK FORM */}
+        <div className="bg-slate-50 border border-slate-200 rounded-2xl p-5 space-y-4">
+          <div className="flex items-center justify-between border-b border-slate-200 pb-3">
+            <div className="flex items-center gap-2">
+              <CalendarRange className="w-4 h-4 text-blue-600" />
+              <h4 className="text-sm font-bold text-slate-900">Borang Tersuai: Sekatan Multi-Tarikh &amp; Berbilang Ruang</h4>
+            </div>
+            <span className="text-[11px] text-slate-500 font-medium">
+              Sesuai untuk sebarang tarikh atau bilik tambahan
+            </span>
+          </div>
+
+          <form onSubmit={handleCustomCreateBlocks} className="space-y-4">
+            {/* 1. Room Multi-Selection */}
+            <div className="space-y-2">
+              <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-2">
+                <label className="text-xs font-bold text-slate-800 flex items-center gap-1.5">
+                  <Building className="w-3.5 h-3.5 text-slate-600" />
+                  <span>Pilih Ruang / Dewan ({selectedBlockRooms.length} dipilih):</span>
+                </label>
+                <div className="flex items-center gap-1.5 text-[11px]">
+                  <button
+                    type="button"
+                    onClick={() => setSelectedBlockRooms(['DEWAN_BESAR', 'SRI_PENAWAR', 'DEWAN_SEMINAR', 'MINI_SEMINAR'])}
+                    className="px-2 py-0.5 bg-rose-100 hover:bg-rose-200 text-rose-800 rounded font-bold transition cursor-pointer"
+                  >
+                    4 Dewan Peperiksaan
+                  </button>
+                  <button
+                    type="button"
+                    onClick={() => setSelectedBlockRooms(rooms.filter(r => r.category === 'Dewan Kuliah' || r.category === 'Ruang Khas').map(r => r.id))}
+                    className="px-2 py-0.5 bg-blue-100 hover:bg-blue-200 text-blue-800 rounded font-medium transition cursor-pointer"
+                  >
+                    Semua Dewan
+                  </button>
+                  <button
+                    type="button"
+                    onClick={() => setSelectedBlockRooms([])}
+                    className="px-2 py-0.5 bg-slate-200 hover:bg-slate-300 text-slate-700 rounded font-medium transition cursor-pointer"
+                  >
+                    Kosongkan
+                  </button>
+                </div>
+              </div>
+
+              {/* Scrollable Room Checklist */}
+              <div className="grid grid-cols-2 sm:grid-cols-3 md:grid-cols-4 gap-2 max-h-40 overflow-y-auto p-2 bg-white rounded-xl border border-slate-200 text-xs">
+                {rooms.map(room => {
+                  const isChecked = selectedBlockRooms.includes(room.id);
+                  return (
+                    <label
+                      key={room.id}
+                      className={`flex items-center gap-2 p-2 rounded-lg border transition cursor-pointer ${
+                        isChecked
+                          ? 'bg-rose-50 border-rose-300 text-rose-950 font-bold'
+                          : 'bg-slate-50/50 hover:bg-slate-100 border-slate-200 text-slate-700'
+                      }`}
+                    >
+                      <input
+                        type="checkbox"
+                        checked={isChecked}
+                        onChange={(e) => {
+                          if (e.target.checked) {
+                            setSelectedBlockRooms(prev => [...prev, room.id]);
+                          } else {
+                            setSelectedBlockRooms(prev => prev.filter(id => id !== room.id));
+                          }
+                        }}
+                        className="rounded text-rose-600 focus:ring-rose-500 w-3.5 h-3.5"
+                      />
+                      <span className="truncate" title={`${room.code} - ${room.name}`}>
+                        {room.code}
+                      </span>
+                    </label>
+                  );
+                })}
+              </div>
+            </div>
+
+            {/* 2. Date Range & Time Configuration */}
+            {/* Quick Date Presets Toolbar */}
+            <div className="flex flex-wrap items-center justify-between gap-2 p-2.5 bg-white border border-slate-200 rounded-xl text-xs">
+              <span className="text-slate-600 font-bold flex items-center gap-1.5 text-[11px]">
+                <CalendarRange className="w-3.5 h-3.5 text-rose-600 shrink-0" />
+                <span>Pilihan Tarikh Pantas:</span>
+              </span>
+              <div className="flex flex-wrap items-center gap-1.5 text-[11px]">
+                <button
+                  type="button"
+                  onClick={() => {
+                    setBlockStartDate('2026-11-02');
+                    setBlockEndDate('2026-11-16');
+                    setBlockTitle('Peperiksaan Akhir Semester Nov 2026');
+                    setBlockCategory('EXAM');
+                  }}
+                  className={`px-2.5 py-1 rounded-lg font-bold transition cursor-pointer border ${
+                    blockStartDate === '2026-11-02' && blockEndDate === '2026-11-16'
+                      ? 'bg-rose-100 text-rose-900 border-rose-300'
+                      : 'bg-slate-50 hover:bg-slate-100 text-slate-700 border-slate-200'
+                  }`}
+                  title="Tetapkan tarikh Peperiksaan Akhir 2 Nov - 16 Nov 2026"
+                >
+                  📅 Peperiksaan Nov 2026 (02/11 – 16/11)
+                </button>
+                <button
+                  type="button"
+                  onClick={() => {
+                    const todayStr = new Date().toISOString().split('T')[0];
+                    setBlockStartDate(todayStr);
+                    setBlockEndDate(todayStr);
+                  }}
+                  className={`px-2.5 py-1 rounded-lg font-medium transition cursor-pointer border ${
+                    blockStartDate === todayDateStr && blockEndDate === todayDateStr
+                      ? 'bg-blue-100 text-blue-900 border-blue-300 font-bold'
+                      : 'bg-slate-50 hover:bg-slate-100 text-slate-700 border-slate-200'
+                  }`}
+                  title="Tetapkan tarikh hari ini"
+                >
+                  📍 Hari Ini ({todayDateStr})
+                </button>
+                <button
+                  type="button"
+                  onClick={() => {
+                    const today = new Date();
+                    const startStr = today.toISOString().split('T')[0];
+                    const nextWeek = new Date(today);
+                    nextWeek.setDate(nextWeek.getDate() + 7);
+                    setBlockStartDate(startStr);
+                    setBlockEndDate(nextWeek.toISOString().split('T')[0]);
+                  }}
+                  className="px-2.5 py-1 bg-slate-50 hover:bg-slate-100 text-slate-700 border border-slate-200 rounded-lg font-medium transition cursor-pointer"
+                  title="Tetapkan julat 7 hari dari sekarang"
+                >
+                  ⏱️ +7 Hari (1 Minggu)
+                </button>
+                <button
+                  type="button"
+                  onClick={() => {
+                    const today = new Date();
+                    const startStr = today.toISOString().split('T')[0];
+                    const next2Weeks = new Date(today);
+                    next2Weeks.setDate(next2Weeks.getDate() + 14);
+                    setBlockStartDate(startStr);
+                    setBlockEndDate(next2Weeks.toISOString().split('T')[0]);
+                  }}
+                  className="px-2.5 py-1 bg-slate-50 hover:bg-slate-100 text-slate-700 border border-slate-200 rounded-lg font-medium transition cursor-pointer"
+                  title="Tetapkan julat 14 hari dari sekarang"
+                >
+                  ⏱️ +14 Hari (2 Minggu)
+                </button>
+              </div>
+            </div>
+
+            <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-3 text-xs">
+              <div>
+                <div className="flex items-center justify-between mb-1">
+                  <label className="block font-bold text-slate-700">Tarikh Mula:</label>
+                  {blockStartDate === '2026-11-02' ? (
+                    <span className="text-[10px] bg-rose-50 text-rose-700 border border-rose-200 px-1.5 py-0.2 rounded font-semibold">
+                      Default Preset
+                    </span>
+                  ) : (
+                    <span className="text-[10px] bg-blue-50 text-blue-700 border border-blue-200 px-1.5 py-0.2 rounded font-semibold">
+                      Dinamik
+                    </span>
+                  )}
+                </div>
+                <input
+                  type="date"
+                  value={blockStartDate}
+                  onChange={(e) => {
+                    const val = e.target.value;
+                    setBlockStartDate(val);
+                    if (val && blockEndDate && blockEndDate < val) {
+                      setBlockEndDate(val);
+                    }
+                  }}
+                  className="w-full bg-white border border-slate-200 rounded-lg p-2 text-xs font-medium text-slate-800 outline-none focus:ring-2 focus:ring-rose-500 transition shadow-2xs"
+                  required
+                />
+              </div>
+
+              <div>
+                <div className="flex items-center justify-between mb-1">
+                  <label className="block font-bold text-slate-700">Tarikh Tamat:</label>
+                  {blockEndDate === '2026-11-16' ? (
+                    <span className="text-[10px] bg-rose-50 text-rose-700 border border-rose-200 px-1.5 py-0.2 rounded font-semibold">
+                      Default Preset
+                    </span>
+                  ) : (
+                    <span className="text-[10px] bg-blue-50 text-blue-700 border border-blue-200 px-1.5 py-0.2 rounded font-semibold">
+                      Dinamik
+                    </span>
+                  )}
+                </div>
+                <input
+                  type="date"
+                  value={blockEndDate}
+                  min={blockStartDate || undefined}
+                  onChange={(e) => setBlockEndDate(e.target.value)}
+                  className="w-full bg-white border border-slate-200 rounded-lg p-2 text-xs font-medium text-slate-800 outline-none focus:ring-2 focus:ring-rose-500 transition shadow-2xs"
+                  required
+                />
+              </div>
+
+              <div>
+                <label className="block font-bold text-slate-700 mb-1">Kategori Sekatan:</label>
+                <select
+                  value={blockCategory}
+                  onChange={(e) => setBlockCategory(e.target.value as any)}
+                  className="w-full bg-white border border-slate-200 rounded-lg p-2 text-xs font-medium text-slate-800 outline-none focus:ring-2 focus:ring-rose-500"
+                >
+                  <option value="EXAM">🔒 Peperiksaan Akhir (EXAM)</option>
+                  <option value="INSTITUTIONAL">⚫ Program Institusi / MMS / Kolej</option>
+                  <option value="MAINTENANCE">🔧 Penyenggaraan / Penambahbaikan</option>
+                </select>
+              </div>
+
+              <div>
+                <label className="block font-bold text-slate-700 mb-1">Mod Waktu Kunci:</label>
+                <div className="flex items-center h-[34px]">
+                  <label className="flex items-center gap-2 cursor-pointer font-bold text-rose-900">
+                    <input
+                      type="checkbox"
+                      checked={isAllDayBlock}
+                      onChange={(e) => setIsAllDayBlock(e.target.checked)}
+                      className="rounded text-rose-600 focus:ring-rose-500 w-4 h-4"
+                    />
+                    <span>Sepanjang Hari (08:00 – 24:00)</span>
+                  </label>
+                </div>
+              </div>
+            </div>
+
+            {/* Custom Hours when isAllDayBlock is false */}
+            {!isAllDayBlock && (
+              <div className="grid grid-cols-1 sm:grid-cols-2 gap-3 text-xs p-3 bg-white rounded-xl border border-slate-200">
+                <div>
+                  <label className="block font-bold text-slate-700 mb-1">Waktu Mula:</label>
+                  <select
+                    value={blockStartTime}
+                    onChange={(e) => setBlockStartTime(e.target.value)}
+                    className="w-full bg-slate-50 border border-slate-200 rounded-lg p-2 text-xs text-slate-800 outline-none focus:ring-2 focus:ring-rose-500"
+                  >
+                    <option value="08:00">08:00 AM (Awal Pagi)</option>
+                    <option value="08:30">08:30 AM</option>
+                    <option value="09:00">09:00 AM</option>
+                    <option value="12:00">12:00 PM</option>
+                    <option value="14:00">02:00 PM</option>
+                    <option value="20:00">08:00 PM (Malam)</option>
+                  </select>
+                </div>
+                <div>
+                  <label className="block font-bold text-slate-700 mb-1">Waktu Tamat:</label>
+                  <select
+                    value={blockEndTime}
+                    onChange={(e) => setBlockEndTime(e.target.value)}
+                    className="w-full bg-slate-50 border border-slate-200 rounded-lg p-2 text-xs text-slate-800 outline-none focus:ring-2 focus:ring-rose-500"
+                  >
+                    <option value="12:00">12:00 PM</option>
+                    <option value="17:00">05:00 PM</option>
+                    <option value="18:00">06:00 PM</option>
+                    <option value="22:00">10:00 PM</option>
+                    <option value="23:00">11:00 PM</option>
+                    <option value="24:00">12:00 AM (Tengah Malam)</option>
+                  </select>
+                </div>
+              </div>
+            )}
+
+            {/* 3. Event Details */}
+            <div className="grid grid-cols-1 sm:grid-cols-2 gap-3 text-xs">
+              <div>
+                <label className="block font-bold text-slate-700 mb-1">Tajuk Sekatan / Acara:</label>
+                <input
+                  type="text"
+                  value={blockTitle}
+                  onChange={(e) => setBlockTitle(e.target.value)}
+                  placeholder="Cth: Peperiksaan Akhir Semester Nov 2026"
+                  className="w-full bg-white border border-slate-200 rounded-lg p-2 text-xs text-slate-800 outline-none focus:ring-2 focus:ring-rose-500 font-medium"
+                  required
+                />
+              </div>
+
+              <div>
+                <label className="block font-bold text-slate-700 mb-1">Unit / Disediakan Oleh:</label>
+                <input
+                  type="text"
+                  value={blockCreatedBy}
+                  onChange={(e) => setBlockCreatedBy(e.target.value)}
+                  placeholder="Cth: Unit Peperiksaan & Penilaian Kolej"
+                  className="w-full bg-white border border-slate-200 rounded-lg p-2 text-xs text-slate-800 outline-none focus:ring-2 focus:ring-rose-500"
+                  required
+                />
+              </div>
+            </div>
+
+            <div>
+              <label className="block font-bold text-slate-700 mb-1 text-xs">Sebab / Catatan Tambahan:</label>
+              <input
+                type="text"
+                value={blockReason}
+                onChange={(e) => setBlockReason(e.target.value)}
+                placeholder="Cth: Dewan ditutup bagi persediaan dan pelaksanaan peperiksaan akhir."
+                className="w-full bg-white border border-slate-200 rounded-lg p-2 text-xs text-slate-800 outline-none focus:ring-2 focus:ring-rose-500"
+              />
+            </div>
+
+            <div className="flex justify-end pt-2">
+              <button
+                type="submit"
+                disabled={isSubmittingBlock || selectedBlockRooms.length === 0}
+                className="bg-slate-900 hover:bg-slate-800 text-white font-bold text-xs py-2.5 px-5 rounded-xl transition flex items-center gap-2 cursor-pointer shadow-md disabled:opacity-50"
+              >
+                <Lock className="w-3.5 h-3.5 text-rose-400" />
+                <span>Kunci Ruang Terpilih Sekarang ({selectedBlockRooms.length} Ruang)</span>
+              </button>
+            </div>
+          </form>
+        </div>
+
+        {/* ACTIVE INSTITUTIONAL BLOCKS TABLE */}
+        <div className="space-y-3 pt-2">
+          <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-3">
+            <div className="flex items-center gap-2">
+              <h4 className="text-sm font-bold text-slate-900">
+                Senarai Sekatan Institusi &amp; Peperiksaan Aktif ({filteredBlocks.length} Rekod)
+              </h4>
+            </div>
+
+            {/* Filter Tabs & Search */}
+            <div className="flex flex-wrap items-center gap-2">
+              <div className="flex items-center gap-1 bg-slate-100 p-0.5 rounded-lg text-xs">
+                <button
+                  type="button"
+                  onClick={() => setBlockFilterCategory('ALL')}
+                  className={`px-2.5 py-1 rounded-md font-bold transition ${
+                    blockFilterCategory === 'ALL' ? 'bg-white text-slate-900 shadow-2xs' : 'text-slate-600 hover:text-slate-900'
+                  }`}
+                >
+                  Semua ({institutionalBlocks.length})
+                </button>
+                <button
+                  type="button"
+                  onClick={() => setBlockFilterCategory('EXAM')}
+                  className={`px-2.5 py-1 rounded-md font-bold transition flex items-center gap-1 ${
+                    blockFilterCategory === 'EXAM' ? 'bg-rose-100 text-rose-900 shadow-2xs border border-rose-300' : 'text-slate-600 hover:text-rose-900'
+                  }`}
+                >
+                  <Lock className="w-3 h-3 text-rose-600" />
+                  Peperiksaan ({institutionalBlocks.filter(b => b.category === 'EXAM' || b.title.toLowerCase().includes('peperiksaan')).length})
+                </button>
+                <button
+                  type="button"
+                  onClick={() => setBlockFilterCategory('INSTITUTIONAL')}
+                  className={`px-2.5 py-1 rounded-md font-bold transition ${
+                    blockFilterCategory === 'INSTITUTIONAL' ? 'bg-white text-slate-900 shadow-2xs' : 'text-slate-600 hover:text-slate-900'
+                  }`}
+                >
+                  Institusi
+                </button>
+              </div>
+
+              <div className="relative min-w-[180px]">
+                <Search className="w-3.5 h-3.5 absolute left-2.5 top-2.5 text-slate-400" />
+                <input
+                  type="text"
+                  placeholder="Cari sekatan..."
+                  value={blockSearchTerm}
+                  onChange={(e) => setBlockSearchTerm(e.target.value)}
+                  className="w-full bg-slate-50 border border-slate-200 rounded-lg pl-8 pr-2.5 py-1.5 text-xs text-slate-800 outline-none focus:ring-2 focus:ring-rose-500"
+                />
+              </div>
+            </div>
+          </div>
+
+          {filteredBlocks.length === 0 ? (
+            <div className="p-8 text-center bg-slate-50 rounded-2xl border border-dashed border-slate-200 text-slate-500 text-xs space-y-2">
+              <Lock className="w-8 h-8 mx-auto text-slate-400 opacity-60" />
+              <div className="font-semibold text-slate-700">Tiada sekatan institusi atau peperiksaan yang sepadan.</div>
+              <p className="text-[11px] text-slate-400 max-w-md mx-auto">
+                Gunakan butang 1-Klik di atas untuk mengunci dewan bagi Peperiksaan Akhir (2 Nov – 16 Nov 2026) atau cipta sekatan baharu melalui borang tersuai.
+              </p>
+            </div>
+          ) : (
+            <div className="max-h-72 overflow-y-auto border border-slate-200 rounded-xl">
+              <table className="w-full text-left text-xs divide-y divide-slate-200">
+                <thead className="bg-slate-50 text-slate-700 text-[11px] uppercase tracking-wider sticky top-0">
+                  <tr>
+                    <th className="p-2.5">Ruang / Dewan</th>
+                    <th className="p-2.5">Tajuk Sekatan</th>
+                    <th className="p-2.5">Kategori</th>
+                    <th className="p-2.5">Tarikh</th>
+                    <th className="p-2.5">Waktu</th>
+                    <th className="p-2.5">Disediakan Oleh</th>
+                    <th className="p-2.5 text-center">Tindakan</th>
+                  </tr>
+                </thead>
+                <tbody className="divide-y divide-slate-100 text-[11px]">
+                  {filteredBlocks.map(b => {
+                    const roomObj = rooms.find(r => r.id === b.roomId || r.code === b.roomId);
+                    const roomLabel = roomObj ? `${roomObj.code} (${roomObj.name})` : b.roomId;
+                    const isExam = b.category === 'EXAM' || b.title.toLowerCase().includes('peperiksaan');
+
+                    return (
+                      <tr key={b.id} className="hover:bg-slate-50 transition">
+                        <td className="p-2.5 font-bold text-slate-900">
+                          <div className="flex items-center gap-1.5">
+                            <Building className="w-3 h-3 text-slate-400 shrink-0" />
+                            <span>{roomLabel}</span>
+                          </div>
+                        </td>
+                        <td className="p-2.5 text-slate-800 font-medium">
+                          {b.title}
+                          {b.reason && (
+                            <div className="text-[10px] text-slate-400 font-normal">{b.reason}</div>
+                          )}
+                        </td>
+                        <td className="p-2.5">
+                          {isExam ? (
+                            <span className="bg-rose-100 border border-rose-300 text-rose-900 font-extrabold px-2 py-0.5 rounded text-[10px] inline-flex items-center gap-1">
+                              <Lock className="w-2.5 h-2.5 text-rose-700" />
+                              PEPERIKSAAN
+                            </span>
+                          ) : (
+                            <span className="bg-slate-100 border border-slate-300 text-slate-800 font-bold px-2 py-0.5 rounded text-[10px]">
+                              {b.category || 'INSTITUSI'}
+                            </span>
+                          )}
+                        </td>
+                        <td className="p-2.5 font-mono text-slate-700">
+                          {b.endDate && b.endDate !== b.date ? (
+                            <span className="font-semibold text-slate-900">
+                              {b.date} &rarr; {b.endDate}
+                            </span>
+                          ) : (
+                            <span>{b.date}</span>
+                          )}
+                        </td>
+                        <td className="p-2.5 font-mono text-slate-600">
+                          {b.startTime === '08:00' && (b.endTime === '24:00' || b.endTime === '23:59') ? (
+                            <span className="bg-indigo-50 border border-indigo-200 text-indigo-900 font-bold px-1.5 py-0.5 rounded text-[10px]">
+                              Sepanjang Hari (24 Jam)
+                            </span>
+                          ) : (
+                            <span>{b.startTime} – {b.endTime}</span>
+                          )}
+                        </td>
+                        <td className="p-2.5 text-slate-500">{b.createdBy}</td>
+                        <td className="p-2.5 text-center">
+                          <button
+                            type="button"
+                            onClick={() => handleDeleteSingleBlock(b.id, b.title, roomLabel)}
+                            className="bg-rose-50 hover:bg-rose-600 hover:text-white text-rose-700 border border-rose-200 font-bold py-1 px-2 rounded-lg text-[10.5px] transition inline-flex items-center gap-1 cursor-pointer"
+                            title="Padam / Nyahkunci sekatan ini"
+                          >
+                            <Trash2 className="w-3 h-3" />
+                            <span>Nyahkunci</span>
+                          </button>
+                        </td>
+                      </tr>
+                    );
+                  })}
+                </tbody>
+              </table>
+            </div>
+          )}
         </div>
       </div>
 

@@ -90,20 +90,29 @@ export function checkRoomAvailability(
     };
   }
 
-  // Layer 3: Check Institutional Block
-  const block = institutionalBlocks.find(b => 
-    b.roomId === room.id && 
-    b.date === date && 
-    isTimeOverlap(startTime, endTime, b.startTime, b.endTime)
-  );
+  // Layer 3: Check Institutional Block (Supports single-date and multi-day date ranges e.g. 2 Nov - 16 Nov 2026)
+  const block = institutionalBlocks.find(b => {
+    if (b.roomId !== room.id) return false;
+    // Check if query date falls on single date or within multi-day range
+    const isDateMatch = b.endDate
+      ? (date >= b.date && date <= b.endDate)
+      : (b.date === date);
+    if (!isDateMatch) return false;
+
+    return isTimeOverlap(startTime, endTime, b.startTime, b.endTime);
+  });
 
   if (block) {
+    const isExam = block.category === 'EXAM' || block.title.toLowerCase().includes('peperiksaan');
+    const rangeText = block.endDate && block.endDate !== block.date ? ` [${block.date} – ${block.endDate}]` : '';
     return {
       roomId: room.id,
       room,
       status: 'BLOCKED',
       institutionalBlock: block,
-      conflictReason: `Program/Aktiviti Institusi: ${block.title} (${block.createdBy})`
+      conflictReason: isExam
+        ? `🔒 Peperiksaan Akhir Rasmi Kolej: ${block.title}${rangeText} (${block.createdBy})`
+        : `⚫ Sekatan Acara Institusi: ${block.title}${rangeText} (${block.createdBy})`
     };
   }
 

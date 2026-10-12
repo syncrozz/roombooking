@@ -558,6 +558,23 @@ export async function saveBlockToCloud(block: InstitutionalBlock): Promise<void>
 }
 
 /**
+ * Bulk save institutional blocks into Firestore using batch write.
+ */
+export async function bulkSaveBlocksToCloud(blocks: InstitutionalBlock[]): Promise<void> {
+  try {
+    const batch = writeBatch(db);
+    blocks.forEach((block) => {
+      const docRef = doc(db, BLOCKS_COLLECTION, block.id);
+      batch.set(docRef, sanitizeForFirestore(block), { merge: true });
+    });
+    await batch.commit();
+    console.log(`Successfully synced ${blocks.length} institutional blocks to Cloud Firestore.`);
+  } catch (err) {
+    console.warn('Batch save blocks error (local storage fallback active):', err);
+  }
+}
+
+/**
  * Delete an institutional block from Firestore.
  */
 export async function deleteBlockFromCloud(blockId: string): Promise<void> {
@@ -566,6 +583,23 @@ export async function deleteBlockFromCloud(blockId: string): Promise<void> {
     await deleteDoc(docRef);
   } catch (err) {
     console.warn('Block deleted locally (Cloud sync skipped / quota exceeded).');
+  }
+}
+
+/**
+ * Bulk delete institutional blocks from Firestore.
+ */
+export async function bulkDeleteBlocksFromCloud(blockIds: string[]): Promise<void> {
+  try {
+    const batch = writeBatch(db);
+    blockIds.forEach((id) => {
+      const docRef = doc(db, BLOCKS_COLLECTION, id);
+      batch.delete(docRef);
+    });
+    await batch.commit();
+    console.log(`Successfully deleted ${blockIds.length} institutional blocks from Cloud Firestore.`);
+  } catch (err) {
+    console.warn('Batch delete blocks error (local cache updated):', err);
   }
 }
 

@@ -12,14 +12,21 @@ export function getStoredRooms(): Room[] {
     if (data) {
       const parsed = JSON.parse(data);
       if (Array.isArray(parsed) && parsed.length > 0) {
-        // Ensure DEWAN_BESAR is present
-        const hasDewanBesar = parsed.some(r => r.id === 'DEWAN_BESAR' || r.code === 'DEWAN BESAR');
-        if (!hasDewanBesar) {
-          const dewanBesar = INITIAL_ROOMS.find(r => r.id === 'DEWAN_BESAR');
-          if (dewanBesar) {
-            parsed.push(dewanBesar);
-            localStorage.setItem(ROOMS_KEY, JSON.stringify(parsed));
+        // Ensure key exam halls and seminar venues are present
+        const requiredVenues = ['DEWAN_BESAR', 'SRI_PENAWAR', 'DEWAN_SEMINAR', 'MINI_SEMINAR'];
+        let hasChanges = false;
+        for (const reqId of requiredVenues) {
+          const exists = parsed.some(r => r.id === reqId || r.code === reqId);
+          if (!exists) {
+            const found = INITIAL_ROOMS.find(r => r.id === reqId);
+            if (found) {
+              parsed.push(found);
+              hasChanges = true;
+            }
           }
+        }
+        if (hasChanges) {
+          localStorage.setItem(ROOMS_KEY, JSON.stringify(parsed));
         }
         return parsed;
       }
@@ -38,15 +45,20 @@ export function isTargetVenue(room: { code: string; name: string; category?: str
 
   return (
     idUpper === 'DEWAN_BESAR' ||
+    idUpper === 'SRI_PENAWAR' ||
     idUpper === 'DEWAN_SEMINAR' ||
+    idUpper === 'MINI_SEMINAR' ||
     idUpper === 'DKA' ||
     idUpper === 'DKB' ||
     codeUpper === 'DKA' ||
     codeUpper === 'DKB' ||
     codeUpper.includes('DKA') ||
     codeUpper.includes('DKB') ||
+    codeUpper.includes('PENAWAR') ||
     nameUpper.includes('DEWAN BESAR') ||
+    nameUpper.includes('SRI PENAWAR') ||
     nameUpper.includes('DEWAN SEMINAR') ||
+    nameUpper.includes('MINI SEMINAR') ||
     (nameUpper.includes('DEWAN') && nameUpper.includes('BESAR')) ||
     (nameUpper.includes('DEWAN') && nameUpper.includes('SEMINAR'))
   );
