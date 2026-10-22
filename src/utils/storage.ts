@@ -426,6 +426,9 @@ export function clearActiveUser(): void {
   try {
     localStorage.removeItem(ACTIVE_USER_KEY);
     localStorage.removeItem(USER_PROFILES_KEY);
+    if (typeof window !== 'undefined') {
+      sessionStorage.removeItem('kpmbp_active_user_pin');
+    }
     notifyActiveUserChanged(null);
   } catch (err) {
     console.error('Error clearing active user:', err);

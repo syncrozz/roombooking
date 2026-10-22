@@ -78,6 +78,9 @@ export const SetPinModal: React.FC<SetPinModalProps> = ({
         pinStatus: 'CUSTOM'
       };
       saveActiveUser(activeProfile);
+      if (typeof window !== 'undefined') {
+        sessionStorage.setItem('kpmbp_active_user_pin', cleanNewPin);
+      }
 
       onSuccess(updatedStaff);
     } catch (err) {

@@ -8,7 +8,7 @@ import {
 } from '../utils/storage';
 import { StaffUser } from '../types';
 import { INITIAL_STAFF_DATA } from '../data/staffData';
-import { verifyStaffCredentials } from '../lib/firebase';
+import { verifyStaffCredentials, setStaffSessionPin, getStaffSessionPin } from '../lib/firebase';
 import { ForgotPinHelp } from './ForgotPinHelp';
 import { WhatsAppIcon } from './WhatsAppIcon';
 import { 
@@ -101,6 +101,10 @@ export const LoginUserCard: React.FC<LoginUserCardProps> = ({
     };
 
     saveActiveUser(updatedProfile);
+    setStaffSessionPin(matchedStaff.id, pinInput);
+    if (typeof window !== 'undefined') {
+      sessionStorage.setItem('kpmbp_active_user_pin', pinInput);
+    }
     setActiveUser(updatedProfile);
     setIsEditing(false);
     setErrorMsg(null);
@@ -120,7 +124,10 @@ export const LoginUserCard: React.FC<LoginUserCardProps> = ({
     setActiveUser(null);
     setIsEditing(true);
     setEmailInput('');
-    setPinInput('1234');
+    setPinInput('');
+    if (typeof window !== 'undefined') {
+      sessionStorage.removeItem('kpmbp_active_user_pin');
+    }
     setErrorMsg(null);
     setSaveSuccessMsg('Berjaya log keluar. Kembali ke paparan lalai (default view).');
 

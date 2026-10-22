@@ -29,7 +29,7 @@ import {
   UserProfileHistory 
 } from '../utils/storage';
 import { generateBookingIdempotencyKey } from '../utils/idempotency';
-import { verifyStaffCredentials } from '../lib/firebase';
+import { verifyStaffCredentials, setStaffSessionPin, getStaffSessionPin } from '../lib/firebase';
 import { INITIAL_STAFF_DATA } from '../data/staffData';
 import { ForgotPinHelp } from './ForgotPinHelp';
 import { 
@@ -147,12 +147,46 @@ export const BookingModal: React.FC<BookingModalProps> = ({
 
   const activeDates = isMultiDay ? getDatesInRange(startDate, endDate) : [startDate || date];
 
-  const [applicantName, setApplicantName] = useState<string>('Ahmad Khairi Bin Mohd');
-  const [applicantEmail, setApplicantEmail] = useState<string>('khaikerr@gmail.com');
-  const [pinInput, setPinInput] = useState<string>('1234');
-  const [applicantPhone, setApplicantPhone] = useState<string>('014-5313756');
-  const [applicantRole, setApplicantRole] = useState<string>('Pensyarah');
-  const [department, setDepartment] = useState<string>('Pengajian Am');
+  // Pre-load logged-in user credentials if available; if not logged in, leave empty
+  const getInitialActiveUser = () => {
+    const activeUser = getStoredActiveUser();
+    if (activeUser && activeUser.applicantEmail) {
+      let pin = '';
+      if (activeUser.staffId) {
+        pin = getStaffSessionPin(activeUser.staffId) || '';
+      }
+      if (!pin && typeof window !== 'undefined') {
+        pin = sessionStorage.getItem('kpmbp_active_user_pin') || '';
+      }
+      if (!pin && activeUser.pinStatus === 'DEFAULT') {
+        pin = '1234';
+      }
+      return {
+        name: activeUser.applicantName || '',
+        email: activeUser.applicantEmail || '',
+        pin: pin,
+        phone: activeUser.applicantPhone || '',
+        role: activeUser.applicantRole || 'Pensyarah',
+        department: activeUser.department || 'Pengajian Am'
+      };
+    }
+    return {
+      name: '',
+      email: '',
+      pin: '',
+      phone: '',
+      role: '',
+      department: ''
+    };
+  };
+
+  const initialCreds = getInitialActiveUser();
+  const [applicantName, setApplicantName] = useState<string>(initialCreds.name);
+  const [applicantEmail, setApplicantEmail] = useState<string>(initialCreds.email);
+  const [pinInput, setPinInput] = useState<string>(initialCreds.pin);
+  const [applicantPhone, setApplicantPhone] = useState<string>(initialCreds.phone);
+  const [applicantRole, setApplicantRole] = useState<string>(initialCreds.role);
+  const [department, setDepartment] = useState<string>(initialCreds.department);
   const [purposeCategory, setPurposeCategory] = useState<PurposeCategory>(initialPurpose || 'Kelas');
   const [paxCount, setPaxCount] = useState<number>(Math.min(room.capacity, 28));
   const [notes, setNotes] = useState<string>('');
@@ -179,19 +213,49 @@ export const BookingModal: React.FC<BookingModalProps> = ({
     const activeUser = getStoredActiveUser();
 
     if (activeUser && activeUser.applicantEmail) {
-      setApplicantName(activeUser.applicantName);
-      setApplicantEmail(activeUser.applicantEmail);
+      setApplicantName(activeUser.applicantName || '');
+      setApplicantEmail(activeUser.applicantEmail || '');
       setApplicantRole(activeUser.applicantRole || 'Pensyarah');
       setDepartment(activeUser.department || 'Pengajian Am');
       if (activeUser.applicantPhone) setApplicantPhone(activeUser.applicantPhone);
+
+      let pin = '';
+      if (activeUser.staffId) {
+        pin = getStaffSessionPin(activeUser.staffId) || '';
+      }
+      if (!pin && typeof window !== 'undefined') {
+        pin = sessionStorage.getItem('kpmbp_active_user_pin') || '';
+      }
+      if (!pin && activeUser.pinStatus === 'DEFAULT') {
+        pin = '1234';
+      }
+      if (pin) {
+        setPinInput(pin);
+      }
+    } else {
+      // Jika belum login, biarkan ruang kosong untuk diisi kemudian
+      setApplicantName('');
+      setApplicantEmail('');
+      setPinInput('');
+      setApplicantPhone('');
+      setApplicantRole('');
+      setDepartment('');
     }
   }, [staffList]);
 
   const handleEmailInputChange = (val: string) => {
     setApplicantEmail(val);
     setVerificationError(null);
-    // Auto-match staff metadata from list (without populating PIN)
-    const match = staffList.find(s => s.email.toLowerCase() === val.trim().toLowerCase());
+    const clean = val.trim().toLowerCase();
+    if (!clean) {
+      setApplicantName('');
+      setApplicantPhone('');
+      setApplicantRole('');
+      setDepartment('');
+      return;
+    }
+    // Auto-match staff metadata from list
+    const match = staffList.find(s => s.email.toLowerCase() === clean);
     if (match) {
       setApplicantName(match.name);
       setApplicantRole(match.role);
@@ -423,7 +487,11 @@ export const BookingModal: React.FC<BookingModalProps> = ({
       finalApplicantRole = verifiedStaff.role;
       finalDepartment = verifiedStaff.department;
 
-      // Save active user profile
+      // Save session pin & active user profile
+      setStaffSessionPin(verifiedStaff.id, pinInput);
+      if (typeof window !== 'undefined') {
+        sessionStorage.setItem('kpmbp_active_user_pin', pinInput);
+      }
       saveActiveUser({
         staffId: verifiedStaff.id,
         applicantName: verifiedStaff.name,
@@ -1068,7 +1136,7 @@ export const BookingModal: React.FC<BookingModalProps> = ({
 
           <div>
             <label htmlFor="modal-purpose-input" className="block font-bold text-slate-700 mb-1">
-              Tujuan Tempahan / Kategori:
+              Tujuan Tempahan:
             </label>
             <div className="relative">
               <input
@@ -1092,7 +1160,7 @@ export const BookingModal: React.FC<BookingModalProps> = ({
               </datalist>
             </div>
             <p className="text-[10px] text-slate-500 mt-1">
-              Boleh ditaip / diisi secara manual mengikut keperluan program atau aktiviti anda.
+              Sila Isi secara ringkas sahaja
             </p>
           </div>
 

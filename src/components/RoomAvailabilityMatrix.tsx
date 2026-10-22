@@ -270,57 +270,13 @@ export const RoomAvailabilityMatrix: React.FC<RoomAvailabilityMatrixProps> = ({
 
   return (
     <div className="space-y-6">
-      {/* Exam Notice & Quick Jump Bar */}
-      {institutionalBlocks.length > 0 && (
-        <div className="bg-rose-50 border border-rose-200 rounded-xl p-3 sm:p-3.5 flex flex-col sm:flex-row sm:items-center justify-between gap-3 text-xs shadow-2xs">
-          <div className="flex items-center gap-2.5 text-rose-950">
-            <span className="p-1.5 bg-rose-200 text-rose-900 rounded-lg shrink-0">
-              <Lock className="w-4 h-4" />
-            </span>
-            <div>
-              <div className="font-extrabold text-rose-950 flex items-center gap-1.5">
-                <span>Peperiksaan Akhir Semester: 2 Nov – 16 Nov 2026</span>
-                <span className="text-[10px] bg-rose-200 text-rose-800 px-1.5 py-0.2 rounded font-bold">8:00 AM – 12:00 AM</span>
-              </div>
-              <div className="text-rose-800 text-[11px] mt-0.5">
-                Dewan Besar, Sri Penawar, Dewan Seminar &amp; Mini Seminar dikunci sepenuhnya bagi peperiksaan berpusat.
-              </div>
-            </div>
-          </div>
-          <div className="flex items-center gap-2 shrink-0">
-            {selectedDate >= '2026-11-02' && selectedDate <= '2026-11-16' ? (
-              <span className="px-3 py-1 bg-rose-200 text-rose-900 rounded-lg font-bold text-xs flex items-center gap-1 border border-rose-300">
-                <CheckCircle2 className="w-3.5 h-3.5 text-rose-700" />
-                <span>Tarikh Peperiksaan Sedang Dipaparkan</span>
-              </span>
-            ) : (
-              <button
-                type="button"
-                onClick={() => setSelectedDate('2026-11-02')}
-                className="px-3.5 py-1.5 bg-rose-600 hover:bg-rose-700 text-white rounded-lg font-bold text-xs transition cursor-pointer shadow-sm flex items-center gap-1.5 active:scale-95"
-                title="Papar jadual matriks bagi tarikh peperiksaan bermula 2 Nov 2026"
-              >
-                <Calendar className="w-3.5 h-3.5" />
-                <span>Lihat Tarikh Peperiksaan (02 Nov)</span>
-              </button>
-            )}
-          </div>
-        </div>
-      )}
 
       {/* Header Banner */}
-      <div className="bg-white rounded-2xl p-6 shadow-md border border-slate-200">
-        <div className="flex flex-col md:flex-row items-start md:items-center justify-between gap-4 border-b border-slate-100 pb-5">
-          <div>
-            <div className="inline-flex items-center gap-1.5 bg-indigo-50 text-indigo-700 px-3 py-1 rounded-full text-xs font-bold border border-indigo-200">
-              <Calendar className="w-3.5 h-3.5" />
-              Matriks Ketersediaan
-            </div>
-          </div>
-
+      <div className="bg-white rounded-2xl p-4 sm:p-5 shadow-md border border-slate-200">
+        <div className="flex flex-col sm:flex-row items-stretch sm:items-center justify-between gap-3 border-b border-slate-100 pb-3.5">
           <label 
             htmlFor="matrix-date-input"
-            className="flex items-center gap-2 bg-slate-50 hover:bg-emerald-50/60 border border-slate-200 hover:border-emerald-300 p-2.5 rounded-xl cursor-pointer transition-all duration-150 shadow-sm active:scale-[0.98] group"
+            className="flex items-center gap-2 bg-slate-50 hover:bg-emerald-50/60 border border-slate-200 hover:border-emerald-300 p-2.5 rounded-xl cursor-pointer transition-all duration-150 shadow-xs active:scale-[0.98] group w-fit"
             title="Klik untuk memilih tarikh"
           >
             <Calendar className="w-4 h-4 text-emerald-600 group-hover:scale-110 transition-transform shrink-0" />
@@ -340,62 +296,9 @@ export const RoomAvailabilityMatrix: React.FC<RoomAvailabilityMatrixProps> = ({
               {getMalayDayOfWeek(selectedDate)}
             </span>
           </label>
-        </div>
-
-        {/* Filter Controls Bar */}
-        <div className="mt-4 flex flex-wrap items-center justify-between gap-3 text-xs">
-          <div className="flex flex-wrap items-center gap-2">
-            <div className="relative min-w-[260px] sm:min-w-[320px] lg:min-w-[360px]">
-              <div className="absolute inset-y-0 left-0 pl-3 flex items-center pointer-events-none">
-                <div className="w-6 h-6 rounded-md bg-emerald-100 text-emerald-700 flex items-center justify-center">
-                  <Search className="w-3.5 h-3.5" />
-                </div>
-              </div>
-              <input
-                type="text"
-                placeholder="Cari ruang / bilik (cth: BK04, DKA, Makmal)..."
-                value={searchQuery}
-                onChange={(e) => setSearchQuery(e.target.value)}
-                className="w-full bg-white border-2 border-emerald-500 hover:border-emerald-600 focus:border-emerald-600 rounded-xl pl-11 pr-9 py-2 text-slate-900 font-semibold text-xs placeholder:text-slate-400 placeholder:font-medium outline-none ring-2 ring-emerald-500/20 focus:ring-4 focus:ring-emerald-500/30 shadow-md shadow-emerald-500/10 hover:shadow-lg transition-all"
-              />
-              {searchQuery && (
-                <button
-                  type="button"
-                  onClick={() => setSearchQuery('')}
-                  className="absolute right-2.5 top-1/2 -translate-y-1/2 text-slate-400 hover:text-slate-600 p-1 rounded-full hover:bg-slate-100 transition cursor-pointer"
-                  title="Kosongkan carian"
-                >
-                  <X className="w-3.5 h-3.5" />
-                </button>
-              )}
-            </div>
-
-            <select
-              value={categoryFilter}
-              onChange={(e) => setCategoryFilter(e.target.value as RoomCategory | 'Semua')}
-              className="bg-slate-50 border border-slate-300 rounded-lg px-3 py-1.5 font-medium text-slate-800 outline-none focus:ring-2 focus:ring-emerald-500"
-            >
-              <option value="Semua">Kategori: Semua ({rooms.length} Ruang)</option>
-              <option value="Bilik Kuliah">Bilik Kuliah & Smart Class</option>
-              <option value="Makmal Komputer">Makmal Komputer (5)</option>
-              <option value="Dewan Kuliah">Dewan Kuliah (DKA & DKB)</option>
-              <option value="Ruang Khas">Ruang Khas (4)</option>
-              <option value="Surau">Surau (2)</option>
-            </select>
-
-            <label className="inline-flex items-center gap-1.5 bg-slate-50 border border-slate-200 px-3 py-1.5 rounded-lg cursor-pointer select-none">
-              <input
-                type="checkbox"
-                checked={isAircondOnly}
-                onChange={(e) => setIsAircondOnly(e.target.checked)}
-                className="rounded text-emerald-600 focus:ring-emerald-500"
-              />
-              <span className="font-semibold text-slate-700">💠 Aircond Sahaja</span>
-            </label>
-          </div>
 
           {/* Session View Filter Toggle */}
-          <div className="flex items-center gap-1 bg-slate-100 p-1 rounded-xl border border-slate-200">
+          <div className="flex items-center gap-1 bg-slate-100 p-1 rounded-xl border border-slate-200 self-start sm:self-auto">
             <button
               onClick={() => setPeriodFilter('ALL')}
               className={`px-3 py-1 rounded-lg font-bold transition flex items-center gap-1.5 ${
@@ -432,35 +335,73 @@ export const RoomAvailabilityMatrix: React.FC<RoomAvailabilityMatrixProps> = ({
           </div>
         </div>
 
-          {/* Status Legend Bar */}
-          <div className="mt-4 pt-3 border-t border-slate-100 flex flex-wrap items-center justify-between gap-3 text-xs">
-            <div className="flex flex-wrap items-center gap-3">
-              <span className="font-bold text-slate-700">Petunjuk :</span>
-              <div className="flex items-center gap-1.5">
-                <span className="hidden w-3.5 h-3.5 rounded bg-emerald-500 border border-emerald-600"></span>
-                <span className="text-slate-700 font-medium">🟢 Kosong</span>
-              </div>
-              <div className="flex items-center gap-1.5" title="Jadual kuliah semester rasmi kolej">
-                <span className="hidden w-3.5 h-3.5 rounded bg-rose-500 border border-rose-600"></span>
-                <span className="text-slate-700 font-medium">🔴 Jadual Kuliah</span>
-              </div>
-              <div className="flex items-center gap-1.5">
-                <span className="text-slate-700 font-medium">🟨 Tempahan Ad-Hoc</span>
-              </div>
-              <div className="flex items-center gap-1.5">
-                <span className="text-slate-700 font-medium">⚫ Sekatan Institusi / Peperiksaan</span>
+        {/* Filter Controls Bar */}
+        <div className="mt-3.5 flex flex-wrap items-center gap-2.5 text-xs">
+          <div className="relative min-w-[260px] sm:min-w-[320px] lg:min-w-[360px] flex-1 sm:flex-initial">
+            <div className="absolute inset-y-0 left-0 pl-3 flex items-center pointer-events-none">
+              <div className="w-6 h-6 rounded-md bg-emerald-100 text-emerald-700 flex items-center justify-center">
+                <Search className="w-3.5 h-3.5" />
               </div>
             </div>
-
-            <div className="flex items-center gap-2 text-[11px] text-slate-500">
-              <span className="inline-flex items-center gap-1 bg-amber-50 text-amber-800 px-2 py-0.5 rounded border border-amber-200">
-                ☀️ Sesi Siang: 08:30 – 17:30
-              </span>
-              <span className="inline-flex items-center gap-1 bg-indigo-50 text-indigo-800 px-2 py-0.5 rounded border border-indigo-200 font-semibold">
-                🌙 Sesi Malam: 20:00 – 23:00 (Maksimum 23:00)
-              </span>
-            </div>
+            <input
+              type="text"
+              placeholder="Cari ruang / bilik (cth: BK04, DKA, Makmal)..."
+              value={searchQuery}
+              onChange={(e) => setSearchQuery(e.target.value)}
+              className="w-full bg-white border-2 border-emerald-500 hover:border-emerald-600 focus:border-emerald-600 rounded-xl pl-11 pr-9 py-2 text-slate-900 font-semibold text-xs placeholder:text-slate-400 placeholder:font-medium outline-none ring-2 ring-emerald-500/20 focus:ring-4 focus:ring-emerald-500/30 shadow-md shadow-emerald-500/10 hover:shadow-lg transition-all"
+            />
+            {searchQuery && (
+              <button
+                type="button"
+                onClick={() => setSearchQuery('')}
+                className="absolute right-2.5 top-1/2 -translate-y-1/2 text-slate-400 hover:text-slate-600 p-1 rounded-full hover:bg-slate-100 transition cursor-pointer"
+                title="Kosongkan carian"
+              >
+                <X className="w-3.5 h-3.5" />
+              </button>
+            )}
           </div>
+
+          <select
+            value={categoryFilter}
+            onChange={(e) => setCategoryFilter(e.target.value as RoomCategory | 'Semua')}
+            className="bg-slate-50 border border-slate-300 rounded-lg px-3 py-2 font-medium text-slate-800 outline-none focus:ring-2 focus:ring-emerald-500"
+          >
+            <option value="Semua">Kategori: Semua ({rooms.length} Ruang)</option>
+            <option value="Bilik Kuliah">Bilik Kuliah & Smart Class</option>
+            <option value="Makmal Komputer">Makmal Komputer (5)</option>
+            <option value="Dewan Kuliah">Dewan Kuliah (DKA & DKB)</option>
+            <option value="Ruang Khas">Ruang Khas (4)</option>
+            <option value="Surau">Surau (2)</option>
+          </select>
+
+          <label className="inline-flex items-center gap-1.5 bg-slate-50 border border-slate-200 px-3 py-2 rounded-lg cursor-pointer select-none">
+            <input
+              type="checkbox"
+              checked={isAircondOnly}
+              onChange={(e) => setIsAircondOnly(e.target.checked)}
+              className="rounded text-emerald-600 focus:ring-emerald-500"
+            />
+            <span className="font-semibold text-slate-700">💠 Aircond Sahaja</span>
+          </label>
+        </div>
+
+        {/* Status Legend Bar */}
+        <div className="mt-3.5 pt-3 border-t border-slate-100 flex flex-wrap items-center gap-3 text-xs">
+          <span className="font-bold text-slate-700">Petunjuk :</span>
+          <div className="flex items-center gap-1.5">
+            <span className="text-slate-700 font-medium">🟢 Kosong</span>
+          </div>
+          <div className="flex items-center gap-1.5" title="Jadual kuliah semester rasmi kolej">
+            <span className="text-slate-700 font-medium">🔴 Jadual Kuliah</span>
+          </div>
+          <div className="flex items-center gap-1.5">
+            <span className="text-slate-700 font-medium">🟨 Tempahan Ad-Hoc</span>
+          </div>
+          <div className="flex items-center gap-1.5">
+            <span className="text-slate-700 font-medium">⚫ Sekatan Institusi / Peperiksaan</span>
+          </div>
+        </div>
       </div>
 
       {/* MATRIX TABLE CONTAINER */}
@@ -598,7 +539,7 @@ export const RoomAvailabilityMatrix: React.FC<RoomAvailabilityMatrixProps> = ({
                                 )}
                               </span>
                               <span className="text-[9px] opacity-80 font-mono group-hover:text-white font-medium">
-                                {slot.start} +
+                                {slot.start}
                               </span>
                             </button>
                           )}
