@@ -605,8 +605,6 @@ const RAW_STAFF_DATA = [
 
 export const INITIAL_STAFF_DATA: StaffUser[] = RAW_STAFF_DATA.map((st) => ({
   ...st,
-  pin: '1234',
-  pinStatus: 'DEFAULT' as const,
-  passcode: '1234'
+  pinStatus: 'DEFAULT' as const
 }));
 

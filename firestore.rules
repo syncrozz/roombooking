@@ -1,23 +1,124 @@
 rules_version = '2';
 service cloud.firestore {
   match /databases/{database}/documents {
+    // 1. Global Safety Net (Default-Deny Catch-All)
+    match /{document=**} {
+      allow read, write: if false;
+    }
+
+    // Security Helpers & Primitives
+    function isSignedIn() {
+      return request.auth != null;
+    }
+
+    function isVerifiedUser() {
+      return isSignedIn() && request.auth.token.email_verified == true;
+    }
+
+    function isValidId(id) {
+      return id is string && id.size() <= 64 && id.matches('^[a-zA-Z0-9_\\-]+$');
+    }
+
+    // Admin authorization: validated against locked /admins collection or bootstrap email
+    function isAdmin() {
+      return isVerifiedUser() && (
+        request.auth.token.email == 'festivalseni.kpmbp@gmail.com' ||
+        exists(/databases/$(database)/documents/admins/$(request.auth.uid))
+      );
+    }
+
+    function isBookingOwner(email) {
+      return isVerifiedUser() && request.auth.token.email == email;
+    }
+
+    function incoming() {
+      return request.resource.data;
+    }
+
+    function existing() {
+      return resource.data;
+    }
+
+    function isValidBooking(d) {
+      return d.keys().hasAll([
+        'id', 'roomId', 'date', 'startTime', 'endTime',
+        'applicantName', 'applicantEmail', 'applicantRole',
+        'department', 'purposeCategory', 'title', 'paxCount',
+        'status', 'createdAt'
+      ]) &&
+        d.id is string && d.id.size() <= 40 &&
+        d.roomId is string && d.roomId.size() <= 20 &&
+        d.date is string && d.date.matches('^202[6-9]-(0[1-9]|1[0-2])-(0[1-9]|[12][0-9]|3[01])$') &&
+        d.startTime is string && d.startTime.matches('^([01][0-9]|2[0-3]):[0-5][0-9]$') &&
+        d.endTime is string && d.endTime.matches('^([01][0-9]|2[0-3]):[0-5][0-9]$') &&
+        d.applicantName is string && d.applicantName.size() <= 100 &&
+        d.applicantEmail is string && d.applicantEmail.size() <= 120 &&
+        d.title is string && d.title.size() <= 150 &&
+        d.paxCount is number && d.paxCount > 0 && d.paxCount <= 500 &&
+        d.status in ['CONFIRMED', 'REQUESTED', 'CANCELLED'];
+    }
+
+    // 2. Bookings: Sensitive PII protected; only owner or admin can read details
     match /bookings/{bookingId} {
-      allow read, write: if true;
+      allow get: if isBookingOwner(resource.data.applicantEmail) || isAdmin();
+      allow list: if isVerifiedUser() && (
+        resource.data.applicantEmail == request.auth.token.email || isAdmin()
+      );
+      allow create: if isValidId(bookingId) &&
+        isValidBooking(incoming()) &&
+        (isBookingOwner(incoming().applicantEmail) || isAdmin());
+      allow update: if isValidId(bookingId) && (
+        isAdmin() || (
+          isBookingOwner(existing().applicantEmail) &&
+          existing().status != 'CANCELLED' &&
+          incoming().diff(existing()).affectedKeys().hasOnly(['status', 'notes', 'updatedAt']) &&
+          incoming().status == 'CANCELLED'
+        )
+      );
+      allow delete: if isAdmin();
+    }
+
+    // 3. De-identified Public Matrix (Occupancy projection)
+    match /occupancy/{occupancyId} {
+      allow read: if true;
+      allow write: if isAdmin();
+    }
+
+    // 4. Institutional Blocks & Room Directory
+    match /blocks/{blockId} {
+      allow read: if true;
+      allow write: if isAdmin();
     }
     match /rooms/{roomId} {
-      allow read, write: if true;
+      allow read: if true;
+      allow write: if isAdmin();
     }
     match /schedule/{scheduleId} {
-      allow read, write: if true;
+      allow read: if true;
+      allow write: if isAdmin();
     }
-    match /blocks/{blockId} {
-      allow read, write: if true;
+
+    // 5. Versioned Catalog Metadata
+    match /metadata/{metaId} {
+      allow read: if true;
+      allow write: if isAdmin();
     }
+
+    // 6. Staff Directory (Public profiles without PINs)
     match /staff_users/{staffId} {
-      allow read, write: if true;
+      allow read: if isVerifiedUser();
+      allow write: if isAdmin();
     }
-    match /test/{testId} {
-      allow read, write: if true;
+
+    // 7. Staff Credentials Vault (Completely isolated from Client SDKs)
+    match /staff_credentials/{staffId} {
+      allow read, write: if false;
+    }
+
+    // 8. Admin Role Assignments (Immutable by Client SDKs)
+    match /admins/{adminId} {
+      allow read: if isVerifiedUser();
+      allow write: if false;
     }
   }
 }

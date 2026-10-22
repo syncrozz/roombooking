@@ -42,6 +42,8 @@ export type PurposeCategory =
 
 export type BookingStatus = 'CONFIRMED' | 'PENDING' | 'REJECTED' | 'CANCELLED';
 
+export type BookingSyncStatus = 'synced' | 'pending_sync' | 'sync_failed';
+
 export interface AdHocBooking {
   id: string;             // e.g. 'BK-2026-000124'
   roomId: string;
@@ -60,6 +62,10 @@ export interface AdHocBooking {
   notes?: string;
   status: BookingStatus;
   createdAt: string;
+  syncStatus?: BookingSyncStatus;
+  syncError?: string;
+  syncedAt?: string;
+  idempotencyKey?: string;
 }
 
 export interface InstitutionalBlock {
@@ -107,8 +113,6 @@ export interface StaffUser {
   role: string;
   phone: string;
   email: string;
-  passcode?: string; // Legacy compatibility
-  pin: string;
   pinStatus: 'DEFAULT' | 'CUSTOM';
   pinChangedAt?: string;
 }

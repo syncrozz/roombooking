@@ -28,7 +28,8 @@ import {
   saveActiveUser, 
   UserProfileHistory 
 } from '../utils/storage';
-import { verifyStaffCredentialsLocally } from '../lib/firebase';
+import { generateBookingIdempotencyKey } from '../utils/idempotency';
+import { verifyStaffCredentials } from '../lib/firebase';
 import { INITIAL_STAFF_DATA } from '../data/staffData';
 import { ForgotPinHelp } from './ForgotPinHelp';
 import { 
@@ -66,6 +67,7 @@ interface BookingModalProps {
   adhocBookings?: AdHocBooking[];
   institutionalBlocks?: InstitutionalBlock[];
   isAdmin?: boolean;
+  isFallbackMode?: boolean;
   onClose: () => void;
   onSubmitBooking: (bookingData: Omit<AdHocBooking, 'id' | 'status' | 'createdAt'> | Omit<AdHocBooking, 'id' | 'status' | 'createdAt'>[]) => void;
   onRequirePinChange?: (staff: StaffUser) => void;
@@ -82,6 +84,7 @@ export const BookingModal: React.FC<BookingModalProps> = ({
   adhocBookings = [],
   institutionalBlocks = [],
   isAdmin = false,
+  isFallbackMode = false,
   onClose,
   onSubmitBooking,
   onRequirePinChange
@@ -332,7 +335,7 @@ export const BookingModal: React.FC<BookingModalProps> = ({
       return { value: t, isAvailable };
     });
 
-  const handleSubmit = (e: React.FormEvent) => {
+  const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault();
     setVerificationError(null);
 
@@ -393,8 +396,8 @@ export const BookingModal: React.FC<BookingModalProps> = ({
         finalApplicantEmail = `${finalApplicantName.toLowerCase().replace(/[^a-z0-9]/g, '') || 'staf'}@mara.gov.my`;
       }
     } else {
-      // 2. Standard Staff PIN Verification
-      const verifyResult = verifyStaffCredentialsLocally(applicantEmail, pinInput, staffList);
+      // 2. Standard Staff PIN Verification via Secure Server API
+      const verifyResult = await verifyStaffCredentials(applicantEmail, pinInput, staffList);
 
       if (!verifyResult.success || !verifyResult.staff) {
         setVerificationError(
@@ -407,7 +410,7 @@ export const BookingModal: React.FC<BookingModalProps> = ({
       const verifiedStaff = verifyResult.staff;
 
       // Check mandatory PIN change if still on default PIN 1234
-      if (verifiedStaff.pinStatus === 'DEFAULT' || verifiedStaff.pin === '1234') {
+      if (verifiedStaff.pinStatus === 'DEFAULT') {
         if (onRequirePinChange) {
           onRequirePinChange(verifiedStaff);
         }
@@ -437,27 +440,33 @@ export const BookingModal: React.FC<BookingModalProps> = ({
     const consolidatedNotes = [notes.trim(), adminTag].filter(Boolean).join(' ');
 
     if (isMultiDay && activeDates.length > 1) {
-      const seriesBookings = activeDates.map((d, index) => ({
-        roomId: room.id,
-        roomName: room.name,
-        date: d,
-        startTime: selectedStartTime,
-        endTime: selectedEndTime,
-        applicantName: finalApplicantName,
-        applicantEmail: finalApplicantEmail,
-        applicantPhone: finalApplicantPhone,
-        applicantRole: finalApplicantRole,
-        department: finalDepartment,
-        purposeCategory: effectivePurpose,
-        title: `${effectivePurpose} (${room.code}) - Siri ${index + 1}/${activeDates.length}`,
-        paxCount,
-        notes: consolidatedNotes
-          ? `${consolidatedNotes} [Siri Hari ${index + 1}/${activeDates.length}]`
-          : `Siri Tempahan ${activeDates.length} Hari (${formatDateMalay(startDate)} - ${formatDateMalay(endDate)})`
-      }));
+      const seriesBookings = activeDates.map((d, index) => {
+        const itemParams = {
+          roomId: room.id,
+          roomName: room.name,
+          date: d,
+          startTime: selectedStartTime,
+          endTime: selectedEndTime,
+          applicantName: finalApplicantName,
+          applicantEmail: finalApplicantEmail,
+          applicantPhone: finalApplicantPhone,
+          applicantRole: finalApplicantRole,
+          department: finalDepartment,
+          purposeCategory: effectivePurpose,
+          title: `${effectivePurpose} (${room.code}) - Siri ${index + 1}/${activeDates.length}`,
+          paxCount,
+          notes: consolidatedNotes
+            ? `${consolidatedNotes} [Siri Hari ${index + 1}/${activeDates.length}]`
+            : `Siri Tempahan ${activeDates.length} Hari (${formatDateMalay(startDate)} - ${formatDateMalay(endDate)})`
+        };
+        return {
+          ...itemParams,
+          idempotencyKey: generateBookingIdempotencyKey(itemParams)
+        };
+      });
       onSubmitBooking(seriesBookings);
     } else {
-      onSubmitBooking({
+      const singleParams = {
         roomId: room.id,
         roomName: room.name,
         date: activeDates[0] || date,
@@ -472,6 +481,10 @@ export const BookingModal: React.FC<BookingModalProps> = ({
         title: `${effectivePurpose} (${room.code})`,
         paxCount,
         notes: consolidatedNotes || undefined
+      };
+      onSubmitBooking({
+        ...singleParams,
+        idempotencyKey: generateBookingIdempotencyKey(singleParams)
       });
     }
   };
@@ -493,6 +506,16 @@ export const BookingModal: React.FC<BookingModalProps> = ({
             <X className="w-5 h-5" />
           </button>
         </div>
+
+        {/* Offline Fallback Warning Notice */}
+        {isFallbackMode && (
+          <div className="bg-amber-50 border border-amber-300 rounded-xl p-3 text-amber-900 text-xs flex items-start gap-2.5">
+            <AlertCircle className="w-4 h-4 text-amber-600 shrink-0 mt-0.5" />
+            <p className="leading-relaxed">
+              <strong>Mod Luar Talian:</strong> Tempahan ini akan disimpan di storan pelayar tempatan dan tidak dihantar ke Firestore Cloud sehingga sambungan pulih.
+            </p>
+          </div>
+        )}
 
         {/* Multi-Day / Single-Day Option Card */}
         <div className={`rounded-xl p-3 space-y-2.5 text-xs transition-all duration-200 border ${

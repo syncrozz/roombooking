@@ -61,9 +61,22 @@ export const QRCodeModal: React.FC<QRCodeModalProps> = ({ booking, onClose }) =>
 
         {/* Badge Header */}
         <div className="space-y-1 pt-2">
-          <div className="inline-flex items-center gap-1 bg-emerald-100 text-emerald-800 text-[11px] font-bold px-3 py-1 rounded-full border border-emerald-300">
-            <CheckCircle2 className="w-3.5 h-3.5 text-emerald-600" />
-            PAS AKSES KULIAH DISAHKAN
+          <div className={`inline-flex items-center gap-1 text-[11px] font-bold px-3 py-1 rounded-full border ${
+            booking.status === 'CONFIRMED'
+              ? 'bg-emerald-100 text-emerald-800 border-emerald-300'
+              : 'bg-amber-100 text-amber-800 border-amber-300'
+          }`}>
+            {booking.status === 'CONFIRMED' ? (
+              <>
+                <CheckCircle2 className="w-3.5 h-3.5 text-emerald-600" />
+                PAS AKSES KULIAH DISAHKAN
+              </>
+            ) : (
+              <>
+                <Clock className="w-3.5 h-3.5 text-amber-600" />
+                PAS SEMENTARA (MENUNGGU SINKRONISASI)
+              </>
+            )}
           </div>
           <h3 className="text-xl font-extrabold text-slate-900 tracking-tight">
             KPMBP SmartHub
@@ -71,6 +84,11 @@ export const QRCodeModal: React.FC<QRCodeModalProps> = ({ booking, onClose }) =>
           <p className="text-xs text-slate-500 font-mono font-bold">
             ID: {booking.id}
           </p>
+          {booking.status === 'PENDING' && (
+            <p className="text-[10px] text-amber-700 bg-amber-50 border border-amber-200 px-2 py-0.5 rounded-md mx-auto inline-block">
+              ⚠️ Tempahan luar talian. Disahkan di Cloud apabila sambungan pulih.
+            </p>
+          )}
         </div>
 
         {/* QR Code Visual Illustration */}

@@ -8,7 +8,7 @@ import {
 } from '../utils/storage';
 import { StaffUser } from '../types';
 import { INITIAL_STAFF_DATA } from '../data/staffData';
-import { verifyStaffCredentialsLocally } from '../lib/firebase';
+import { verifyStaffCredentials } from '../lib/firebase';
 import { ForgotPinHelp } from './ForgotPinHelp';
 import { WhatsAppIcon } from './WhatsAppIcon';
 import { 
@@ -68,11 +68,11 @@ export const LoginUserCard: React.FC<LoginUserCardProps> = ({
     };
   }, []);
 
-  const handleVerifyAndLogin = (e: React.FormEvent) => {
+  const handleVerifyAndLogin = async (e: React.FormEvent) => {
     e.preventDefault();
     setErrorMsg(null);
 
-    const result = verifyStaffCredentialsLocally(emailInput, pinInput, staffList);
+    const result = await verifyStaffCredentials(emailInput, pinInput, staffList);
 
     if (!result.success || !result.staff) {
       setErrorMsg(result.errorMsg || 'Email atau PIN tidak sah.');
@@ -82,7 +82,7 @@ export const LoginUserCard: React.FC<LoginUserCardProps> = ({
     const matchedStaff = result.staff;
 
     // Check mandatory PIN change if still using default PIN 1234
-    if (matchedStaff.pinStatus === 'DEFAULT' || matchedStaff.pin === '1234') {
+    if (matchedStaff.pinStatus === 'DEFAULT') {
       if (onRequirePinChange) {
         onRequirePinChange(matchedStaff);
       }

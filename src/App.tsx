@@ -30,7 +30,13 @@ import {
   UserProfileHistory,
   getStoredStaffUsers,
   saveStoredStaffUsers,
-  deduplicateStaffById
+  deduplicateStaffById,
+  getStoredPendingBookingQueue,
+  subscribeToPendingBookingQueue,
+  enqueuePendingBooking,
+  dequeuePendingBooking,
+  updateStoredBooking,
+  mergeCloudBookingsWithPendingQueue
 } from './utils/storage';
 import { 
   subscribeToBookings, 
@@ -49,7 +55,12 @@ import {
   deleteBlockFromCloud,
   bulkSaveBlocksToCloud,
   bulkDeleteBlocksFromCloud,
-  cleanObsoleteDemoRecordsFromCloud
+  cleanObsoleteDemoRecordsFromCloud,
+  subscribeToConnectionStatus,
+  getConnectionStatus,
+  testFirebaseConnection,
+  ConnectionStatusState,
+  syncPendingBookingsQueue
 } from './lib/firebase';
 import { INITIAL_STAFF_DATA } from './data/staffData';
 
@@ -65,8 +76,9 @@ import { BookingModal } from './components/BookingModal';
 import { QRCodeModal } from './components/QRCodeModal';
 import { SupportModal } from './components/SupportModal';
 import { SetPinModal } from './components/SetPinModal';
+import { OfflineFallbackBanner } from './components/OfflineFallbackBanner';
 
-import { Building2, Shield, Heart, Sparkles, CheckCircle2, Lock, X, KeyRound, ShieldCheck, AlertCircle } from 'lucide-react';
+import { Building2, Shield, Heart, Sparkles, CheckCircle2, Lock, X, KeyRound, ShieldCheck, AlertCircle, AlertTriangle } from 'lucide-react';
 
 export default function App() {
   const [isAdminUnlocked, setIsAdminUnlocked] = useState<boolean>(() => {
@@ -178,6 +190,113 @@ export default function App() {
   // Mandatory PIN Change modal state for staff/owner on default PIN (1234)
   const [mandatoryPinChangeStaff, setMandatoryPinChangeStaff] = useState<StaffUser | null>(null);
 
+  // Connection Status (Online vs Fallback) & Retry State
+  const [connectionStatus, setConnectionStatus] = useState<ConnectionStatusState>(() => getConnectionStatus());
+  const [isRetryingConnection, setIsRetryingConnection] = useState<boolean>(false);
+  const [retryListenerTrigger, setRetryListenerTrigger] = useState<number>(0);
+
+  // SES v4.5: Offline Pending Booking Queue state
+  const [pendingQueueCount, setPendingQueueCount] = useState<number>(() => getStoredPendingBookingQueue().length);
+  const [isSyncingQueue, setIsSyncingQueue] = useState<boolean>(false);
+
+  // Amaran Sebelum Tempahan - Pending Offline Booking state
+  const [offlineBookingPending, setOfflineBookingPending] = useState<{
+    room: Room;
+    date: string;
+    startTime: string;
+    endTime: string;
+    purpose: PurposeCategory;
+  } | null>(null);
+
+  // Subscribe to Global Connection Status
+  useEffect(() => {
+    const unsubStatus = subscribeToConnectionStatus((status) => {
+      setConnectionStatus(status);
+    });
+    return () => {
+      unsubStatus();
+    };
+  }, []);
+
+  // Subscribe to Pending Queue updates
+  useEffect(() => {
+    const unsubQueue = subscribeToPendingBookingQueue((queue) => {
+      setPendingQueueCount(queue.length);
+    });
+    return () => {
+      unsubQueue();
+    };
+  }, []);
+
+  // Process offline pending bookings queue
+  const handleSyncPendingQueue = React.useCallback(async (isAuto: boolean = false) => {
+    if (isSyncingQueue) return;
+    const queue = getStoredPendingBookingQueue();
+    if (queue.length === 0) return;
+
+    setIsSyncingQueue(true);
+    if (!isAuto) {
+      showToast('🔄 Menyelaraskan tempahan luar talian ke Cloud...');
+    }
+
+    try {
+      const res = await syncPendingBookingsQueue();
+      if (res.syncedCount > 0) {
+        // Refresh local bookings state to reflect confirmed status
+        const latestBookings = getStoredAdHocBookings();
+        setAdhocBookings(latestBookings);
+        showToast(`🟢 ${res.syncedCount} tempahan luar talian berjaya DISAHKAN & disinkronkan ke Cloud!`);
+      } else if (res.failedCount > 0 && !isAuto) {
+        showToast(`🟡 ${res.failedCount} tempahan gagal disinkronkan. Sila semak sambungan internet.`);
+      }
+    } catch (err) {
+      console.error('Error during queue sync:', err);
+    } finally {
+      setIsSyncingQueue(false);
+    }
+  }, [isSyncingQueue]);
+
+  // Automatic retry synchronization when connectivity returns to 'online'
+  useEffect(() => {
+    if (connectionStatus.status === 'online' && pendingQueueCount > 0) {
+      handleSyncPendingQueue(true);
+    }
+  }, [connectionStatus.status, pendingQueueCount, handleSyncPendingQueue]);
+
+  // Browser window online event listener
+  useEffect(() => {
+    const handleBrowserOnline = () => {
+      if (getStoredPendingBookingQueue().length > 0) {
+        handleSyncPendingQueue(true);
+      }
+    };
+    window.addEventListener('online', handleBrowserOnline);
+    return () => window.removeEventListener('online', handleBrowserOnline);
+  }, [handleSyncPendingQueue]);
+
+  const handleRetryConnection = async () => {
+    setIsRetryingConnection(true);
+    showToast('🔄 Menghubungkan semula ke Cloud Firestore...');
+    try {
+      const res = await testFirebaseConnection();
+      if (res.connected) {
+        showToast('🟢 Berjaya disambung semula ke Cloud Firestore!');
+        setRetryListenerTrigger((prev) => prev + 1);
+        await handleSyncPendingQueue(false);
+      } else {
+        showToast(`🟡 Masih di luar talian: ${res.error || 'Tiada sambungan'}`);
+        setRetryListenerTrigger((prev) => prev + 1);
+      }
+    } catch {
+      showToast('🔴 Gagal menyambung ke Firestore.');
+      setRetryListenerTrigger((prev) => prev + 1);
+    } finally {
+      setTimeout(() => {
+        setIsRetryingConnection(false);
+      }, 1000);
+    }
+  };
+
   // Toast notification state
   const [toastMessage, setToastMessage] = useState<string | null>(null);
 
@@ -192,7 +311,7 @@ export default function App() {
         const match = staffUsers.find(
           (s) => s.email.trim().toLowerCase() === active.applicantEmail.trim().toLowerCase()
         );
-        if (match && (match.pinStatus === 'DEFAULT' || match.pin === '1234')) {
+        if (match && match.pinStatus === 'DEFAULT') {
           setMandatoryPinChangeStaff(match);
         } else {
           setMandatoryPinChangeStaff(null);
@@ -221,6 +340,8 @@ export default function App() {
       if (e.key === 'Escape') {
         if (showAdminPinModal) {
           setShowAdminPinModal(false);
+        } else if (offlineBookingPending) {
+          setOfflineBookingPending(null);
         } else if (bookingModalInfo) {
           setBookingModalInfo(null);
         } else if (qrModalBooking) {
@@ -230,9 +351,11 @@ export default function App() {
     };
     window.addEventListener('keydown', handleKeyDown);
     return () => window.removeEventListener('keydown', handleKeyDown);
-  }, [showAdminPinModal, bookingModalInfo, qrModalBooking]);
+  }, [showAdminPinModal, offlineBookingPending, bookingModalInfo, qrModalBooking]);
 
   useEffect(() => {
+    let isCancelled = false;
+
     setRooms(getStoredRooms());
     setAcademicSchedule(getStoredAcademicSchedule());
     setAdhocBookings(getStoredAdHocBookings());
@@ -243,6 +366,7 @@ export default function App() {
 
     // Subscribe to Firestore staff users (SES v4.4: Authoritative Staff List)
     const unsubStaff = subscribeToStaffUsers((cloudStaff) => {
+      if (isCancelled) return;
       if (cloudStaff && cloudStaff.length > 0) {
         const deduplicated = deduplicateStaffById(cloudStaff);
         setStaffUsers(deduplicated);
@@ -252,16 +376,19 @@ export default function App() {
 
     // Subscribe to Firestore for real-time multi-device booking synchronization
     const unsubBookings = subscribeToBookings((cloudBookings) => {
+      if (isCancelled) return;
       setAdhocBookings(cloudBookings);
       saveStoredAdHocBookings(cloudBookings);
     });
 
     const unsubBlocks = subscribeToBlocks((cloudBlocks) => {
+      if (isCancelled) return;
       setInstitutionalBlocks(cloudBlocks);
       saveStoredInstitutionalBlocks(cloudBlocks);
     });
 
     const unsubSchedule = subscribeToSchedule((cloudSchedule) => {
+      if (isCancelled) return;
       if (cloudSchedule && cloudSchedule.length > 0) {
         setAcademicSchedule(cloudSchedule);
         saveStoredAcademicSchedule(cloudSchedule);
@@ -269,6 +396,7 @@ export default function App() {
     });
 
     const unsubRooms = subscribeToRooms((cloudRooms) => {
+      if (isCancelled) return;
       if (cloudRooms && cloudRooms.length > 0) {
         setRooms(cloudRooms);
         saveStoredRooms(cloudRooms);
@@ -276,13 +404,14 @@ export default function App() {
     });
 
     return () => {
+      isCancelled = true;
       unsubStaff();
       unsubBookings();
       unsubBlocks();
       unsubSchedule();
       unsubRooms();
     };
-  }, []);
+  }, [retryListenerTrigger]);
 
   const showToast = (msg: string) => {
     setToastMessage(msg);
@@ -291,7 +420,7 @@ export default function App() {
     }, 4000);
   };
 
-  // Open booking modal
+  // Open booking modal - Checks if offline fallback is active
   const handleOpenBookingModal = (
     room: Room,
     date: string,
@@ -299,6 +428,11 @@ export default function App() {
     endTime: string,
     purpose: PurposeCategory
   ) => {
+    if (connectionStatus.status === 'fallback') {
+      // Display confirmation warning dialog first before proceeding
+      setOfflineBookingPending({ room, date, startTime, endTime, purpose });
+      return;
+    }
     setBookingModalInfo({ room, date, startTime, endTime, purpose });
   };
 
@@ -327,17 +461,68 @@ export default function App() {
       }
     }
 
+    const isCurrentlyOffline = connectionStatus.status === 'fallback';
+    const nowIso = new Date().toISOString();
+
     for (let i = 0; i < dataList.length; i++) {
       const item = dataList[i];
       const baseId = generateBookingId();
       const newId = dataList.length > 1 ? `${baseId}-D${i + 1}` : baseId;
-      const newBooking: AdHocBooking = {
-        ...item,
-        id: newId,
-        status: 'CONFIRMED', // Auto-confirmed by the engine after zero-conflict verification
-        createdAt: new Date().toISOString()
-      };
-      newBookings.push(newBooking);
+
+      if (isCurrentlyOffline) {
+        // SES v4.5: Offline bookings MUST remain PENDING until Firestore confirms the write
+        const pendingBooking: AdHocBooking = {
+          ...item,
+          id: newId,
+          status: 'PENDING',
+          syncStatus: 'pending_sync',
+          createdAt: nowIso
+        };
+        enqueuePendingBooking(pendingBooking);
+        newBookings.push(pendingBooking);
+      } else {
+        // Online: Attempt immediate save to Firestore
+        const candidateBooking: AdHocBooking = {
+          ...item,
+          id: newId,
+          status: 'CONFIRMED',
+          syncStatus: 'synced',
+          syncedAt: nowIso,
+          createdAt: nowIso
+        };
+        try {
+          const res = await saveBookingToCloud(candidateBooking, adhocBookings);
+          if (res.success) {
+            newBookings.push(candidateBooking);
+          } else if (res.error && res.error.includes('SLOT_CONFLICT')) {
+            showToast(`⚠️ ${res.error.replace('SLOT_CONFLICT: ', '')}`);
+            return;
+          } else {
+            // Save failed -> fallback to PENDING in offline queue
+            const failedBooking: AdHocBooking = {
+              ...item,
+              id: newId,
+              status: 'PENDING',
+              syncStatus: 'sync_failed',
+              syncError: res.error || 'Gagal menyimpan ke Cloud Firestore',
+              createdAt: nowIso
+            };
+            enqueuePendingBooking(failedBooking);
+            newBookings.push(failedBooking);
+          }
+        } catch (err: any) {
+          const failedBooking: AdHocBooking = {
+            ...item,
+            id: newId,
+            status: 'PENDING',
+            syncStatus: 'sync_failed',
+            syncError: err?.message || 'Ralat sambungan Cloud',
+            createdAt: nowIso
+          };
+          enqueuePendingBooking(failedBooking);
+          newBookings.push(failedBooking);
+        }
+      }
     }
 
     if (newBookings.length > 0 && newBookings[0].applicantEmail) {
@@ -354,26 +539,28 @@ export default function App() {
     setAdhocBookings(updated);
     saveStoredAdHocBookings(updated);
 
-    // Sync to Firestore cloud
-    for (const b of newBookings) {
-      try {
-        await saveBookingToCloud(b);
-      } catch (err) {
-        console.error('Cloud sync error on create booking:', err);
-      }
-    }
-
     setBookingModalInfo(null);
     setQrModalBooking(newBookings[0]);
-    if (newBookings.length > 1) {
-      showToast(`🟢 Berjaya! ${newBookings.length} siri tempahan di ${newBookings[0].roomName} (11–13 Okt 2026, 4pm–11pm) telah disahkan!`);
+
+    const hasPending = newBookings.some(b => b.status === 'PENDING');
+    if (hasPending) {
+      if (newBookings.length > 1) {
+        showToast(`⚠️ ${newBookings.length} siri tempahan disimpan secara LUAR TALIAN (PENDING). Akan disinkronkan secara automatik apabila sambungan pulih.`);
+      } else {
+        showToast(`⚠️ Tempahan ${newBookings[0].id} disimpan secara LUAR TALIAN (PENDING). Akan disinkronkan sebaik sahaja Cloud pulih.`);
+      }
     } else {
-      showToast(`🟢 Tempahan ${newBookings[0].id} di ${newBookings[0].roomName} berjaya disahkan & disimpan ke Cloud!`);
+      if (newBookings.length > 1) {
+        showToast(`🟢 Berjaya! ${newBookings.length} siri tempahan di ${newBookings[0].roomName} (11–13 Okt 2026, 4pm–11pm) telah disahkan!`);
+      } else {
+        showToast(`🟢 Tempahan ${newBookings[0].id} di ${newBookings[0].roomName} berjaya disahkan & disimpan ke Cloud!`);
+      }
     }
   };
 
   // Cancel booking
   const handleCancelBooking = async (bookingId: string) => {
+    dequeuePendingBooking(bookingId);
     const updated = adhocBookings.filter(b => b.id !== bookingId);
     setAdhocBookings(updated);
     saveStoredAdHocBookings(updated);
@@ -651,6 +838,16 @@ export default function App() {
         onRequirePinChange={(st) => setMandatoryPinChangeStaff(st)}
       />
 
+      {/* Offline Fallback Alert Banner */}
+      <OfflineFallbackBanner
+        connectionStatus={connectionStatus}
+        onRetry={handleRetryConnection}
+        isRetrying={isRetryingConnection}
+        pendingQueueCount={pendingQueueCount}
+        isSyncingQueue={isSyncingQueue}
+        onSyncQueue={() => handleSyncPendingQueue(false)}
+      />
+
       {/* Main Content Workspace */}
       <div className="flex-1 flex flex-col min-w-0">
         {/* View Section */}
@@ -801,6 +998,7 @@ export default function App() {
           adhocBookings={adhocBookings}
           institutionalBlocks={institutionalBlocks}
           isAdmin={isAdminUnlocked}
+          isFallbackMode={connectionStatus.status === 'fallback'}
           onClose={() => setBookingModalInfo(null)}
           onSubmitBooking={handleSubmitBooking}
           onRequirePinChange={(st) => setMandatoryPinChangeStaff(st)}
@@ -896,6 +1094,65 @@ export default function App() {
                 </button>
               </div>
             </form>
+          </div>
+        </div>
+      )}
+
+      {/* Offline Booking Warning Confirmation Dialog */}
+      {offlineBookingPending && (
+        <div className="fixed inset-0 z-50 bg-slate-900/60 backdrop-blur-xs flex items-center justify-center p-4 animate-in fade-in duration-200">
+          <div className="bg-white border-2 border-amber-400 rounded-2xl max-w-md w-full p-6 shadow-2xl animate-in zoom-in-95 duration-200">
+            <div className="flex items-start gap-4 mb-4">
+              <div className="w-12 h-12 rounded-xl bg-amber-100 text-amber-600 flex items-center justify-center shrink-0">
+                <AlertTriangle className="w-6 h-6" />
+              </div>
+              <div className="flex-1 min-w-0">
+                <h3 className="text-base sm:text-lg font-bold text-slate-900 leading-tight">
+                  Pengesahan Tempahan Luar Talian
+                </h3>
+                <p className="text-xs text-amber-700 font-semibold mt-0.5">
+                  Pangkalan data dalam mod luar talian
+                </p>
+              </div>
+            </div>
+
+            <div className="bg-amber-50 border border-amber-200 rounded-xl p-3.5 mb-4">
+              <p className="text-xs sm:text-sm text-amber-950 leading-relaxed font-medium">
+                Anda sedang dalam mod luar talian. Tempahan ini TIDAK akan dilihat oleh staf lain dan boleh bertindih dengan tempahan mereka. Teruskan?
+              </p>
+            </div>
+
+            <div className="text-xs text-slate-500 space-y-1 mb-5 bg-slate-50 p-3 rounded-xl border border-slate-200">
+              <div className="flex justify-between">
+                <span className="font-medium text-slate-600">Ruang Dipilih:</span>
+                <span className="font-bold text-slate-900">{offlineBookingPending.room.name}</span>
+              </div>
+              <div className="flex justify-between">
+                <span className="font-medium text-slate-600">Tarikh & Masa:</span>
+                <span className="font-mono text-slate-800">{offlineBookingPending.date} ({offlineBookingPending.startTime} - {offlineBookingPending.endTime})</span>
+              </div>
+            </div>
+
+            <div className="flex gap-2.5">
+              <button
+                type="button"
+                onClick={() => setOfflineBookingPending(null)}
+                className="flex-1 bg-slate-100 hover:bg-slate-200 text-slate-700 font-bold py-2.5 px-4 rounded-xl text-xs transition cursor-pointer"
+              >
+                Batal
+              </button>
+              <button
+                type="button"
+                onClick={() => {
+                  const pending = offlineBookingPending;
+                  setOfflineBookingPending(null);
+                  setBookingModalInfo(pending);
+                }}
+                className="flex-1 bg-amber-600 hover:bg-amber-700 active:bg-amber-800 text-white font-bold py-2.5 px-4 rounded-xl text-xs transition shadow-md shadow-amber-600/30 cursor-pointer flex items-center justify-center gap-1.5"
+              >
+                <span>Teruskan</span>
+              </button>
+            </div>
           </div>
         </div>
       )}

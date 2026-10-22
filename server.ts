@@ -1,0 +1,138 @@
+import express from 'express';
+import path from 'path';
+import { fileURLToPath } from 'url';
+import { serverAuthVault } from './src/server/auth-service';
+
+const __filename = fileURLToPath(import.meta.url);
+const __dirname = path.dirname(__filename);
+
+async function startServer() {
+  const app = express();
+  const PORT = process.env.PORT ? parseInt(process.env.PORT, 10) : 3000;
+  const HOST = '0.0.0.0';
+
+  app.use(express.json());
+
+  // Health check endpoint
+  app.get('/api/health', (_req, res) => {
+    res.json({
+      status: 'UP',
+      service: 'KPMBP SmartHub API Engine',
+      security: 'scrypt-N16384-r8-p1',
+      timestamp: new Date().toISOString(),
+    });
+  });
+
+  // Secure Server-Side Staff Verification Endpoint (scrypt + rate limiting)
+  app.post('/api/auth/staff-verify', async (req, res) => {
+    try {
+      const { email, pin } = req.body || {};
+      const clientIp = (req.headers['x-forwarded-for'] as string) || req.socket.remoteAddress || '127.0.0.1';
+
+      const result = await serverAuthVault.verifyStaff(email, pin, clientIp);
+
+      if (result.isLocked) {
+        return res.status(429).json(result);
+      }
+
+      if (!result.success) {
+        return res.status(401).json(result);
+      }
+
+      return res.status(200).json(result);
+    } catch (err) {
+      console.error('Error during staff verification:', err);
+      return res.status(500).json({ success: false, errorMsg: 'Ralat pelayan dalaman.' });
+    }
+  });
+
+  // Secure Server-Side Staff PIN Update Endpoint (Authentication, Authorization & Rate Limiting)
+  app.post('/api/auth/staff-update-pin', async (req, res) => {
+    try {
+      const { staffId, newPin, currentPin, adminPasscode } = req.body || {};
+      const clientIp = (req.headers['x-forwarded-for'] as string) || req.socket.remoteAddress || '127.0.0.1';
+      const headerPasscode = req.headers['x-admin-passcode'] as string | undefined;
+
+      if (!staffId || !newPin) {
+        return res.status(400).json({ success: false, errorMsg: 'staffId dan newPin diperlukan.' });
+      }
+
+      const result = await serverAuthVault.updateStaffPin(staffId, newPin, {
+        clientIp,
+        currentPin,
+        adminPasscode: adminPasscode || headerPasscode,
+        skipAuth: false,
+      });
+
+      if (result.isLocked) {
+        return res.status(429).json(result);
+      }
+
+      if (!result.success) {
+        return res.status(401).json(result);
+      }
+
+      return res.status(200).json(result);
+    } catch (err) {
+      console.error('Error during staff PIN update:', err);
+      return res.status(500).json({ success: false, errorMsg: 'Ralat pelayan dalaman.' });
+    }
+  });
+
+  // Secure Server-Side Staff PIN Reset (Default 1234 - Requires Master Admin Authorization)
+  app.post('/api/auth/staff-reset-pin', async (req, res) => {
+    try {
+      const { staffId, adminPasscode } = req.body || {};
+      const clientIp = (req.headers['x-forwarded-for'] as string) || req.socket.remoteAddress || '127.0.0.1';
+      const headerPasscode = req.headers['x-admin-passcode'] as string | undefined;
+
+      if (!staffId) {
+        return res.status(400).json({ success: false, errorMsg: 'staffId diperlukan.' });
+      }
+
+      const result = await serverAuthVault.resetStaffPin(staffId, {
+        clientIp,
+        adminPasscode: adminPasscode || headerPasscode,
+        skipAuth: false,
+      });
+
+      if (result.isLocked) {
+        return res.status(429).json(result);
+      }
+
+      if (!result.success) {
+        return res.status(403).json(result);
+      }
+
+      return res.status(200).json(result);
+    } catch (err) {
+      console.error('Error during staff PIN reset:', err);
+      return res.status(500).json({ success: false, errorMsg: 'Ralat pelayan dalaman.' });
+    }
+  });
+
+  // Development: Mount Vite middlewares for SPA HMR & bundle serving
+  if (process.env.NODE_ENV !== 'production') {
+    const { createServer: createViteServer } = await import('vite');
+    const vite = await createViteServer({
+      server: { middlewareMode: true },
+      appType: 'spa',
+    });
+    app.use(vite.middlewares);
+  } else {
+    // Production: Serve static assets built by Vite
+    app.use(express.static(path.resolve(__dirname, 'dist')));
+    app.get('*', (_req, res) => {
+      res.sendFile(path.resolve(__dirname, 'dist', 'index.html'));
+    });
+  }
+
+  app.listen(PORT, HOST, () => {
+    console.log(`[KPMBP SmartHub] Server running on http://${HOST}:${PORT}`);
+  });
+}
+
+startServer().catch((err) => {
+  console.error('[KPMBP SmartHub] Failed to start server:', err);
+  process.exit(1);
+});

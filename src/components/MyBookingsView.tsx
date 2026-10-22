@@ -1,7 +1,7 @@
 import React, { useState, useEffect } from 'react';
 import { AdHocBooking, BookingStatus, StaffUser } from '../types';
 import { formatDateMalay, formatWhatsAppMessage, generateWhatsAppLink, exportBookingsToCSV } from '../utils/availabilityEngine';
-import { verifyStaffCredentialsLocally } from '../lib/firebase';
+import { verifyStaffCredentials } from '../lib/firebase';
 import { INITIAL_STAFF_DATA } from '../data/staffData';
 import { getStoredActiveUser, saveActiveUser, clearActiveUser, subscribeToActiveUser, UserProfileHistory } from '../utils/storage';
 import { WhatsAppIcon } from './WhatsAppIcon';
@@ -89,12 +89,12 @@ export const MyBookingsView: React.FC<MyBookingsViewProps> = ({
     return () => window.removeEventListener('keydown', handleKeyDown);
   }, [targetCancelBooking]);
 
-  // Handle Quick Login
-  const handleQuickLogin = (e: React.FormEvent) => {
+  // Handle Quick Login via Secure Server API
+  const handleQuickLogin = async (e: React.FormEvent) => {
     e.preventDefault();
     setLoginError(null);
 
-    const result = verifyStaffCredentialsLocally(loginEmail, loginPin, staffList);
+    const result = await verifyStaffCredentials(loginEmail, loginPin, staffList);
     if (!result.success || !result.staff) {
       setLoginError(result.errorMsg || 'Email atau PIN tidak sah.');
       return;
@@ -103,7 +103,7 @@ export const MyBookingsView: React.FC<MyBookingsViewProps> = ({
     const st = result.staff;
 
     // Mandatory PIN Change Check if still on default PIN 1234
-    if (st.pinStatus === 'DEFAULT' || st.pin === '1234') {
+    if (st.pinStatus === 'DEFAULT') {
       if (onRequirePinChange) {
         onRequirePinChange(st);
       }
@@ -206,7 +206,7 @@ export const MyBookingsView: React.FC<MyBookingsViewProps> = ({
     setCancelErrorMsg(null);
   };
 
-  const handleConfirmCancel = (e: React.FormEvent) => {
+  const handleConfirmCancel = async (e: React.FormEvent) => {
     e.preventDefault();
     if (!targetCancelBooking) return;
 
@@ -217,21 +217,21 @@ export const MyBookingsView: React.FC<MyBookingsViewProps> = ({
       return;
     }
 
-    // 2. If Owner: verify PIN for security confirmation
+    // 2. If Owner: verify PIN for security confirmation using secure credential verifier
     if (currentUser && isBookingOwnedByCurrentUser(targetCancelBooking)) {
-      // Find staff in staffList to check PIN
-      const staffMember = staffList.find(
-        s => s.email.toLowerCase().trim() === currentUser.applicantEmail.toLowerCase().trim()
+      const verifyRes = await verifyStaffCredentials(
+        currentUser.applicantEmail,
+        cancelPinInput,
+        staffList
       );
-      
-      const expectedPin = staffMember?.pin || '1234';
-      const cleanInput = cancelPinInput.trim();
 
-      if (cleanInput === expectedPin) {
+      if (verifyRes.success) {
         onCancelBooking(targetCancelBooking.id);
         setTargetCancelBooking(null);
       } else {
-        setCancelErrorMsg('PIN tidak sah. Sila masukkan 4-digit PIN keselamatan anda untuk pengesahan pembatalan.');
+        setCancelErrorMsg(
+          verifyRes.errorMsg || 'PIN tidak sah. Sila masukkan 4-digit PIN keselamatan anda untuk pengesahan pembatalan.'
+        );
       }
       return;
     }
@@ -528,17 +528,43 @@ export const MyBookingsView: React.FC<MyBookingsViewProps> = ({
                       </span>
                     </div>
 
-                    <span className={`text-xs font-bold px-3 py-1 rounded-full border ${
-                      isConfirmed 
-                        ? 'bg-emerald-100 text-emerald-800 border-emerald-300'
-                        : isPending
-                        ? 'bg-amber-100 text-amber-800 border-amber-300'
-                        : 'bg-rose-100 text-rose-800 border-rose-300'
-                    }`}>
-                      {isConfirmed && '🟢 CONFIRMED'}
-                      {isPending && '🟡 MENUNGGU KELULUSAN'}
-                      {b.status === 'REJECTED' && '🔴 DITOLAK'}
-                    </span>
+                    <div className="flex flex-col items-end gap-1">
+                      <span className={`text-xs font-bold px-3 py-1 rounded-full border ${
+                        isConfirmed 
+                          ? 'bg-emerald-100 text-emerald-800 border-emerald-300'
+                          : isPending
+                          ? b.syncStatus === 'sync_failed'
+                            ? 'bg-rose-100 text-rose-800 border-rose-300'
+                            : 'bg-amber-100 text-amber-800 border-amber-300'
+                          : 'bg-rose-100 text-rose-800 border-rose-300'
+                      }`}>
+                        {isConfirmed && '🟢 DISAHKAN'}
+                        {isPending && b.syncStatus === 'pending_sync' && '🟡 MENUNGGU SINKRONISASI'}
+                        {isPending && b.syncStatus === 'sync_failed' && '🔴 GAGAL SINKRONISASI'}
+                        {isPending && !b.syncStatus && '🟡 MENUNGGU KELULUSAN'}
+                        {b.status === 'REJECTED' && '🔴 DITOLAK'}
+                      </span>
+
+                      {/* Sync Status Sub-pill */}
+                      {b.syncStatus === 'pending_sync' && (
+                        <span className="text-[10px] font-semibold text-amber-700 bg-amber-50 border border-amber-200 px-2 py-0.5 rounded-md flex items-center gap-1">
+                          <span className="w-1.5 h-1.5 rounded-full bg-amber-500 animate-pulse"></span>
+                          Luar Talian (Dalam Giliran)
+                        </span>
+                      )}
+                      {b.syncStatus === 'sync_failed' && (
+                        <span className="text-[10px] font-semibold text-rose-700 bg-rose-50 border border-rose-200 px-2 py-0.5 rounded-md flex items-center gap-1" title={b.syncError}>
+                          <AlertCircle className="w-3 h-3 text-rose-500" />
+                          Menunggu Sambungan Pulih
+                        </span>
+                      )}
+                      {isConfirmed && b.syncStatus === 'synced' && (
+                        <span className="text-[10px] font-semibold text-emerald-700 bg-emerald-50 border border-emerald-200 px-2 py-0.5 rounded-md flex items-center gap-1">
+                          <Check className="w-3 h-3 text-emerald-500" />
+                          Cloud Synced
+                        </span>
+                      )}
+                    </div>
                   </div>
 
                   {/* Applicant Details */}

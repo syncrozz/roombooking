@@ -121,7 +121,9 @@ export function getStoredAdHocBookings(): AdHocBooking[] {
     const data = localStorage.getItem(ADHOC_BOOKINGS_KEY);
     const list: AdHocBooking[] = data ? JSON.parse(data) : INITIAL_ADHOC_BOOKINGS;
     // Strict Zero Demo Data Filter
-    return list.filter(b => b.id !== 'BK-2026-000101' && b.id !== 'BK-2026-000102' && b.id !== 'BK-2026-000103');
+    const clean = list.filter(b => b.id !== 'BK-2026-000101' && b.id !== 'BK-2026-000102' && b.id !== 'BK-2026-000103');
+    // Ensure any queued pending bookings are merged in so they are never lost on reload
+    return mergeCloudBookingsWithPendingQueue(clean);
   } catch {
     return INITIAL_ADHOC_BOOKINGS;
   }
@@ -130,6 +132,178 @@ export function getStoredAdHocBookings(): AdHocBooking[] {
 export function saveStoredAdHocBookings(bookings: AdHocBooking[]): void {
   const cleanBookings = bookings.filter(b => b.id !== 'BK-2026-000101' && b.id !== 'BK-2026-000102' && b.id !== 'BK-2026-000103');
   localStorage.setItem(ADHOC_BOOKINGS_KEY, JSON.stringify(cleanBookings));
+}
+
+/**
+ * SES v4.5: Reliable Offline Pending-Booking Queue in LocalStorage
+ */
+const PENDING_BOOKING_QUEUE_KEY = 'kpmbp_pending_booking_queue_v1';
+
+type PendingQueueListener = (queue: AdHocBooking[]) => void;
+const pendingQueueListeners = new Set<PendingQueueListener>();
+
+/**
+ * Generate a deterministic idempotency key for booking requests.
+ * Distinguishes genuine retries for the same slot from new distinct bookings.
+ */
+export function generateBookingIdempotencyKey(data: {
+  roomId: string;
+  date: string;
+  startTime: string;
+  endTime: string;
+  applicantEmail?: string;
+  applicantName?: string;
+}): string {
+  const room = (data.roomId || '').trim().toUpperCase();
+  const date = (data.date || '').trim();
+  const start = (data.startTime || '').trim();
+  const end = (data.endTime || '').trim();
+  const user = (data.applicantEmail || data.applicantName || '').trim().toLowerCase();
+  return `IDEM_${room}_${date}_${start}_${end}_${user}`;
+}
+
+export function getStoredPendingBookingQueue(): AdHocBooking[] {
+  try {
+    const data = localStorage.getItem(PENDING_BOOKING_QUEUE_KEY);
+    if (!data) return [];
+    const parsed = JSON.parse(data);
+    return Array.isArray(parsed) ? parsed : [];
+  } catch {
+    return [];
+  }
+}
+
+export function saveStoredPendingBookingQueue(queue: AdHocBooking[]): void {
+  try {
+    localStorage.setItem(PENDING_BOOKING_QUEUE_KEY, JSON.stringify(queue));
+    notifyPendingQueueListeners(queue);
+  } catch (err) {
+    console.error('Failed to save pending booking queue:', err);
+  }
+}
+
+export function enqueuePendingBooking(booking: AdHocBooking): void {
+  const current = getStoredPendingBookingQueue();
+  // Safe retry handling: Prevent duplicate insertion by checking both ID and idempotency key
+  const existingIndex = current.findIndex(b => 
+    b.id === booking.id || 
+    (Boolean(b.idempotencyKey) && Boolean(booking.idempotencyKey) && b.idempotencyKey === booking.idempotencyKey)
+  );
+  let updated: AdHocBooking[];
+  if (existingIndex >= 0) {
+    // Retry of existing booking: update record with latest payload and preserve status
+    updated = current.map((b, idx) => idx === existingIndex ? { ...b, ...booking, id: b.id } : b);
+  } else {
+    updated = [...current, booking];
+  }
+  saveStoredPendingBookingQueue(updated);
+}
+
+export function dequeuePendingBooking(bookingIdOrKey: string): void {
+  const current = getStoredPendingBookingQueue();
+  const updated = current.filter(b => b.id !== bookingIdOrKey && b.idempotencyKey !== bookingIdOrKey);
+  saveStoredPendingBookingQueue(updated);
+}
+
+export function updatePendingBookingInQueue(booking: AdHocBooking): void {
+  const current = getStoredPendingBookingQueue();
+  const index = current.findIndex(b => 
+    b.id === booking.id || 
+    (Boolean(b.idempotencyKey) && Boolean(booking.idempotencyKey) && b.idempotencyKey === booking.idempotencyKey)
+  );
+  if (index >= 0) {
+    const updated = current.map((b, idx) => idx === index ? { ...b, ...booking, id: b.id } : b);
+    saveStoredPendingBookingQueue(updated);
+  } else {
+    enqueuePendingBooking(booking);
+  }
+}
+
+export function updateStoredBooking(updatedBooking: AdHocBooking): void {
+  const all = getStoredAdHocBookings();
+  const index = all.findIndex(b => 
+    b.id === updatedBooking.id || 
+    (Boolean(b.idempotencyKey) && Boolean(updatedBooking.idempotencyKey) && b.idempotencyKey === updatedBooking.idempotencyKey)
+  );
+  let updatedList: AdHocBooking[];
+  if (index >= 0) {
+    updatedList = all.map((b, idx) => idx === index ? { ...b, ...updatedBooking } : b);
+  } else {
+    updatedList = [updatedBooking, ...all];
+  }
+  saveStoredAdHocBookings(updatedList);
+}
+
+/**
+ * Merge Cloud Firestore bookings with Local Offline Pending Queue.
+ * Guarantees that pending offline bookings are never lost or overwritten across cloud snapshots or reloads.
+ */
+export function mergeCloudBookingsWithPendingQueue(cloudBookings: AdHocBooking[]): AdHocBooking[] {
+  const queue = getStoredPendingBookingQueue();
+  if (queue.length === 0) {
+    return cloudBookings;
+  }
+
+  const cloudIdMap = new Map<string, AdHocBooking>();
+  const cloudKeyMap = new Map<string, AdHocBooking>();
+  cloudBookings.forEach(b => {
+    cloudIdMap.set(b.id, b);
+    if (b.idempotencyKey) {
+      cloudKeyMap.set(b.idempotencyKey, b);
+    }
+  });
+
+  const remainingQueue: AdHocBooking[] = [];
+  const merged: AdHocBooking[] = [...cloudBookings];
+
+  queue.forEach(pending => {
+    const inCloud = cloudIdMap.get(pending.id) || (pending.idempotencyKey ? cloudKeyMap.get(pending.idempotencyKey) : undefined);
+    if (inCloud && inCloud.status === 'CONFIRMED') {
+      // Confirmed in cloud! Dequeue it automatically
+    } else {
+      // Still pending sync to cloud
+      remainingQueue.push(pending);
+      // If not in cloud list, add it to merged list so UI shows it with PENDING status
+      const existsInMerged = merged.some(m => m.id === pending.id || (m.idempotencyKey && pending.idempotencyKey && m.idempotencyKey === pending.idempotencyKey));
+      if (!existsInMerged) {
+        merged.unshift({
+          ...pending,
+          status: 'PENDING',
+          syncStatus: pending.syncStatus || 'pending_sync'
+        });
+      }
+    }
+  });
+
+  if (remainingQueue.length !== queue.length) {
+    saveStoredPendingBookingQueue(remainingQueue);
+  }
+
+  // Deduplicate
+  const seenIds = new Set<string>();
+  return merged.filter(b => {
+    if (seenIds.has(b.id)) return false;
+    seenIds.add(b.id);
+    return true;
+  });
+}
+
+export function subscribeToPendingBookingQueue(listener: PendingQueueListener): () => void {
+  pendingQueueListeners.add(listener);
+  listener(getStoredPendingBookingQueue());
+  return () => {
+    pendingQueueListeners.delete(listener);
+  };
+}
+
+function notifyPendingQueueListeners(queue: AdHocBooking[]) {
+  pendingQueueListeners.forEach(listener => {
+    try {
+      listener(queue);
+    } catch (err) {
+      console.error('Error notifying pending queue listener:', err);
+    }
+  });
 }
 
 export function getStoredInstitutionalBlocks(): InstitutionalBlock[] {
@@ -304,39 +478,29 @@ export function deduplicateStaffById(list: StaffUser[]): StaffUser[] {
     if (!rawId) return;
     const key = rawId.toLowerCase();
     const existing = map.get(key);
+    
+    // Sanitize and resolve duplicate record
     if (!existing) {
-      const isCustom = st.pinStatus === 'CUSTOM' && st.pin && /^\d{4}$/.test(st.pin) && st.pin !== '1234' && !!st.pinChangedAt;
       map.set(key, {
-        ...st,
         id: rawId,
-        pin: isCustom ? st.pin : '1234',
-        pinStatus: isCustom ? 'CUSTOM' : 'DEFAULT',
-        pinChangedAt: isCustom ? st.pinChangedAt : undefined
+        name: st.name || '',
+        department: st.department || '',
+        role: st.role || '',
+        phone: st.phone || '',
+        email: st.email || '',
+        pinStatus: st.pinStatus === 'CUSTOM' ? 'CUSTOM' : 'DEFAULT',
+        pinChangedAt: st.pinStatus === 'CUSTOM' ? st.pinChangedAt : undefined
       });
     } else {
       // Identity is Staff ID: resolve duplicate record
-      // 1. Email: prefer @mara.gov.my over older domains if available
+      // Prefer @mara.gov.my over older domains if available
       let chosenEmail = existing.email;
       if (st.email && (st.email.includes('@mara.gov.my') || !existing.email.includes('@mara.gov.my'))) {
         chosenEmail = st.email;
       }
       
-      const existingIsCustom = existing.pinStatus === 'CUSTOM' && existing.pin && existing.pin !== '1234' && !!existing.pinChangedAt;
-      const stIsCustom = st.pinStatus === 'CUSTOM' && st.pin && st.pin !== '1234' && !!st.pinChangedAt;
-
-      let chosenPin = '1234';
-      let chosenStatus: 'DEFAULT' | 'CUSTOM' = 'DEFAULT';
-      let chosenChangedAt: string | undefined = undefined;
-
-      if (existingIsCustom) {
-        chosenPin = existing.pin;
-        chosenStatus = 'CUSTOM';
-        chosenChangedAt = existing.pinChangedAt;
-      } else if (stIsCustom) {
-        chosenPin = st.pin;
-        chosenStatus = 'CUSTOM';
-        chosenChangedAt = st.pinChangedAt;
-      }
+      const isCustom = existing.pinStatus === 'CUSTOM' || st.pinStatus === 'CUSTOM';
+      const chosenChangedAt = existing.pinChangedAt || st.pinChangedAt;
 
       map.set(key, {
         id: existing.id || st.id,
@@ -345,9 +509,8 @@ export function deduplicateStaffById(list: StaffUser[]): StaffUser[] {
         role: st.role || existing.role,
         phone: st.phone || existing.phone,
         email: chosenEmail,
-        pin: chosenPin,
-        pinStatus: chosenStatus,
-        pinChangedAt: chosenChangedAt
+        pinStatus: isCustom ? 'CUSTOM' : 'DEFAULT',
+        pinChangedAt: isCustom ? chosenChangedAt : undefined
       });
     }
   });

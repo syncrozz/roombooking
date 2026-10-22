@@ -1,6 +1,6 @@
 import React, { useState } from 'react';
 import { StaffUser } from '../types';
-import { updateStaffPinInCloud } from '../lib/firebase';
+import { updateStaffPinInCloud, getStaffSessionPin } from '../lib/firebase';
 import { saveActiveUser, UserProfileHistory } from '../utils/storage';
 import { Lock, KeyRound, AlertCircle, CheckCircle2, ShieldCheck } from 'lucide-react';
 
@@ -56,12 +56,12 @@ export const SetPinModal: React.FC<SetPinModalProps> = ({
 
     setIsSaving(true);
     try {
-      // Update in Cloud Firestore
-      await updateStaffPinInCloud(staff.id, cleanNewPin, 'CUSTOM');
+      // Update in Cloud Firestore via Server Scrypt Vault
+      const currentPin = getStaffSessionPin(staff.id) || (staff.pinStatus === 'DEFAULT' ? '1234' : undefined);
+      await updateStaffPinInCloud(staff.id, cleanNewPin, 'CUSTOM', currentPin);
 
       const updatedStaff: StaffUser = {
         ...staff,
-        pin: cleanNewPin,
         pinStatus: 'CUSTOM',
         pinChangedAt: new Date().toISOString()
       };
