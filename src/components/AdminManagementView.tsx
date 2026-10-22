@@ -52,7 +52,7 @@ import {
   downloadRoomsCSVTemplate, 
   parseRoomsCSV 
 } from '../utils/roomsCsvParser';
-import { formatLevel } from '../utils/storage';
+import { formatLevel, saveStoredStaffUsers } from '../utils/storage';
 
 interface AdminManagementViewProps {
   bookings: AdHocBooking[];
@@ -638,13 +638,14 @@ ST003,Pengajian Am,Cik Siti Sarah Binti Razak,Pensyarah,013-5558899,siti.sarah@k
 
     setResettingPinStaffId(st.id);
     try {
-      await resetStaffPinInCloud(st.id, '5313');
-      if (onSyncStaffUsers) {
-        const updated = staffList.map(item =>
-          item.id === st.id ? { ...item, pinStatus: 'DEFAULT' as const, pinChangedAt: undefined } : item
-        );
-        await onSyncStaffUsers(updated);
+      const res = await resetStaffPinInCloud(st.id, '5313');
+      if (!res.success) {
+        throw new Error(res.errorMsg || 'Gagal menetapkan semula PIN staf.');
       }
+      const updated = staffList.map(item =>
+        item.id === st.id ? { ...item, pinStatus: 'DEFAULT' as const, pinChangedAt: undefined } : item
+      );
+      saveStoredStaffUsers(updated);
       alert(`PIN untuk ${st.name} telah berjaya diset semula kepada 1234 (Lalai).`);
     } catch (err: any) {
       alert(`Ralat semasa menetapkan semula PIN staf: ${err.message || 'Ralat sambungan.'}`);
@@ -663,16 +664,15 @@ ST003,Pengajian Am,Cik Siti Sarah Binti Razak,Pensyarah,013-5558899,siti.sarah@k
 
     setIsResettingAllPins(true);
     try {
-      for (const st of staffList) {
-        await resetStaffPinInCloud(st.id, '5313').catch(() => {});
-      }
       const resetList: StaffUser[] = staffList.map(item => ({
         ...item,
         pinStatus: 'DEFAULT' as const,
         pinChangedAt: undefined
       }));
       if (onSyncStaffUsers) {
-        await onSyncStaffUsers(resetList);
+        await onSyncStaffUsers(resetList, 'merge', true);
+      } else {
+        saveStoredStaffUsers(resetList);
       }
       alert('🟢 Berjaya! Semua PIN staf telah ditetapkan semula kepada 1234 (Lalai) dan disinkronkan ke Cloud Firebase.');
     } catch (err: any) {

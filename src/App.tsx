@@ -60,7 +60,8 @@ import {
   getConnectionStatus,
   testFirebaseConnection,
   ConnectionStatusState,
-  syncPendingBookingsQueue
+  syncPendingBookingsQueue,
+  saveScheduleSlotToCloud
 } from './lib/firebase';
 import { INITIAL_STAFF_DATA } from './data/staffData';
 
@@ -804,6 +805,43 @@ export default function App() {
     showToast(`🟢 Data sistem ditetapkan ke Master Data rasmi (Sifar Data Demo).`);
   };
 
+  // Admin Remark & Slot Alignment Handlers
+  const handleUpdateAcademicSlot = async (updatedSlot: AcademicScheduleSlot) => {
+    const updated = academicSchedule.map(s => s.id === updatedSlot.id ? updatedSlot : s);
+    setAcademicSchedule(updated);
+    saveStoredAcademicSchedule(updated);
+    try {
+      await saveScheduleSlotToCloud(updatedSlot);
+    } catch (err) {
+      console.warn('Error saving schedule slot to cloud:', err);
+    }
+    showToast(`🟢 Remark slot jadual (${updatedSlot.roomId} ${updatedSlot.startTime}–${updatedSlot.endTime}) telah dikemas kini.`);
+  };
+
+  const handleUpdateBooking = async (updatedBooking: AdHocBooking) => {
+    updateStoredBooking(updatedBooking);
+    const updated = adhocBookings.map(b => b.id === updatedBooking.id ? updatedBooking : b);
+    setAdhocBookings(updated);
+    try {
+      await saveBookingToCloud(updatedBooking);
+    } catch (err) {
+      console.warn('Error saving booking to cloud:', err);
+    }
+    showToast(`🟢 Maklumat tempahan (${updatedBooking.roomName}) telah dikemas kini.`);
+  };
+
+  const handleUpdateBlock = async (updatedBlock: InstitutionalBlock) => {
+    const updated = institutionalBlocks.map(b => b.id === updatedBlock.id ? updatedBlock : b);
+    setInstitutionalBlocks(updated);
+    saveStoredInstitutionalBlocks(updated);
+    try {
+      await saveBlockToCloud(updatedBlock);
+    } catch (err) {
+      console.warn('Error saving block to cloud:', err);
+    }
+    showToast(`🟢 Remark sekatan (${updatedBlock.title}) telah dikemas kini.`);
+  };
+
   const pendingCount = adhocBookings.filter(b => b.status === 'PENDING').length;
 
   const getTabBreadcrumb = (tab: ActiveTab) => {
@@ -881,6 +919,14 @@ export default function App() {
               onViewRoomDetails={(room) => {
                 setActiveTab('directory');
               }}
+              isAdmin={isAdminUnlocked}
+              onAdminUnlock={() => {
+                setIsAdminUnlocked(true);
+                sessionStorage.setItem('kpmbp_admin_unlocked', 'true');
+              }}
+              onUpdateAcademicSlot={handleUpdateAcademicSlot}
+              onUpdateBooking={handleUpdateBooking}
+              onUpdateBlock={handleUpdateBlock}
             />
           )}
 

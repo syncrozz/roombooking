@@ -35,7 +35,13 @@ import {
   Moon,
   Sun,
   X,
-  Lock
+  Lock,
+  Edit3,
+  Save,
+  RotateCcw,
+  KeyRound,
+  ShieldCheck,
+  Check
 } from 'lucide-react';
 
 interface RoomAvailabilityMatrixProps {
@@ -45,6 +51,11 @@ interface RoomAvailabilityMatrixProps {
   institutionalBlocks: InstitutionalBlock[];
   onOpenBookingModal: (room: Room, date: string, startTime: string, endTime: string, purpose: PurposeCategory) => void;
   onViewRoomDetails: (room: Room) => void;
+  isAdmin?: boolean;
+  onAdminUnlock?: () => void;
+  onUpdateAcademicSlot?: (slot: AcademicScheduleSlot) => Promise<void> | void;
+  onUpdateBooking?: (booking: AdHocBooking) => Promise<void> | void;
+  onUpdateBlock?: (block: InstitutionalBlock) => Promise<void> | void;
 }
 
 export const RoomAvailabilityMatrix: React.FC<RoomAvailabilityMatrixProps> = ({
@@ -53,7 +64,12 @@ export const RoomAvailabilityMatrix: React.FC<RoomAvailabilityMatrixProps> = ({
   adhocBookings,
   institutionalBlocks,
   onOpenBookingModal,
-  onViewRoomDetails
+  onViewRoomDetails,
+  isAdmin = false,
+  onAdminUnlock,
+  onUpdateAcademicSlot,
+  onUpdateBooking,
+  onUpdateBlock
 }) => {
   // Default to today's live current date in YYYY-MM-DD format
   const getTodayFormatted = () => {
@@ -75,6 +91,155 @@ export const RoomAvailabilityMatrix: React.FC<RoomAvailabilityMatrixProps> = ({
     endTime: string;
     check: ReturnType<typeof checkRoomAvailability>;
   } | null>(null);
+
+  // Remark editing state (Admin)
+  const [isEditingRemark, setIsEditingRemark] = useState<boolean>(false);
+  const [editRemarkValue, setEditRemarkValue] = useState<string>('');
+  const [editClassValue, setEditClassValue] = useState<string>('');
+  const [editSubjectValue, setEditSubjectValue] = useState<string>('');
+  const [editLecturerValue, setEditLecturerValue] = useState<string>('');
+  const [editReasonValue, setEditReasonValue] = useState<string>('');
+  const [isSavingRemark, setIsSavingRemark] = useState<boolean>(false);
+  const [remarkSuccessMsg, setRemarkSuccessMsg] = useState<string | null>(null);
+  const [showAdminPinPrompt, setShowAdminPinPrompt] = useState<boolean>(false);
+  const [adminPinInput, setAdminPinInput] = useState<string>('');
+  const [adminPinError, setAdminPinError] = useState<string | null>(null);
+
+  const handleOpenCellInspection = (info: {
+    room: Room;
+    startTime: string;
+    endTime: string;
+    check: ReturnType<typeof checkRoomAvailability>;
+  }) => {
+    setSelectedCellInfo(info);
+    setIsEditingRemark(false);
+    setRemarkSuccessMsg(null);
+    setShowAdminPinPrompt(false);
+    setAdminPinError(null);
+    setAdminPinInput('');
+
+    if (info.check.status === 'OCCUPIED_ACADEMIC' && info.check.academicSlot) {
+      const slot = info.check.academicSlot;
+      setEditRemarkValue(slot.remark || (slot.courseCode === 'TERKUNCI' ? 'LOCKED' : slot.courseCode));
+      setEditClassValue(slot.className || '');
+      setEditSubjectValue(slot.courseName || '');
+      setEditLecturerValue(slot.lecturerName || '');
+    } else if (info.check.status === 'BLOCKED' && info.check.institutionalBlock) {
+      const block = info.check.institutionalBlock;
+      setEditRemarkValue(block.title || '');
+      setEditReasonValue(block.reason || '');
+    } else if ((info.check.status === 'OCCUPIED_BOOKING' || info.check.status === 'PENDING_BOOKING') && info.check.existingBooking) {
+      const b = info.check.existingBooking;
+      setEditRemarkValue(b.title || '');
+      setEditReasonValue(b.notes || '');
+    }
+  };
+
+  const handleStartEditing = () => {
+    if (!isAdmin) {
+      setShowAdminPinPrompt(true);
+      return;
+    }
+    setIsEditingRemark(true);
+    setRemarkSuccessMsg(null);
+  };
+
+  const handleVerifyAdminPinForEdit = (e: React.FormEvent) => {
+    e.preventDefault();
+    if (adminPinInput.trim() === '5313') {
+      if (onAdminUnlock) {
+        onAdminUnlock();
+      }
+      setShowAdminPinPrompt(false);
+      setIsEditingRemark(true);
+      setAdminPinInput('');
+      setAdminPinError(null);
+    } else {
+      setAdminPinError('PIN Pentadbir tidak sah (Sila gunakan 5313).');
+    }
+  };
+
+  const handleSaveRemark = async () => {
+    if (!selectedCellInfo) return;
+    setIsSavingRemark(true);
+    setRemarkSuccessMsg(null);
+
+    try {
+      if (selectedCellInfo.check.status === 'OCCUPIED_ACADEMIC' && selectedCellInfo.check.academicSlot) {
+        const cleanRemark = editRemarkValue.trim();
+        const updatedSlot: AcademicScheduleSlot = {
+          ...selectedCellInfo.check.academicSlot,
+          remark: cleanRemark,
+          courseCode: cleanRemark || selectedCellInfo.check.academicSlot.courseCode,
+          className: editClassValue.trim() || selectedCellInfo.check.academicSlot.className,
+          courseName: editSubjectValue.trim() || selectedCellInfo.check.academicSlot.courseName,
+          lecturerName: editLecturerValue.trim() || selectedCellInfo.check.academicSlot.lecturerName,
+        };
+
+        if (onUpdateAcademicSlot) {
+          await onUpdateAcademicSlot(updatedSlot);
+        }
+
+        setSelectedCellInfo(prev => prev ? {
+          ...prev,
+          check: {
+            ...prev.check,
+            academicSlot: updatedSlot,
+          }
+        } : null);
+      } else if (selectedCellInfo.check.status === 'BLOCKED' && selectedCellInfo.check.institutionalBlock) {
+        const cleanTitle = editRemarkValue.trim();
+        const updatedBlock: InstitutionalBlock = {
+          ...selectedCellInfo.check.institutionalBlock,
+          title: cleanTitle || selectedCellInfo.check.institutionalBlock.title,
+          reason: editReasonValue.trim() || selectedCellInfo.check.institutionalBlock.reason,
+        };
+
+        if (onUpdateBlock) {
+          await onUpdateBlock(updatedBlock);
+        }
+
+        setSelectedCellInfo(prev => prev ? {
+          ...prev,
+          check: {
+            ...prev.check,
+            institutionalBlock: updatedBlock,
+          }
+        } : null);
+      } else if (
+        (selectedCellInfo.check.status === 'OCCUPIED_BOOKING' || selectedCellInfo.check.status === 'PENDING_BOOKING') &&
+        selectedCellInfo.check.existingBooking
+      ) {
+        const cleanTitle = editRemarkValue.trim();
+        const updatedBooking: AdHocBooking = {
+          ...selectedCellInfo.check.existingBooking,
+          title: cleanTitle || selectedCellInfo.check.existingBooking.title,
+          notes: editReasonValue.trim() || selectedCellInfo.check.existingBooking.notes,
+        };
+
+        if (onUpdateBooking) {
+          await onUpdateBooking(updatedBooking);
+        }
+
+        setSelectedCellInfo(prev => prev ? {
+          ...prev,
+          check: {
+            ...prev.check,
+            existingBooking: updatedBooking,
+          }
+        } : null);
+      }
+
+      setRemarkSuccessMsg('🟢 Remark berjaya disimpan dan diselaraskan!');
+      setTimeout(() => {
+        setIsEditingRemark(false);
+      }, 1200);
+    } catch (err: any) {
+      alert(`Ralat menyimpan remark: ${err?.message || 'Ralat'}`);
+    } finally {
+      setIsSavingRemark(false);
+    }
+  };
 
   useEffect(() => {
     const handleKeyDown = (e: KeyboardEvent) => {
@@ -425,13 +590,12 @@ export const RoomAvailabilityMatrix: React.FC<RoomAvailabilityMatrixProps> = ({
                               }`}
                               title={`Klik untuk Tempah ${room.code} | Slot: ${slot.start} – ${slot.end}`}
                             >
-                              <span className="text-[11px] flex items-center gap-1 font-bold">
+                              <span className="text-[11px] flex items-center justify-center font-bold">
                                 {slot.period === 'NIGHT' ? (
-                                  <Moon className="w-3 h-3 text-indigo-600 group-hover:text-white" />
+                                  <Moon className="w-3.5 h-3.5 text-indigo-600 group-hover:text-white transition-transform group-hover:scale-110" />
                                 ) : (
-                                  <CheckCircle2 className="w-3 h-3 text-emerald-600 group-hover:text-white" />
+                                  <CheckCircle2 className="w-3.5 h-3.5 text-emerald-600 group-hover:text-white transition-transform group-hover:scale-110" />
                                 )}
-                                Kosong
                               </span>
                               <span className="text-[9px] opacity-80 font-mono group-hover:text-white font-medium">
                                 {slot.start} +
@@ -466,18 +630,32 @@ export const RoomAvailabilityMatrix: React.FC<RoomAvailabilityMatrixProps> = ({
                               displayClassName = displayClassName.charAt(0) + displayClassName.slice(1).toLowerCase();
                             }
 
+                            const rawRemark = acadSlot?.remark || (acadSlot?.courseCode === 'TERKUNCI' ? 'LOCKED' : acadSlot?.courseCode) || '';
+                            const isLockedRemark = !rawRemark || 
+                              rawRemark.toUpperCase() === 'LOCKED' || 
+                              rawRemark.toUpperCase() === 'TERKUNCI' || 
+                              rawRemark.toUpperCase() === 'LOCK' || 
+                              rawRemark.toUpperCase() === 'DIKUNCI';
+
                             return (
                               <button
-                                onClick={() => setSelectedCellInfo({ room, startTime: slot.start, endTime: slot.end, check })}
+                                onClick={() => handleOpenCellInspection({ room, startTime: slot.start, endTime: slot.end, check })}
                                 className="w-full h-11 rounded-lg bg-rose-50 hover:bg-rose-100 border border-rose-300 text-rose-900 font-semibold transition p-1 text-center flex flex-col items-center justify-center overflow-hidden group shadow-2xs active:scale-[0.98]"
-                                title={`Jadual Kuliah Semester Rasmi KPMBP (Bukan Tempahan Ad-hoc): ${acadSlot?.className || displayClassName} - ${acadSlot?.courseCode === 'TERKUNCI' ? 'LOCKED' : acadSlot?.courseCode} (${acadSlot?.lecturerName || displayClassName})`}
+                                title={`Jadual Kuliah Semester Rasmi KPMBP (Bukan Tempahan Ad-hoc): ${acadSlot?.className || displayClassName} - ${rawRemark} (${acadSlot?.lecturerName || displayClassName})`}
                               >
                                 <div className="flex items-center justify-center gap-1 w-full text-[9px] font-bold text-rose-700 tracking-tight">
                                   <span className="w-1.5 h-1.5 rounded-full bg-rose-500 shrink-0"></span>
                                   <span className="truncate max-w-[95px]">{displayClassName}</span>
                                 </div>
-                                <div className="text-[10px] truncate max-w-full text-rose-950 font-extrabold">
-                                  {acadSlot?.courseCode === 'TERKUNCI' ? 'LOCKED' : acadSlot?.courseCode}
+                                <div className="text-[10px] truncate max-w-full text-rose-950 font-extrabold flex items-center justify-center gap-1">
+                                  <span className="truncate flex items-center justify-center">
+                                    {isLockedRemark ? (
+                                      <Lock className="w-3 h-3 text-rose-600 shrink-0" />
+                                    ) : (
+                                      rawRemark
+                                    )}
+                                  </span>
+                                  {isAdmin && <span className="opacity-0 group-hover:opacity-100 text-[8px] text-rose-600 transition" title="Admin: Klik untuk ubah remark">✏️</span>}
                                 </div>
                               </button>
                             );
@@ -485,15 +663,16 @@ export const RoomAvailabilityMatrix: React.FC<RoomAvailabilityMatrixProps> = ({
 
                           {isAdhoc && (
                             <button
-                              onClick={() => setSelectedCellInfo({ room, startTime: slot.start, endTime: slot.end, check })}
-                              className="w-full h-11 rounded-lg bg-amber-100 hover:bg-amber-200 border border-amber-300 text-amber-900 font-semibold transition p-1 text-center flex flex-col items-center justify-center overflow-hidden"
+                              onClick={() => handleOpenCellInspection({ room, startTime: slot.start, endTime: slot.end, check })}
+                              className="w-full h-11 rounded-lg bg-amber-100 hover:bg-amber-200 border border-amber-300 text-amber-900 font-semibold transition p-1 text-center flex flex-col items-center justify-center overflow-hidden group"
                               title={check.conflictReason}
                             >
                               <div className="text-[10px] font-bold truncate max-w-full text-amber-950">
                                 🟨 {getShortName(check.existingBooking?.applicantName ?? '')}
                               </div>
-                              <div className="text-[9px] truncate max-w-full text-amber-800">
-                                {check.existingBooking?.purposeCategory}
+                              <div className="text-[9px] truncate max-w-full text-amber-800 flex items-center justify-center gap-1">
+                                <span className="truncate">{check.existingBooking?.title || check.existingBooking?.purposeCategory}</span>
+                                {isAdmin && <span className="opacity-0 group-hover:opacity-100 text-[8px] text-amber-600 transition" title="Admin: Klik untuk ubah remark">✏️</span>}
                               </div>
                             </button>
                           )}
@@ -501,19 +680,21 @@ export const RoomAvailabilityMatrix: React.FC<RoomAvailabilityMatrixProps> = ({
                           {isBlocked && (() => {
                             const block = check.institutionalBlock;
                             const blockLabel = block?.title || (block?.category === 'EXAM' ? 'Peperiksaan Akhir' : 'Program Kolej');
+                            const isBlockedLocked = blockLabel.toUpperCase() === 'BLOCKED' || blockLabel.toUpperCase() === 'LOCKED' || blockLabel.toUpperCase() === 'TERKUNCI';
 
                             return (
                               <button
-                                onClick={() => setSelectedCellInfo({ room, startTime: slot.start, endTime: slot.end, check })}
+                                onClick={() => handleOpenCellInspection({ room, startTime: slot.start, endTime: slot.end, check })}
                                 className="w-full h-11 rounded-xl bg-[#0b1329] hover:bg-[#131d38] border border-slate-800/90 text-white font-semibold transition p-1 text-center flex flex-col items-center justify-center overflow-hidden shadow-2xs cursor-pointer group"
                                 title={check.conflictReason}
                               >
                                 <div className="text-[10px] font-extrabold truncate max-w-full text-amber-400 flex items-center justify-center gap-1.5 leading-tight">
-                                  <span className="text-[11px] leading-none shrink-0 select-none">⚫</span>
-                                  <span className="tracking-wide">BLOCKED</span>
+                                  <Lock className="w-3 h-3 text-amber-400 shrink-0" />
+                                  <span className="text-[10px] leading-none shrink-0 select-none">⚫</span>
                                 </div>
-                                <div className="text-[10px] font-bold text-white truncate max-w-full leading-tight mt-0.5">
-                                  {blockLabel}
+                                <div className="text-[10px] font-bold text-white truncate max-w-full leading-tight mt-0.5 flex items-center justify-center gap-1">
+                                  <span className="truncate">{isBlockedLocked ? '' : blockLabel}</span>
+                                  {isAdmin && <span className="opacity-0 group-hover:opacity-100 text-[8px] text-amber-300 transition" title="Admin: Klik untuk ubah remark">✏️</span>}
                                 </div>
                               </button>
                             );
@@ -556,95 +737,307 @@ export const RoomAvailabilityMatrix: React.FC<RoomAvailabilityMatrixProps> = ({
                 <strong className="text-slate-900">Masa:</strong> {selectedCellInfo.startTime} – {selectedCellInfo.endTime} ({calculateDurationText(selectedCellInfo.startTime, selectedCellInfo.endTime)}) • {formatDateMalay(selectedDate)}
               </div>
 
-              {selectedCellInfo.check.status === 'OCCUPIED_ACADEMIC' && (
-                <div className="p-3.5 bg-rose-50 border border-rose-200 rounded-xl space-y-2">
-                  <div className="flex items-center gap-2">
-                    <span className="px-2 py-0.5 rounded bg-rose-200 text-rose-900 text-[10px] font-black uppercase tracking-wider">
-                      Jadual Kuliah Semester Rasmi
-                    </span>
-                  </div>
-                  <div className="pt-2 text-xs text-rose-950 space-y-1 border-t border-rose-200">
-                    <div><span className="text-slate-500">Subjek:</span> <strong>{(selectedCellInfo.check.academicSlot?.courseCode === 'TERKUNCI' ? 'LOCKED' : selectedCellInfo.check.academicSlot?.courseCode)} - {selectedCellInfo.check.academicSlot?.courseName}</strong></div>
-                    <div><span className="text-slate-500">Kelas / Maklumat:</span> <strong>{(() => {
-                      const cls = selectedCellInfo.check.academicSlot?.className;
-                      const lec = selectedCellInfo.check.academicSlot?.lecturerName;
-                      if (!cls) return 'Slot Terkunci';
-                      if (cls === 'Pengajian / Aktiviti' || cls.startsWith('Pensyarah (') || cls === 'TERKUNCI') {
-                        const raw = lec || cls.replace(/^Pensyarah\s*\((.*)\)$/, '$1') || cls;
-                        return /^[A-Z]{3,}$/.test(raw) ? raw.charAt(0) + raw.slice(1).toLowerCase() : raw;
-                      }
-                      return cls;
-                    })()}</strong></div>
-                    <div><span className="text-slate-500">Pensyarah:</span> <strong>{selectedCellInfo.check.academicSlot?.lecturerName}</strong></div>
-                  </div>
+              {/* SUCCESS NOTICE */}
+              {remarkSuccessMsg && (
+                <div className="p-3 bg-emerald-50 border border-emerald-200 rounded-xl text-emerald-800 text-xs font-bold flex items-center gap-2 animate-in fade-in">
+                  <CheckCircle2 className="w-4 h-4 text-emerald-600 shrink-0" />
+                  <span>{remarkSuccessMsg}</span>
                 </div>
               )}
 
-              {(selectedCellInfo.check.status === 'OCCUPIED_BOOKING' || selectedCellInfo.check.status === 'PENDING_BOOKING') && (
-                <div className="p-3.5 bg-amber-50 border border-amber-200 rounded-xl space-y-2">
-                  <div className="flex items-center gap-2">
-                    <span className="px-2 py-0.5 rounded bg-amber-200 text-amber-900 text-[10px] font-black uppercase tracking-wider">
-                      Tempahan Ad-Hoc Staf
-                    </span>
-                    <span className="text-[11px] font-bold text-amber-700">
-                      {selectedCellInfo.check.existingBooking?.status === 'CONFIRMED' ? 'Disahkan (Aktif)' : 'Menunggu Kelulusan'}
-                    </span>
+              {/* ADMIN PIN VERIFICATION PROMPT */}
+              {showAdminPinPrompt && (
+                <form onSubmit={handleVerifyAdminPinForEdit} className="p-3.5 bg-amber-50 border border-amber-300 rounded-xl space-y-2.5 animate-in fade-in">
+                  <div className="flex items-center gap-2 text-amber-900 font-bold text-xs">
+                    <KeyRound className="w-4 h-4 text-amber-700 shrink-0" />
+                    <span>Akses Pentadbir Diperlukan untuk Ubah Remark</span>
                   </div>
-                  <div className="pt-1 text-xs text-amber-950 space-y-1">
-                    <div><span className="text-slate-500">Pemohon:</span> <strong>{selectedCellInfo.check.existingBooking?.applicantName}</strong> ({selectedCellInfo.check.existingBooking?.applicantDepartment})</div>
-                    <div><span className="text-slate-500">Tujuan:</span> <strong>{selectedCellInfo.check.existingBooking?.purpose}</strong></div>
-                    <div><span className="text-slate-500">Kategori:</span> {selectedCellInfo.check.existingBooking?.purposeCategory}</div>
-                  </div>
-                </div>
-              )}
-
-              {selectedCellInfo.check.status === 'BLOCKED' && (() => {
-                const block = selectedCellInfo.check.institutionalBlock;
-                return (
-                  <div className="p-3.5 bg-[#0b1329] text-slate-100 rounded-xl space-y-2 border border-slate-800">
-                    <div className="flex items-center gap-2">
-                      <span className="px-2 py-0.5 rounded bg-amber-400 text-slate-950 text-[10px] font-black uppercase tracking-wider flex items-center gap-1.5">
-                        <span className="text-[11px] leading-none">⚫</span>
-                        Sekatan Institusi / Kolej
-                      </span>
-                    </div>
-                    <div className="text-sm font-bold text-white">{block?.title || 'Program Kolej'}</div>
-                    <p className="text-slate-300 text-xs leading-relaxed">
-                      {selectedCellInfo.check.conflictReason}
-                    </p>
-                    {block?.reason && (
-                      <div className="text-slate-400 text-[11px] leading-relaxed pt-0.5">{block.reason}</div>
-                    )}
-                    <div className="pt-2 text-[11px] text-slate-300 flex flex-wrap gap-x-4 gap-y-1 border-t border-slate-800">
-                      {block?.endDate && (
-                        <div><span className="text-slate-400">Tempoh:</span> <strong>{block.date} &rarr; {block.endDate}</strong></div>
-                      )}
-                      <div><span className="text-slate-400">Waktu:</span> <strong>{block?.startTime} – {block?.endTime}</strong></div>
-                      {block?.createdBy && (
-                        <div><span className="text-slate-400">Disediakan Oleh:</span> <strong>{block.createdBy}</strong></div>
-                      )}
-                    </div>
-                  </div>
-                );
-              })()}
-
-              {selectedCellInfo.check.status === 'AVAILABLE' && (
-                <div className="p-3.5 bg-emerald-50 border border-emerald-200 rounded-xl space-y-1.5">
-                  <div className="flex items-center gap-2 text-emerald-800 font-bold text-xs">
-                    <CheckCircle2 className="w-4 h-4 text-emerald-600" />
-                    <span>Ruang Kosong & Boleh Ditempah</span>
-                  </div>
-                  <p className="text-emerald-700 text-xs">
-                    Tiada jadual kuliah rasmi atau tempahan ad-hoc pada waktu ini.
+                  <p className="text-[11px] text-amber-800">
+                    Sila masukkan PIN Pentadbir (5313) untuk mengaktifkan kebenaran menyunting remark:
                   </p>
+                  <div className="flex gap-2">
+                    <input
+                      type="password"
+                      inputMode="numeric"
+                      maxLength={8}
+                      placeholder="PIN Pentadbir (5313)"
+                      value={adminPinInput}
+                      onChange={(e) => {
+                        setAdminPinInput(e.target.value);
+                        setAdminPinError(null);
+                      }}
+                      className="flex-1 px-3 py-1.5 border border-amber-300 rounded-lg text-xs font-mono bg-white focus:outline-hidden focus:ring-2 focus:ring-amber-500"
+                      autoFocus
+                    />
+                    <button
+                      type="submit"
+                      className="px-3 py-1.5 bg-amber-600 hover:bg-amber-700 text-white rounded-lg text-xs font-bold transition flex items-center gap-1 shrink-0"
+                    >
+                      <ShieldCheck className="w-3.5 h-3.5" />
+                      Sahkan
+                    </button>
+                    <button
+                      type="button"
+                      onClick={() => setShowAdminPinPrompt(false)}
+                      className="px-2.5 py-1.5 bg-slate-200 hover:bg-slate-300 text-slate-700 rounded-lg text-xs font-semibold transition"
+                    >
+                      Batal
+                    </button>
+                  </div>
+                  {adminPinError && (
+                    <div className="text-[11px] font-bold text-rose-600">{adminPinError}</div>
+                  )}
+                </form>
+              )}
+
+              {/* EDIT REMARK FORM (ADMIN) */}
+              {isEditingRemark ? (
+                <div className="p-3.5 bg-indigo-50/80 border border-indigo-200 rounded-xl space-y-3 animate-in fade-in">
+                  <div className="flex items-center justify-between border-b border-indigo-100 pb-2">
+                    <div className="flex items-center gap-1.5 text-indigo-950 font-bold text-xs">
+                      <Edit3 className="w-4 h-4 text-indigo-600" />
+                      <span>Ubah Remark &amp; Selaraskan Maklumat</span>
+                    </div>
+                    <span className="text-[10px] font-semibold bg-indigo-200 text-indigo-900 px-2 py-0.5 rounded-full">
+                      Mod Pentadbir
+                    </span>
+                  </div>
+
+                  {/* PRESET CHIPS UNTUK KESELARASAN */}
+                  <div>
+                    <label className="block text-[11px] font-bold text-indigo-900 mb-1.5">
+                      Pilihan Pantas (Klik untuk Selaraskan):
+                    </label>
+                    <div className="flex flex-wrap gap-1.5">
+                      {['LOCKED', 'TERKUNCI', 'KELAS', 'KULIAH DIA', 'BENGKEL', 'PEPERIKSAAN', 'KONSULTASI', 'MESYUARAT'].map((preset) => (
+                        <button
+                          key={preset}
+                          type="button"
+                          onClick={() => setEditRemarkValue(preset)}
+                          className={`px-2 py-1 rounded text-[10px] font-bold transition border ${
+                            editRemarkValue === preset
+                              ? 'bg-indigo-600 text-white border-indigo-700 shadow-2xs'
+                              : 'bg-white text-indigo-800 border-indigo-200 hover:bg-indigo-100'
+                          }`}
+                        >
+                          {preset}
+                        </button>
+                      ))}
+                    </div>
+                  </div>
+
+                  {/* REMARK INPUT */}
+                  <div>
+                    <label className="block text-[11px] font-bold text-slate-700 mb-1">
+                      Remark / Label Paparan Slot (Dipaparkan pada Grid):
+                    </label>
+                    <input
+                      type="text"
+                      value={editRemarkValue}
+                      onChange={(e) => setEditRemarkValue(e.target.value)}
+                      placeholder="Contoh: LOCKED, TERKUNCI, DIA 1023, dsb."
+                      className="w-full px-3 py-1.5 border border-indigo-300 rounded-lg text-xs bg-white text-slate-900 font-bold focus:outline-hidden focus:ring-2 focus:ring-indigo-500"
+                    />
+                  </div>
+
+                  {/* EXTRA ACADEMIC FIELDS */}
+                  {selectedCellInfo.check.status === 'OCCUPIED_ACADEMIC' && (
+                    <div className="space-y-2 pt-1 border-t border-indigo-100">
+                      <div>
+                        <label className="block text-[10px] font-semibold text-slate-600 mb-0.5">
+                          Nama Kelas / Kumpulan:
+                        </label>
+                        <input
+                          type="text"
+                          value={editClassValue}
+                          onChange={(e) => setEditClassValue(e.target.value)}
+                          placeholder="Contoh: DIA 4C / Pengajian"
+                          className="w-full px-2.5 py-1 border border-slate-300 rounded text-xs bg-white text-slate-800 focus:outline-hidden focus:ring-1 focus:ring-indigo-500"
+                        />
+                      </div>
+                      <div>
+                        <label className="block text-[10px] font-semibold text-slate-600 mb-0.5">
+                          Nama Kursus / Subjek:
+                        </label>
+                        <input
+                          type="text"
+                          value={editSubjectValue}
+                          onChange={(e) => setEditSubjectValue(e.target.value)}
+                          placeholder="Contoh: Perakaunan Kewangan 1"
+                          className="w-full px-2.5 py-1 border border-slate-300 rounded text-xs bg-white text-slate-800 focus:outline-hidden focus:ring-1 focus:ring-indigo-500"
+                        />
+                      </div>
+                      <div>
+                        <label className="block text-[10px] font-semibold text-slate-600 mb-0.5">
+                          Nama Pensyarah:
+                        </label>
+                        <input
+                          type="text"
+                          value={editLecturerValue}
+                          onChange={(e) => setEditLecturerValue(e.target.value)}
+                          placeholder="Contoh: Pn. Tahira Mohamed"
+                          className="w-full px-2.5 py-1 border border-slate-300 rounded text-xs bg-white text-slate-800 focus:outline-hidden focus:ring-1 focus:ring-indigo-500"
+                        />
+                      </div>
+                    </div>
+                  )}
+
+                  {/* EXTRA BLOCKED / BOOKING FIELDS */}
+                  {(selectedCellInfo.check.status === 'BLOCKED' || selectedCellInfo.check.status === 'OCCUPIED_BOOKING' || selectedCellInfo.check.status === 'PENDING_BOOKING') && (
+                    <div className="pt-1 border-t border-indigo-100">
+                      <label className="block text-[10px] font-semibold text-slate-600 mb-0.5">
+                        Catatan / Penerangan Tambahan:
+                      </label>
+                      <input
+                        type="text"
+                        value={editReasonValue}
+                        onChange={(e) => setEditReasonValue(e.target.value)}
+                        placeholder="Catatan tujuan atau sebab sekatan"
+                        className="w-full px-2.5 py-1 border border-slate-300 rounded text-xs bg-white text-slate-800 focus:outline-hidden focus:ring-1 focus:ring-indigo-500"
+                      />
+                    </div>
+                  )}
+
+                  {/* FORM ACTIONS */}
+                  <div className="flex items-center justify-end gap-2 pt-2 border-t border-indigo-100">
+                    <button
+                      type="button"
+                      onClick={() => setIsEditingRemark(false)}
+                      className="px-3 py-1.5 text-xs font-semibold text-slate-600 hover:text-slate-800 rounded-lg hover:bg-slate-200 transition"
+                      disabled={isSavingRemark}
+                    >
+                      Batal
+                    </button>
+                    <button
+                      type="button"
+                      onClick={handleSaveRemark}
+                      disabled={isSavingRemark}
+                      className="px-4 py-1.5 bg-indigo-600 hover:bg-indigo-700 text-white text-xs font-bold rounded-lg shadow-sm transition flex items-center gap-1.5 disabled:opacity-50"
+                    >
+                      <Save className="w-3.5 h-3.5" />
+                      <span>{isSavingRemark ? 'Menyimpan...' : 'Simpan & Selaraskan'}</span>
+                    </button>
+                  </div>
                 </div>
+              ) : (
+                /* VIEW DETAILS SECTION */
+                <>
+                  {selectedCellInfo.check.status === 'OCCUPIED_ACADEMIC' && (
+                    <div className="p-3.5 bg-rose-50 border border-rose-200 rounded-xl space-y-2">
+                      <div className="flex items-center justify-between">
+                        <span className="px-2 py-0.5 rounded bg-rose-200 text-rose-900 text-[10px] font-black uppercase tracking-wider">
+                          Jadual Kuliah Semester Rasmi
+                        </span>
+                        {selectedCellInfo.check.academicSlot?.remark && (
+                          <span className="text-[10px] bg-rose-100 text-rose-800 px-2 py-0.5 rounded font-extrabold border border-rose-200">
+                            Remark: {selectedCellInfo.check.academicSlot.remark}
+                          </span>
+                        )}
+                      </div>
+                      <div className="pt-2 text-xs text-rose-950 space-y-1 border-t border-rose-200">
+                        <div>
+                          <span className="text-slate-500">Remark / Kod:</span>{' '}
+                          <strong className="text-rose-900 bg-rose-100/70 px-1.5 py-0.5 rounded font-mono">
+                            {selectedCellInfo.check.academicSlot?.remark || (selectedCellInfo.check.academicSlot?.courseCode === 'TERKUNCI' ? 'LOCKED' : selectedCellInfo.check.academicSlot?.courseCode)}
+                          </strong>
+                        </div>
+                        <div><span className="text-slate-500">Subjek:</span> <strong>{selectedCellInfo.check.academicSlot?.courseCode} - {selectedCellInfo.check.academicSlot?.courseName}</strong></div>
+                        <div><span className="text-slate-500">Kelas / Maklumat:</span> <strong>{(() => {
+                          const cls = selectedCellInfo.check.academicSlot?.className;
+                          const lec = selectedCellInfo.check.academicSlot?.lecturerName;
+                          if (!cls) return 'Slot Terkunci';
+                          if (cls === 'Pengajian / Aktiviti' || cls.startsWith('Pensyarah (') || cls === 'TERKUNCI') {
+                            const raw = lec || cls.replace(/^Pensyarah\s*\((.*)\)$/, '$1') || cls;
+                            return /^[A-Z]{3,}$/.test(raw) ? raw.charAt(0) + raw.slice(1).toLowerCase() : raw;
+                          }
+                          return cls;
+                        })()}</strong></div>
+                        <div><span className="text-slate-500">Pensyarah:</span> <strong>{selectedCellInfo.check.academicSlot?.lecturerName}</strong></div>
+                      </div>
+                    </div>
+                  )}
+
+                  {(selectedCellInfo.check.status === 'OCCUPIED_BOOKING' || selectedCellInfo.check.status === 'PENDING_BOOKING') && (
+                    <div className="p-3.5 bg-amber-50 border border-amber-200 rounded-xl space-y-2">
+                      <div className="flex items-center gap-2">
+                        <span className="px-2 py-0.5 rounded bg-amber-200 text-amber-900 text-[10px] font-black uppercase tracking-wider">
+                          Tempahan Ad-Hoc Staf
+                        </span>
+                        <span className="text-[11px] font-bold text-amber-700">
+                          {selectedCellInfo.check.existingBooking?.status === 'CONFIRMED' ? 'Disahkan (Aktif)' : 'Menunggu Kelulusan'}
+                        </span>
+                      </div>
+                      <div className="pt-1 text-xs text-amber-950 space-y-1">
+                        <div><span className="text-slate-500">Pemohon:</span> <strong>{selectedCellInfo.check.existingBooking?.applicantName}</strong> ({selectedCellInfo.check.existingBooking?.applicantDepartment})</div>
+                        <div><span className="text-slate-500">Tujuan / Remark:</span> <strong>{selectedCellInfo.check.existingBooking?.title || selectedCellInfo.check.existingBooking?.purpose}</strong></div>
+                        <div><span className="text-slate-500">Kategori:</span> {selectedCellInfo.check.existingBooking?.purposeCategory}</div>
+                        {selectedCellInfo.check.existingBooking?.notes && (
+                          <div><span className="text-slate-500">Catatan:</span> {selectedCellInfo.check.existingBooking?.notes}</div>
+                        )}
+                      </div>
+                    </div>
+                  )}
+
+                  {selectedCellInfo.check.status === 'BLOCKED' && (() => {
+                    const block = selectedCellInfo.check.institutionalBlock;
+                    return (
+                      <div className="p-3.5 bg-[#0b1329] text-slate-100 rounded-xl space-y-2 border border-slate-800">
+                        <div className="flex items-center gap-2">
+                          <span className="px-2 py-0.5 rounded bg-amber-400 text-slate-950 text-[10px] font-black uppercase tracking-wider flex items-center gap-1.5">
+                            <span className="text-[11px] leading-none">⚫</span>
+                            Sekatan Institusi / Kolej
+                          </span>
+                        </div>
+                        <div className="text-sm font-bold text-white">{block?.title || 'Program Kolej'}</div>
+                        <p className="text-slate-300 text-xs leading-relaxed">
+                          {selectedCellInfo.check.conflictReason}
+                        </p>
+                        {block?.reason && (
+                          <div className="text-slate-400 text-[11px] leading-relaxed pt-0.5">{block.reason}</div>
+                        )}
+                        <div className="pt-2 text-[11px] text-slate-300 flex flex-wrap gap-x-4 gap-y-1 border-t border-slate-800">
+                          {block?.endDate && (
+                            <div><span className="text-slate-400">Tempoh:</span> <strong>{block.date} &rarr; {block.endDate}</strong></div>
+                          )}
+                          <div><span className="text-slate-400">Waktu:</span> <strong>{block?.startTime} – {block?.endTime}</strong></div>
+                          {block?.createdBy && (
+                            <div><span className="text-slate-400">Disediakan Oleh:</span> <strong>{block.createdBy}</strong></div>
+                          )}
+                        </div>
+                      </div>
+                    );
+                  })()}
+
+                  {selectedCellInfo.check.status === 'AVAILABLE' && (
+                    <div className="p-3.5 bg-emerald-50 border border-emerald-200 rounded-xl space-y-1.5">
+                      <div className="flex items-center gap-2 text-emerald-800 font-bold text-xs">
+                        <CheckCircle2 className="w-4 h-4 text-emerald-600" />
+                        <span>Ruang Kosong &amp; Boleh Ditempah</span>
+                      </div>
+                      <p className="text-emerald-700 text-xs">
+                        Tiada jadual kuliah rasmi atau tempahan ad-hoc pada waktu ini.
+                      </p>
+                    </div>
+                  )}
+                </>
               )}
             </div>
 
-            <div className="pt-2 flex justify-end">
+            <div className="pt-2 flex items-center justify-between border-t border-slate-100">
+              {/* EDIT REMARK BUTTON FOR OCCUPIED SLOTS */}
+              {selectedCellInfo.check.status !== 'AVAILABLE' && !isEditingRemark && (
+                <button
+                  type="button"
+                  onClick={handleStartEditing}
+                  className="px-3 py-1.5 bg-indigo-50 hover:bg-indigo-100 text-indigo-700 border border-indigo-200 font-bold rounded-xl text-xs transition flex items-center gap-1.5"
+                >
+                  <Edit3 className="w-3.5 h-3.5 text-indigo-600" />
+                  <span>Ubah Remark (Admin)</span>
+                </button>
+              )}
               <button
                 onClick={() => setSelectedCellInfo(null)}
-                className="bg-slate-800 hover:bg-slate-900 text-white font-bold py-2 px-4 rounded-xl text-xs transition"
+                className="bg-slate-800 hover:bg-slate-900 text-white font-bold py-2 px-4 rounded-xl text-xs transition ml-auto"
               >
                 Tutup
               </button>

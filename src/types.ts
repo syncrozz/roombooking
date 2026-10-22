@@ -29,6 +29,7 @@ export interface AcademicScheduleSlot {
   className: string;      // e.g. 'DIA 4C'
   lecturerName: string;   // e.g. 'Pn. Tahira Mohamed'
   department: string;     // e.g. 'Jabatan Perdagangan'
+  remark?: string;        // Custom Admin Remark / Label Paparan Selaras
 }
 
 export type PurposeCategory = 

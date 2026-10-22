@@ -95,32 +95,32 @@ export const BookingModal: React.FC<BookingModalProps> = ({
   const [startDate, setStartDate] = useState<string>(date);
   const [endDate, setEndDate] = useState<string>(isOctSpecial ? '2026-10-13' : date);
 
-  // Compute default end time: prefer 2 hours (120 mins) if available, fallback to endTime
+  // Compute default end time: default to 1 hour (60 mins) from startTime, fallback to endTime
   const computeInitialEndTime = () => {
     const startMin = parseTimeMinutes(startTime);
-    const twoHoursEndMin = startMin + 120;
-    const maxEndMin = 1380; // 23:00 ceiling
+    const oneHourEndMin = startMin + 60;
+    const maxEndMin = room.allowNightBooking === false ? 1110 : 1380; // 23:00 ceiling
 
-    if (twoHoursEndMin <= maxEndMin) {
-      const twoHoursStr = minutesToTimeString(twoHoursEndMin);
+    if (oneHourEndMin <= maxEndMin) {
+      const oneHourStr = minutesToTimeString(oneHourEndMin);
       if (academicSchedule.length > 0 || adhocBookings.length > 0 || institutionalBlocks.length > 0) {
         const check = checkRoomAvailability(
           room,
           date,
           startTime,
-          twoHoursStr,
+          oneHourStr,
           academicSchedule,
           adhocBookings,
           institutionalBlocks
         );
         if (check.status === 'AVAILABLE') {
-          return twoHoursStr;
+          return oneHourStr;
         }
       } else {
-        return twoHoursStr;
+        return oneHourStr;
       }
     }
-    return endTime;
+    return endTime || minutesToTimeString(Math.min(startMin + 60, maxEndMin));
   };
 
   const [selectedStartTime, setSelectedStartTime] = useState<string>(startTime);
@@ -291,7 +291,7 @@ export const BookingModal: React.FC<BookingModalProps> = ({
       return {
         hours,
         endTime: endStr,
-        isPopular: hours === 2,
+        isPopular: hours === 1,
         isAvailable,
         conflictReason
       };
@@ -701,8 +701,15 @@ export const BookingModal: React.FC<BookingModalProps> = ({
                 id="modal-start-time"
                 value={selectedStartTime}
                 onChange={(e) => {
-                  setSelectedStartTime(e.target.value);
+                  const newStart = e.target.value;
+                  setSelectedStartTime(newStart);
                   setVerificationError(null);
+                  const newStartMin = parseTimeMinutes(newStart);
+                  const oneHourEndMin = newStartMin + 60;
+                  const maxCeil = room.allowNightBooking === false ? 1110 : 1380;
+                  if (oneHourEndMin <= maxCeil) {
+                    setSelectedEndTime(minutesToTimeString(oneHourEndMin));
+                  }
                 }}
                 className="w-full bg-slate-800 border border-slate-700 rounded-lg px-2 py-1.5 text-white font-mono text-xs outline-none focus:ring-1 focus:ring-blue-500 cursor-pointer"
               >
