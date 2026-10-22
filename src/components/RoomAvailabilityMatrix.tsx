@@ -41,7 +41,9 @@ import {
   RotateCcw,
   KeyRound,
   ShieldCheck,
-  Check
+  Check,
+  ChevronLeft,
+  ChevronRight
 } from 'lucide-react';
 
 interface RoomAvailabilityMatrixProps {
@@ -81,6 +83,31 @@ export const RoomAvailabilityMatrix: React.FC<RoomAvailabilityMatrixProps> = ({
   };
 
   const [selectedDate, setSelectedDate] = useState<string>(getTodayFormatted);
+
+  const handlePrevDay = () => {
+    const [y, m, d] = selectedDate.split('-').map(Number);
+    const dateObj = new Date(y, m - 1, d);
+    dateObj.setDate(dateObj.getDate() - 1);
+    const year = dateObj.getFullYear();
+    const month = String(dateObj.getMonth() + 1).padStart(2, '0');
+    const day = String(dateObj.getDate()).padStart(2, '0');
+    setSelectedDate(`${year}-${month}-${day}`);
+  };
+
+  const handleNextDay = () => {
+    const [y, m, d] = selectedDate.split('-').map(Number);
+    const dateObj = new Date(y, m - 1, d);
+    dateObj.setDate(dateObj.getDate() + 1);
+    const year = dateObj.getFullYear();
+    const month = String(dateObj.getMonth() + 1).padStart(2, '0');
+    const day = String(dateObj.getDate()).padStart(2, '0');
+    setSelectedDate(`${year}-${month}-${day}`);
+  };
+
+  const handleToday = () => {
+    setSelectedDate(getTodayFormatted());
+  };
+
   const [categoryFilter, setCategoryFilter] = useState<RoomCategory | 'Semua'>('Semua');
   const [periodFilter, setPeriodFilter] = useState<'ALL' | 'DAY' | 'NIGHT'>('ALL');
   const [searchQuery, setSearchQuery] = useState<string>('');
@@ -272,36 +299,77 @@ export const RoomAvailabilityMatrix: React.FC<RoomAvailabilityMatrixProps> = ({
     <div className="space-y-6">
 
       {/* Header Banner */}
-      <div className="bg-white rounded-2xl p-4 sm:p-5 shadow-md border border-slate-200">
-        <div className="flex flex-col sm:flex-row items-stretch sm:items-center justify-between gap-3 border-b border-slate-100 pb-3.5">
-          <label 
-            htmlFor="matrix-date-input"
-            className="flex items-center gap-2 bg-slate-50 hover:bg-emerald-50/60 border border-slate-200 hover:border-emerald-300 p-2.5 rounded-xl cursor-pointer transition-all duration-150 shadow-xs active:scale-[0.98] group w-fit"
-            title="Klik untuk memilih tarikh"
-          >
-            <Calendar className="w-4 h-4 text-emerald-600 group-hover:scale-110 transition-transform shrink-0" />
-            <input
-              id="matrix-date-input"
-              type="date"
-              value={selectedDate}
-              onChange={(e) => setSelectedDate(e.target.value)}
-              onClick={(e) => {
-                try {
-                  (e.currentTarget as any).showPicker?.();
-                } catch {}
-              }}
-              className="bg-transparent font-bold text-slate-900 text-sm outline-none cursor-pointer w-auto"
-            />
-            <span className="text-xs bg-emerald-100 group-hover:bg-emerald-200 text-emerald-800 font-semibold px-2 py-0.5 rounded transition-colors select-none shrink-0">
-              {getMalayDayOfWeek(selectedDate)}
-            </span>
-          </label>
+      <div className="bg-white rounded-2xl p-3.5 sm:p-4 shadow-md border border-slate-200 space-y-3">
+        {/* Baris 1: Tarikh + Navigasi Hari, Status Ruang & Pilihan Sesi */}
+        <div className="flex flex-wrap items-center justify-between gap-3 border-b border-slate-100 pb-3">
+          {/* Tarikh + Butang Pantas Semalam / Esok / Hari Ini */}
+          <div className="flex items-center gap-1.5 flex-wrap">
+            <div className="flex items-center bg-slate-50 border border-slate-200 hover:border-emerald-300 rounded-xl p-0.5 shadow-2xs transition-all">
+              <button
+                type="button"
+                onClick={handlePrevDay}
+                className="p-1.5 hover:bg-white text-slate-600 hover:text-emerald-700 rounded-lg transition cursor-pointer"
+                title="Hari Sebelumnya"
+              >
+                <ChevronLeft className="w-4 h-4" />
+              </button>
+
+              <label 
+                htmlFor="matrix-date-input"
+                className="flex items-center gap-2 px-2 py-1 cursor-pointer group select-none"
+                title="Klik untuk memilih tarikh"
+              >
+                <Calendar className="w-4 h-4 text-emerald-600 group-hover:scale-110 transition-transform shrink-0" />
+                <input
+                  id="matrix-date-input"
+                  type="date"
+                  value={selectedDate}
+                  onChange={(e) => setSelectedDate(e.target.value)}
+                  onClick={(e) => {
+                    try {
+                      (e.currentTarget as any).showPicker?.();
+                    } catch {}
+                  }}
+                  className="bg-transparent font-bold text-slate-900 text-sm outline-none cursor-pointer w-auto"
+                />
+                <span className="text-xs bg-emerald-100 group-hover:bg-emerald-200 text-emerald-800 font-semibold px-2 py-0.5 rounded transition-colors select-none shrink-0">
+                  {getMalayDayOfWeek(selectedDate)}
+                </span>
+              </label>
+
+              <button
+                type="button"
+                onClick={handleNextDay}
+                className="p-1.5 hover:bg-white text-slate-600 hover:text-emerald-700 rounded-lg transition cursor-pointer"
+                title="Hari Berikutnya"
+              >
+                <ChevronRight className="w-4 h-4" />
+              </button>
+            </div>
+
+            {selectedDate !== getTodayFormatted() && (
+              <button
+                type="button"
+                onClick={handleToday}
+                className="text-xs bg-emerald-50 hover:bg-emerald-100 text-emerald-700 border border-emerald-200 font-bold px-2.5 py-1.5 rounded-xl transition shadow-2xs cursor-pointer"
+              >
+                Hari Ini
+              </button>
+            )}
+
+            <div className="hidden md:flex items-center gap-1.5 text-xs text-slate-500 pl-2 border-l border-slate-200">
+              <span className="font-medium">Memaparkan</span>
+              <span className="bg-slate-100 text-slate-800 font-bold px-2 py-0.5 rounded-md">
+                {filteredRooms.length} / {rooms.length} Ruang
+              </span>
+            </div>
+          </div>
 
           {/* Session View Filter Toggle */}
-          <div className="flex items-center gap-1 bg-slate-100 p-1 rounded-xl border border-slate-200 self-start sm:self-auto text-xs">
+          <div className="flex items-center gap-1 bg-slate-100 p-1 rounded-xl border border-slate-200 text-xs">
             <button
               onClick={() => setPeriodFilter('ALL')}
-              className={`px-2.5 sm:px-3 py-1.5 rounded-lg text-xs font-bold transition flex items-center gap-1.5 ${
+              className={`px-2.5 sm:px-3 py-1.5 rounded-lg text-xs font-bold transition flex items-center gap-1.5 cursor-pointer ${
                 periodFilter === 'ALL'
                   ? 'bg-white text-slate-900 shadow-2xs'
                   : 'text-slate-600 hover:text-slate-900'
@@ -312,7 +380,7 @@ export const RoomAvailabilityMatrix: React.FC<RoomAvailabilityMatrixProps> = ({
             </button>
             <button
               onClick={() => setPeriodFilter('DAY')}
-              className={`px-2.5 sm:px-3 py-1.5 rounded-lg text-xs font-bold transition flex items-center gap-1.5 ${
+              className={`px-2.5 sm:px-3 py-1.5 rounded-lg text-xs font-bold transition flex items-center gap-1.5 cursor-pointer ${
                 periodFilter === 'DAY'
                   ? 'bg-amber-100 text-amber-950 shadow-2xs border border-amber-300'
                   : 'text-slate-600 hover:text-amber-800'
@@ -323,7 +391,7 @@ export const RoomAvailabilityMatrix: React.FC<RoomAvailabilityMatrixProps> = ({
             </button>
             <button
               onClick={() => setPeriodFilter('NIGHT')}
-              className={`px-2.5 sm:px-3 py-1.5 rounded-lg text-xs font-bold transition flex items-center gap-1.5 ${
+              className={`px-2.5 sm:px-3 py-1.5 rounded-lg text-xs font-bold transition flex items-center gap-1.5 cursor-pointer ${
                 periodFilter === 'NIGHT'
                   ? 'bg-indigo-900 text-white shadow-2xs'
                   : 'text-slate-600 hover:text-indigo-800'
@@ -335,71 +403,74 @@ export const RoomAvailabilityMatrix: React.FC<RoomAvailabilityMatrixProps> = ({
           </div>
         </div>
 
-        {/* Filter Controls Bar */}
-        <div className="mt-3.5 flex flex-wrap items-center gap-2.5 text-xs">
-          <div className="relative min-w-[260px] sm:min-w-[320px] lg:min-w-[360px] flex-1 sm:flex-initial">
-            <div className="absolute inset-y-0 left-0 pl-3 flex items-center pointer-events-none">
-              <div className="w-6 h-6 rounded-md bg-emerald-100 text-emerald-700 flex items-center justify-center">
-                <Search className="w-3.5 h-3.5" />
+        {/* Baris 2: Carian, Penapis Kategori, Aircond & Petunjuk Status (Harmoni & Seimbang) */}
+        <div className="flex flex-col lg:flex-row items-stretch lg:items-center justify-between gap-3 text-xs">
+          {/* Kawalan Penapis (Kiri & Tengah) */}
+          <div className="flex flex-wrap items-center gap-2.5 flex-1">
+            <div className="relative flex-1 min-w-[200px] sm:min-w-[260px] max-w-md">
+              <div className="absolute inset-y-0 left-0 pl-3 flex items-center pointer-events-none">
+                <div className="w-6 h-6 rounded-md bg-emerald-100 text-emerald-700 flex items-center justify-center">
+                  <Search className="w-3.5 h-3.5" />
+                </div>
               </div>
+              <input
+                type="text"
+                placeholder="Cari ruang / bilik (cth: BK04, DKA, Makmal)..."
+                value={searchQuery}
+                onChange={(e) => setSearchQuery(e.target.value)}
+                className="w-full bg-white border-2 border-emerald-500 hover:border-emerald-600 focus:border-emerald-600 rounded-xl pl-11 pr-9 py-2 text-slate-900 font-semibold text-xs placeholder:text-slate-400 placeholder:font-medium outline-none ring-2 ring-emerald-500/20 focus:ring-4 focus:ring-emerald-500/30 shadow-xs transition-all"
+              />
+              {searchQuery && (
+                <button
+                  type="button"
+                  onClick={() => setSearchQuery('')}
+                  className="absolute right-2.5 top-1/2 -translate-y-1/2 text-slate-400 hover:text-slate-600 p-1 rounded-full hover:bg-slate-100 transition cursor-pointer"
+                  title="Kosongkan carian"
+                >
+                  <X className="w-3.5 h-3.5" />
+                </button>
+              )}
             </div>
-            <input
-              type="text"
-              placeholder="Cari ruang / bilik (cth: BK04, DKA, Makmal)..."
-              value={searchQuery}
-              onChange={(e) => setSearchQuery(e.target.value)}
-              className="w-full bg-white border-2 border-emerald-500 hover:border-emerald-600 focus:border-emerald-600 rounded-xl pl-11 pr-9 py-2 text-slate-900 font-semibold text-xs placeholder:text-slate-400 placeholder:font-medium outline-none ring-2 ring-emerald-500/20 focus:ring-4 focus:ring-emerald-500/30 shadow-md shadow-emerald-500/10 hover:shadow-lg transition-all"
-            />
-            {searchQuery && (
-              <button
-                type="button"
-                onClick={() => setSearchQuery('')}
-                className="absolute right-2.5 top-1/2 -translate-y-1/2 text-slate-400 hover:text-slate-600 p-1 rounded-full hover:bg-slate-100 transition cursor-pointer"
-                title="Kosongkan carian"
-              >
-                <X className="w-3.5 h-3.5" />
-              </button>
-            )}
+
+            <select
+              value={categoryFilter}
+              onChange={(e) => setCategoryFilter(e.target.value as RoomCategory | 'Semua')}
+              className="bg-slate-50 border border-slate-300 rounded-xl px-3 py-2 font-medium text-slate-800 outline-none focus:ring-2 focus:ring-emerald-500 shadow-2xs"
+            >
+              <option value="Semua">Kategori: Semua ({rooms.length} Ruang)</option>
+              <option value="Bilik Kuliah">Bilik Kuliah & Smart Class</option>
+              <option value="Makmal Komputer">Makmal Komputer (5)</option>
+              <option value="Dewan Kuliah">Dewan Kuliah (DKA & DKB)</option>
+              <option value="Ruang Khas">Ruang Khas (4)</option>
+              <option value="Surau">Surau (2)</option>
+            </select>
+
+            <label className="inline-flex items-center gap-1.5 bg-slate-50 hover:bg-slate-100 border border-slate-200 px-3 py-2 rounded-xl cursor-pointer select-none transition shadow-2xs">
+              <input
+                type="checkbox"
+                checked={isAircondOnly}
+                onChange={(e) => setIsAircondOnly(e.target.checked)}
+                className="rounded text-emerald-600 focus:ring-emerald-500"
+              />
+              <span className="font-semibold text-slate-700">💠 Aircond Sahaja</span>
+            </label>
           </div>
 
-          <select
-            value={categoryFilter}
-            onChange={(e) => setCategoryFilter(e.target.value as RoomCategory | 'Semua')}
-            className="bg-slate-50 border border-slate-300 rounded-lg px-3 py-2 font-medium text-slate-800 outline-none focus:ring-2 focus:ring-emerald-500"
-          >
-            <option value="Semua">Kategori: Semua ({rooms.length} Ruang)</option>
-            <option value="Bilik Kuliah">Bilik Kuliah & Smart Class</option>
-            <option value="Makmal Komputer">Makmal Komputer (5)</option>
-            <option value="Dewan Kuliah">Dewan Kuliah (DKA & DKB)</option>
-            <option value="Ruang Khas">Ruang Khas (4)</option>
-            <option value="Surau">Surau (2)</option>
-          </select>
-
-          <label className="inline-flex items-center gap-1.5 bg-slate-50 border border-slate-200 px-3 py-2 rounded-lg cursor-pointer select-none">
-            <input
-              type="checkbox"
-              checked={isAircondOnly}
-              onChange={(e) => setIsAircondOnly(e.target.checked)}
-              className="rounded text-emerald-600 focus:ring-emerald-500"
-            />
-            <span className="font-semibold text-slate-700">💠 Aircond Sahaja</span>
-          </label>
-        </div>
-
-        {/* Status Legend Bar */}
-        <div className="mt-3.5 pt-3 border-t border-slate-100 flex flex-wrap items-center gap-3 text-xs">
-          <span className="font-bold text-slate-700">Petunjuk :</span>
-          <div className="flex items-center gap-1.5">
-            <span className="text-slate-700 font-medium">🟢 Kosong</span>
-          </div>
-          <div className="flex items-center gap-1.5" title="Jadual kuliah semester rasmi kolej">
-            <span className="text-slate-700 font-medium">🔴 Jadual</span>
-          </div>
-          <div className="flex items-center gap-1.5">
-            <span className="text-slate-700 font-medium">🟨 Ad-hoc</span>
-          </div>
-          <div className="flex items-center gap-1.5">
-            <span className="text-slate-700 font-medium">⚫ Sekatan Kolej</span>
+          {/* Petunjuk Status (Kanan) - Menyempurnakan ruang mendatar secara seimbang */}
+          <div className="flex flex-wrap items-center gap-2.5 bg-slate-50 border border-slate-200/90 px-3 py-1.5 rounded-xl shadow-2xs text-slate-700 shrink-0 self-start lg:self-auto">
+            <span className="font-bold text-slate-800 text-[11px] uppercase tracking-wider">Petunjuk :</span>
+            <div className="flex items-center gap-1">
+              <span className="text-slate-700 font-medium">🟢 Kosong</span>
+            </div>
+            <div className="flex items-center gap-1" title="Jadual kuliah semester rasmi kolej">
+              <span className="text-slate-700 font-medium">🔴 Jadual</span>
+            </div>
+            <div className="flex items-center gap-1">
+              <span className="text-slate-700 font-medium">🟨 Ad-hoc</span>
+            </div>
+            <div className="flex items-center gap-1">
+              <span className="text-slate-700 font-medium">⚫ Sekatan Kolej</span>
+            </div>
           </div>
         </div>
       </div>
