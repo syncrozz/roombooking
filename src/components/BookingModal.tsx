@@ -558,24 +558,27 @@ export const BookingModal: React.FC<BookingModalProps> = ({
   };
 
   return (
-    <div className="fixed inset-0 bg-slate-950/75 backdrop-blur-xs z-50 flex items-center justify-center p-4 overflow-y-auto">
-      <div className="bg-white rounded-2xl max-w-lg w-full p-6 shadow-2xl border border-slate-200 space-y-4 animate-in fade-in zoom-in duration-150 my-8">
+    <div className="fixed inset-0 bg-slate-950/80 backdrop-blur-xs z-50 overflow-y-auto overscroll-contain p-2 sm:p-4 flex flex-col items-center justify-start sm:justify-center">
+      <div className="bg-white rounded-2xl sm:rounded-3xl max-w-lg w-full max-h-[92vh] sm:max-h-[90vh] shadow-2xl border border-slate-200 flex flex-col my-auto animate-in fade-in zoom-in duration-150">
         
-        {/* Modal Header */}
-        <div className="flex items-center justify-between border-b border-slate-100 pb-3">
+        {/* Modal Header (Pinned at top so title and close button are never cut off) */}
+        <div className="flex items-center justify-between border-b border-slate-100 p-4 sm:p-5 pb-3 shrink-0 bg-white rounded-t-2xl sm:rounded-t-3xl z-10">
           <div>
             <span className="text-xs font-bold text-blue-600 uppercase tracking-wider">Borang Tempahan Ruang KPMBP</span>
-            <h3 className="text-xl font-extrabold text-slate-900">{room.name}</h3>
+            <h3 className="text-lg sm:text-xl font-extrabold text-slate-900 leading-tight">{room.name}</h3>
           </div>
           <button
             onClick={onClose}
-            className="text-slate-400 hover:text-slate-600 font-bold text-lg p-1"
+            className="text-slate-400 hover:text-slate-600 font-bold text-lg p-1.5 rounded-full hover:bg-slate-100 transition cursor-pointer shrink-0"
+            title="Tutup"
           >
             <X className="w-5 h-5" />
           </button>
         </div>
 
-        {/* Offline Fallback Warning Notice */}
+        {/* Scrollable Modal Body (Multi-Day section starts directly here, 100% visible) */}
+        <div className="overflow-y-auto p-4 sm:p-6 space-y-4 flex-1 overscroll-contain touch-pan-y">
+          {/* Offline Fallback Warning Notice */}
         {isFallbackMode && (
           <div className="bg-amber-50 border border-amber-300 rounded-xl p-3 text-amber-900 text-xs flex items-start gap-2.5">
             <AlertCircle className="w-4 h-4 text-amber-600 shrink-0 mt-0.5" />
@@ -1177,24 +1180,25 @@ export const BookingModal: React.FC<BookingModalProps> = ({
             />
           </div>
 
-          <div className="pt-3 border-t border-slate-100 flex items-center justify-end gap-2">
-            <button
-              type="button"
-              onClick={onClose}
-              className="bg-slate-100 hover:bg-slate-200 text-slate-700 font-bold py-2.5 px-4 rounded-xl transition"
-            >
-              Batal
-            </button>
+            <div className="pt-3 border-t border-slate-100 flex items-center justify-end gap-2">
+              <button
+                type="button"
+                onClick={onClose}
+                className="bg-slate-100 hover:bg-slate-200 text-slate-700 font-bold py-2.5 px-4 rounded-xl transition cursor-pointer"
+              >
+                Batal
+              </button>
 
-            <button
-              type="submit"
-              className="bg-blue-600 hover:bg-blue-700 text-white font-bold py-2.5 px-6 rounded-lg shadow-md shadow-blue-200 transition flex items-center gap-1.5"
-            >
-              <CheckCircle2 className="w-4 h-4" />
-              <span>HANTAR TEMPAHAN SEKARANG</span>
-            </button>
-          </div>
-        </form>
+              <button
+                type="submit"
+                className="bg-blue-600 hover:bg-blue-700 text-white font-bold py-2.5 px-6 rounded-lg shadow-md shadow-blue-200 transition flex items-center gap-1.5 cursor-pointer"
+              >
+                <CheckCircle2 className="w-4 h-4" />
+                <span>HANTAR TEMPAHAN SEKARANG</span>
+              </button>
+            </div>
+          </form>
+        </div>
       </div>
     </div>
   );
