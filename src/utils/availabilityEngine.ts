@@ -244,20 +244,18 @@ export function findSmartAlternatives(
 }
 
 export function formatWhatsAppMessage(booking: AdHocBooking): string {
-  const statusEmoji = booking.status === 'CONFIRMED' ? '🟢 CONFIRMED' : '🟡 PENDING';
-  const emailLine = booking.applicantEmail ? `\n✉️ *E-mel Rasmi:* ${booking.applicantEmail}` : '';
-  const text = `*KPMBP SMARTHUB — TEMPAHAN RUANG*
+  const statusEmoji = booking.status === 'CONFIRMED' ? '🟢 CONFIRMED' : booking.status === 'REJECTED' ? '🔴 REJECTED' : '🟡 PENDING';
+  const text = `*TEMPAHAN RUANG*
 ━━━━━━━━━━━━━━━━━━━━━
 📌 *ID Tempahan:* ${booking.id}
 🏫 *Ruang:* ${booking.roomName} (${booking.roomId})
 📅 *Tarikh:* ${booking.date} (${getMalayDayOfWeek(booking.date)})
 🕐 *Masa:* ${booking.startTime} - ${booking.endTime}
-👤 *Pemohon:* ${booking.applicantName} (${booking.applicantRole})${emailLine}
-🏢 *Jabatan:* ${booking.department}
+👤 *Pemohon:* ${booking.applicantName} (${booking.applicantRole})
 🎯 *Tujuan:* ${booking.purposeCategory} - ${booking.title}
 ⚡ *Status:* ${statusEmoji}
 ━━━━━━━━━━━━━━━━━━━━━
-_Mesej ini dijana secara automatik oleh Sistem Tempahan Ruang KPMBP SmartHub._`;
+_Mesej ini dijana secara automatik_`;
 
   return text;
 }
