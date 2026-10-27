@@ -312,6 +312,7 @@ export class StaffCredentialsVault {
     const emailNorm = cleanEmail.trim().toLowerCase();
     if (!emailNorm) return undefined;
 
+    this.loadPersistentVault();
     const allRecords = Array.from(this.vault.values());
 
     // 1. Direct match on primary email
