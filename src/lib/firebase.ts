@@ -705,11 +705,25 @@ export async function verifyStaffCredentials(
   pin: string,
   staffList: StaffUser[] = INITIAL_STAFF_DATA
 ): Promise<{ success: boolean; staff?: StaffUser; errorMsg?: string; isDefaultPin?: boolean }> {
-  const cleanEmail = email.trim().toLowerCase();
+  let cleanEmail = email.trim().toLowerCase();
   const cleanPin = pin.trim();
 
   if (!cleanEmail || !cleanPin || !/^\d{4}$/.test(cleanPin)) {
     return { success: false, errorMsg: 'Email atau PIN tidak sah (mesti 4 digit nombor).' };
+  }
+
+  // Strictly enforce @mara.gov.my as sole login ID
+  if (cleanEmail.endsWith('@gmail.com') || cleanEmail.endsWith('@bpenawar.kpm.edu.my')) {
+    return { success: false, errorMsg: 'Hanya e-mel rasmi @mara.gov.my dibenarkan sebagai ID log masuk.' };
+  }
+
+  if (cleanEmail.includes('@') && !cleanEmail.endsWith('@mara.gov.my')) {
+    return { success: false, errorMsg: 'Hanya e-mel rasmi @mara.gov.my dibenarkan sebagai ID log masuk.' };
+  }
+
+  // Normalize username prefix to @mara.gov.my
+  if (!cleanEmail.includes('@') && !cleanEmail.startsWith('st')) {
+    cleanEmail = `${cleanEmail}@mara.gov.my`;
   }
 
   // 1. In browser: try secure server endpoint if running

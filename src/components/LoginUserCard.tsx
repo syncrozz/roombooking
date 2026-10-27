@@ -72,8 +72,23 @@ export const LoginUserCard: React.FC<LoginUserCardProps> = ({
     e.preventDefault();
     setErrorMsg(null);
 
-    const cleanEmail = emailInput.trim().toLowerCase();
+    let cleanEmail = emailInput.trim().toLowerCase();
     const cleanPin = pinInput.trim().replace(/\D/g, '').slice(0, 4);
+
+    if (cleanEmail.endsWith('@gmail.com') || cleanEmail.endsWith('@bpenawar.kpm.edu.my')) {
+      setErrorMsg('Akaun @gmail.com dan @bpenawar.kpm.edu.my telah dimansuhkan. Sila gunakan e-mel rasmi @mara.gov.my.');
+      return;
+    }
+
+    if (cleanEmail.includes('@') && !cleanEmail.endsWith('@mara.gov.my')) {
+      setErrorMsg('Hanya e-mel rasmi @mara.gov.my dibenarkan sebagai ID tunggal log masuk.');
+      return;
+    }
+
+    if (!cleanEmail.includes('@') && !cleanEmail.startsWith('st')) {
+      cleanEmail = `${cleanEmail}@mara.gov.my`;
+      setEmailInput(cleanEmail);
+    }
 
     const result = await verifyStaffCredentials(cleanEmail, cleanPin, staffList);
 
@@ -223,12 +238,12 @@ export const LoginUserCard: React.FC<LoginUserCardProps> = ({
         <form onSubmit={handleVerifyAndLogin} className="p-3.5 space-y-3 bg-slate-950/60">
           <div>
             <label className="block text-[11px] font-bold text-slate-300 mb-1">
-              E-mel
+              ID E-mel Rasmi (@mara.gov.my)
             </label>
             <div className="relative">
               <Mail className="w-3.5 h-3.5 text-slate-400 absolute left-2.5 top-2.5" />
               <input
-                type="email"
+                type="text"
                 required
                 autoCapitalize="none"
                 autoCorrect="off"
@@ -239,6 +254,9 @@ export const LoginUserCard: React.FC<LoginUserCardProps> = ({
                 className="w-full pl-8 pr-3 py-1.5 bg-slate-800 border border-slate-700 rounded-lg text-xs text-white placeholder-slate-500 focus:outline-none focus:border-blue-500"
               />
             </div>
+            <span className="text-[10px] text-slate-400 mt-1 block">
+              ID tunggal rasmi: <span className="text-blue-300 font-mono">nama@mara.gov.my</span>
+            </span>
           </div>
 
           <div>

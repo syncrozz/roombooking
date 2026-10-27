@@ -53,7 +53,7 @@ export interface AdHocBooking {
   startTime: string;      // e.g. '11:30'
   endTime: string;        // e.g. '12:30'
   applicantName: string;  // e.g. 'En. Ahmad Khairi'
-  applicantEmail?: string;// e.g. 'khairi@bpenawar.kpm.edu.my'
+  applicantEmail?: string;// e.g. 'khairi.mohd@mara.gov.my'
   applicantPhone?: string;// e.g. '012-3456789'
   applicantRole: string;  // e.g. 'Pensyarah DIA' | 'Pegawai Akademik'
   department: string;     // e.g. 'Jabatan Sains Komputer'

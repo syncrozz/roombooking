@@ -356,8 +356,8 @@ export function getStoredUserProfiles(): UserProfileHistory[] {
     if (!data) return [];
     const parsed = JSON.parse(data);
     if (Array.isArray(parsed)) {
-      // Filter out obsolete fake placeholder emails and null entries
-      return parsed.filter(p => p && p.applicantEmail && !['khairi@bpenawar.kpm.edu.my', 'tahira@bpenawar.kpm.edu.my', 'faridah@bpenawar.kpm.edu.my'].includes(p.applicantEmail));
+      // Filter out obsolete domains (@bpenawar.kpm.edu.my, @gmail.com) and null entries
+      return parsed.filter(p => p && p.applicantEmail && !p.applicantEmail.toLowerCase().endsWith('@bpenawar.kpm.edu.my') && !p.applicantEmail.toLowerCase().endsWith('@gmail.com'));
     }
     return [];
   } catch {
@@ -378,7 +378,9 @@ export function getStoredActiveUser(): UserProfileHistory | null {
     if (data) {
       const parsed = JSON.parse(data);
       if (parsed && parsed.applicantEmail) {
-        if (['khairi@bpenawar.kpm.edu.my', 'tahira@bpenawar.kpm.edu.my', 'faridah@bpenawar.kpm.edu.my'].includes(parsed.applicantEmail)) {
+        const emailLower = parsed.applicantEmail.toLowerCase();
+        if (emailLower.endsWith('@bpenawar.kpm.edu.my') || emailLower.endsWith('@gmail.com')) {
+          localStorage.removeItem(ACTIVE_USER_KEY);
           return null;
         }
         return parsed;

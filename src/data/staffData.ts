@@ -34,7 +34,6 @@ export const INITIAL_STAFF_DATA: StaffUser[] = [
     "phone": "017-4693512",
     "email": "musa.ali@mara.gov.my",
     "aliases": [
-      "musamuhamadali77@gmail.com",
       "musa.ali@kpmbp.edu.my"
     ],
     "pinStatus": "DEFAULT",
@@ -73,7 +72,6 @@ export const INITIAL_STAFF_DATA: StaffUser[] = [
     "phone": "012-7278737",
     "email": "norhasnah.nordin@mara.gov.my",
     "aliases": [
-      "norhasnah2@gmail.com",
       "norhasnah.nordin@kpmbp.edu.my"
     ],
     "pinStatus": "CUSTOM",
@@ -87,7 +85,6 @@ export const INITIAL_STAFF_DATA: StaffUser[] = [
     "phone": "014-3999593",
     "email": "nani@mara.gov.my",
     "aliases": [
-      "n4nie84@gmail.com",
       "nani@kpmbp.edu.my"
     ],
     "pinStatus": "CUSTOM",
@@ -101,7 +98,6 @@ export const INITIAL_STAFF_DATA: StaffUser[] = [
     "phone": "017-3473519",
     "email": "roslina.rahim@mara.gov.my",
     "aliases": [
-      "orchidrose040312@gmail.com",
       "roslina.rahim@kpmbp.edu.my"
     ],
     "pinStatus": "DEFAULT"
@@ -182,8 +178,7 @@ export const INITIAL_STAFF_DATA: StaffUser[] = [
     "phone": "011-7808882",
     "email": "syahmi.ismail@mara.gov.my",
     "aliases": [
-      "syahmi.ismail@kpmbp.edu.my",
-      "syahmi.ismail@gmail.com"
+      "syahmi.ismail@kpmbp.edu.my"
     ],
     "pinStatus": "CUSTOM",
     "pinChangedAt": "2026-10-27T02:40:25.610Z"
@@ -262,7 +257,6 @@ export const INITIAL_STAFF_DATA: StaffUser[] = [
     "phone": "017-4993053",
     "email": "ammiru@mara.gov.my",
     "aliases": [
-      "ammirumuzzaki@gmail.com",
       "ammiru@kpmbp.edu.my"
     ],
     "pinStatus": "DEFAULT"
@@ -275,7 +269,6 @@ export const INITIAL_STAFF_DATA: StaffUser[] = [
     "phone": "019-5121343",
     "email": "diyana.abdullah@mara.gov.my",
     "aliases": [
-      "nurdiyana1014@gmail.com",
       "diyana.abdullah@kpmbp.edu.my"
     ],
     "pinStatus": "CUSTOM",
@@ -389,7 +382,6 @@ export const INITIAL_STAFF_DATA: StaffUser[] = [
     "phone": "019-6192421",
     "email": "rabiahtul@mara.gov.my",
     "aliases": [
-      "rabiahtul9332@gmail.com",
       "rabiahtul@kpmbp.edu.my"
     ],
     "pinStatus": "CUSTOM",
@@ -429,7 +421,6 @@ export const INITIAL_STAFF_DATA: StaffUser[] = [
     "phone": "013-7186161",
     "email": "suraya.bahar@mara.gov.my",
     "aliases": [
-      "surayabahar@gmail.com",
       "suraya.bahar@kpmbp.edu.my"
     ],
     "pinStatus": "DEFAULT"
@@ -471,7 +462,6 @@ export const INITIAL_STAFF_DATA: StaffUser[] = [
     "phone": "013-5336235",
     "email": "normala.noor@mara.gov.my",
     "aliases": [
-      "normala0978@gmail.com",
       "normala.noor@kpmbp.edu.my"
     ],
     "pinStatus": "CUSTOM",
@@ -511,7 +501,6 @@ export const INITIAL_STAFF_DATA: StaffUser[] = [
     "phone": "017-5898322",
     "email": "nfirzanah@mara.gov.my",
     "aliases": [
-      "nfirzanahajahar@gmail.com",
       "nfirzanah@kpmbp.edu.my"
     ],
     "pinStatus": "CUSTOM",
@@ -564,7 +553,6 @@ export const INITIAL_STAFF_DATA: StaffUser[] = [
     "phone": "019-2577634",
     "email": "arianti.norman@mara.gov.my",
     "aliases": [
-      "anisnorman84@gmail.com",
       "arianti.norman@kpmbp.edu.my"
     ],
     "pinStatus": "DEFAULT"
@@ -577,7 +565,6 @@ export const INITIAL_STAFF_DATA: StaffUser[] = [
     "phone": "013-3578180",
     "email": "afif.yusof@mara.gov.my",
     "aliases": [
-      "afifmamat@gmail.com",
       "afif.yusof@kpmbp.edu.my"
     ],
     "pinStatus": "DEFAULT"
@@ -590,7 +577,6 @@ export const INITIAL_STAFF_DATA: StaffUser[] = [
     "phone": "014-5313756",
     "email": "khairi.mohd@mara.gov.my",
     "aliases": [
-      "khaikerr@gmail.com",
       "khairi@mara.gov.my",
       "ahmad.khairi@mara.gov.my",
       "khairi.mohd@kpmbp.edu.my",
@@ -687,7 +673,6 @@ export const INITIAL_STAFF_DATA: StaffUser[] = [
     "phone": "014-5274771",
     "email": "nurlaili@mara.gov.my",
     "aliases": [
-      "nurlailibalqis91@gmail.com",
       "nurlailibalqis@mara.gov.my",
       "nurlaili.balqis@mara.gov.my",
       "nurlaili@kpmbp.edu.my",
@@ -719,7 +704,6 @@ export const INITIAL_STAFF_DATA: StaffUser[] = [
     "phone": "013-8261994",
     "email": "afifah.rosli@mara.gov.my",
     "aliases": [
-      "nafifahmrosli@gmail.com",
       "afifah.rosli@kpmbp.edu.my"
     ],
     "pinStatus": "CUSTOM",
@@ -797,7 +781,6 @@ export const INITIAL_STAFF_DATA: StaffUser[] = [
     "phone": "013-9970981",
     "email": "ikhsan.achok@mara.gov.my",
     "aliases": [
-      "ikhsan.achok@gmail.com",
       "ikhsan.achok@kpmbp.edu.my"
     ],
     "pinStatus": "DEFAULT"
@@ -810,7 +793,6 @@ export const INITIAL_STAFF_DATA: StaffUser[] = [
     "phone": "012-7364248",
     "email": "firdaus.ayob@mara.gov.my",
     "aliases": [
-      "aussayob@gmail.com",
       "firdaus.ayob@kpmbp.edu.my"
     ],
     "pinStatus": "DEFAULT"
@@ -887,7 +869,6 @@ export const INITIAL_STAFF_DATA: StaffUser[] = [
     "phone": "019-7247559",
     "email": "raehatulhawa@mara.gov.my",
     "aliases": [
-      "rayharahim004@gmail.com",
       "raehatulhawa@kpmbp.edu.my"
     ],
     "pinStatus": "DEFAULT"
@@ -900,7 +881,6 @@ export const INITIAL_STAFF_DATA: StaffUser[] = [
     "phone": "012-7496044",
     "email": "lutfi.esa@mara.gov.my",
     "aliases": [
-      "aremal6225@gmail.com",
       "lutfi.esa@kpmbp.edu.my"
     ],
     "pinStatus": "DEFAULT"
@@ -927,7 +907,6 @@ export const INITIAL_STAFF_DATA: StaffUser[] = [
     "phone": "017-7515694",
     "email": "zakiy.yahya@mara.gov.my",
     "aliases": [
-      "zakiyy62@gmail.com",
       "zakiy.yahya@kpmbp.edu.my"
     ],
     "pinStatus": "CUSTOM",
@@ -967,7 +946,6 @@ export const INITIAL_STAFF_DATA: StaffUser[] = [
     "phone": "019-7894925",
     "email": "hadi.isnin@mara.gov.my",
     "aliases": [
-      "adikuncup76@gmail.com",
       "hadi.isnin@kpmbp.edu.my"
     ],
     "pinStatus": "DEFAULT"
@@ -980,7 +958,6 @@ export const INITIAL_STAFF_DATA: StaffUser[] = [
     "phone": "018-5780311",
     "email": "rahmatt@mara.gov.my",
     "aliases": [
-      "rahmattuahsenawi@gmail.com",
       "rahmatt@kpmbp.edu.my"
     ],
     "pinStatus": "DEFAULT"
@@ -1019,9 +996,8 @@ export const INITIAL_STAFF_DATA: StaffUser[] = [
     "name": "Nur Sabrina Binti Abdul Rahman",
     "role": "Pensyarah",
     "phone": "014-9315093",
-    "email": "sabrina.rahman@bpenawar.kpm.edu.my",
+    "email": "sabrina.rahman@mara.gov.my",
     "aliases": [
-      "sabrina.rahman@mara.gov.my",
       "sabrina.rahman@kpmbp.edu.my"
     ],
     "pinStatus": "CUSTOM",

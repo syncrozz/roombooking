@@ -300,64 +300,51 @@ export class StaffCredentialsVault {
   }
 
   /**
-   * Smart Staff Record Lookup
-   * Resolves staff records by:
-   * 1. Direct email match
-   * 2. Alias match (e.g. nurlailibalqis91@gmail.com and nurlaili@mara.gov.my)
-   * 3. Domain interchangeability between @mara.gov.my and @kpmbp.edu.my
-   * 4. Staff ID match (e.g. ST061 or st061@mara.gov.my)
-   * 5. Institutional prefix matching for @mara.gov.my or @kpmbp.edu.my
+   * Official MARA Staff Record Lookup
+   * Enforces @mara.gov.my as the sole ID domain for login.
+   * Strictly disallows @gmail.com and @bpenawar.kpm.edu.my.
    */
   public findStaffRecord(cleanEmail: string): StaffCredentialRecord | undefined {
-    const emailNorm = cleanEmail.trim().toLowerCase();
+    let emailNorm = cleanEmail.trim().toLowerCase();
     if (!emailNorm) return undefined;
+
+    // Strictly reject @gmail.com and @bpenawar.kpm.edu.my
+    if (emailNorm.endsWith('@gmail.com') || emailNorm.endsWith('@bpenawar.kpm.edu.my')) {
+      return undefined;
+    }
+
+    // Auto-normalize username prefix without domain (e.g. "syahmi.ismail") to @mara.gov.my
+    if (!emailNorm.includes('@') && !emailNorm.startsWith('st')) {
+      emailNorm = `${emailNorm}@mara.gov.my`;
+    }
 
     this.loadPersistentVault();
     const allRecords = Array.from(this.vault.values());
 
-    // 1. Direct match on primary email
+    // 1. Direct match on primary @mara.gov.my email
     let record = allRecords.find((r) => r.email.toLowerCase() === emailNorm);
     if (record) return record;
 
-    // 2. Direct match on configured aliases
+    // 2. Direct match on configured aliases (strictly filtered)
     record = allRecords.find(
       (r) => r.aliases && r.aliases.some((a) => a.toLowerCase() === emailNorm)
     );
     if (record) return record;
 
-    // 3. Domain interchangeability (@mara.gov.my <-> @kpmbp.edu.my)
+    // 3. User entered staffId or institutional prefix under @mara.gov.my
     const atIdx = emailNorm.indexOf('@');
     if (atIdx !== -1) {
       const userPrefix = emailNorm.substring(0, atIdx).trim();
       const domain = emailNorm.substring(atIdx + 1).trim();
 
-      const altDomain =
-        domain === 'mara.gov.my'
-          ? 'kpmbp.edu.my'
-          : domain === 'kpmbp.edu.my'
-          ? 'mara.gov.my'
-          : null;
-
-      if (altDomain) {
-        const altEmail = `${userPrefix}@${altDomain}`;
-        record = allRecords.find(
-          (r) =>
-            r.email.toLowerCase() === altEmail ||
-            (r.aliases && r.aliases.some((a) => a.toLowerCase() === altEmail))
-        );
+      if (domain === 'mara.gov.my') {
+        // Check if userPrefix matches staffId (e.g. st061@mara.gov.my)
+        record = this.vault.get(userPrefix);
         if (record) return record;
-      }
 
-      // Check if userPrefix matches staffId (e.g. st061@mara.gov.my)
-      record = this.vault.get(userPrefix);
-      if (record) return record;
-
-      // 4. Match against INITIAL_STAFF_DATA aliases or name prefix for official domains
-      if (domain === 'mara.gov.my' || domain === 'kpmbp.edu.my') {
+        // Match against official name tokens under @mara.gov.my
         const staffFromInitial = INITIAL_STAFF_DATA.find((s) => {
           if (s.id.toLowerCase() === userPrefix) return true;
-          if (s.aliases && s.aliases.some((a) => a.toLowerCase() === emailNorm)) return true;
-
           const cleanTokens = s.name
             .toLowerCase()
             .replace(/dr\.|hj\.|hjh\.|bin|binti|bt\.|ibni|cmilt|afpm|m\.t\.a\.m|c\.a\.\(m\)/g, ' ')
@@ -405,7 +392,7 @@ export class StaffCredentialsVault {
       role: rawStaff.role,
       department: rawStaff.department,
       phone: rawStaff.phone,
-      aliases: rawStaff.aliases,
+      aliases: rawStaff.aliases ? rawStaff.aliases.filter((a: string) => !a.includes('@gmail.com') && !a.includes('@bpenawar.kpm.edu.my')) : undefined,
       pinStatus: rawStaff.pinStatus || 'DEFAULT',
       pinChangedAt: rawStaff.pinChangedAt,
     };
@@ -431,6 +418,10 @@ export class StaffCredentialsVault {
 
     if (!cleanEmail || !cleanPin || !/^\d{4}$/.test(cleanPin)) {
       return { success: false, errorMsg: 'Email atau PIN tidak sah (mesti 4 digit nombor).' };
+    }
+
+    if (cleanEmail.includes('@') && !cleanEmail.endsWith('@mara.gov.my')) {
+      return { success: false, errorMsg: 'Hanya e-mel rasmi @mara.gov.my dibenarkan sebagai ID log masuk.' };
     }
 
     // Lookup staff by email with smart alias and institutional domain resolution
@@ -521,6 +512,10 @@ export class StaffCredentialsVault {
 
     if (!cleanEmail || !cleanPin || !/^\d{4}$/.test(cleanPin)) {
       return { success: false, errorMsg: 'Email atau PIN tidak sah (mesti 4 digit nombor).' };
+    }
+
+    if (cleanEmail.includes('@') && !cleanEmail.endsWith('@mara.gov.my')) {
+      return { success: false, errorMsg: 'Hanya e-mel rasmi @mara.gov.my dibenarkan sebagai ID log masuk.' };
     }
 
     const staffRecord = this.findStaffRecord(cleanEmail);

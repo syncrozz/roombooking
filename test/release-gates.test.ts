@@ -401,21 +401,26 @@ async function runAllGateTests() {
     const verifyAfterReset = await serverAuthVault.verifyStaff(testStaff.email, '1234');
     assert.equal(verifyAfterReset.success, true, 'Staff PIN successfully reset to 1234');
 
-    // 10. Post-Fix Verification 4: Universal Email & Alias Resolution (Desktop & Mobile parity)
+    // 10. Post-Fix Verification 4: Official @mara.gov.my Sole ID Enforcement & Purge of @gmail.com
     const nurlailiMara = await serverAuthVault.verifyStaff('nurlaili@mara.gov.my', '2323');
     assert.equal(nurlailiMara.success, true, 'nurlaili@mara.gov.my successfully verifies with PIN 2323');
     assert.equal(nurlailiMara.staff?.id, 'ST061', 'Resolves to ST061');
     assert.equal(nurlailiMara.staff?.pinStatus, 'CUSTOM', 'ST061 has CUSTOM PIN status');
 
+    // Strict rejection of legacy @gmail.com accounts
     const nurlailiGmail = await serverAuthVault.verifyStaff('nurlailibalqis91@gmail.com', '2323');
-    assert.equal(nurlailiGmail.success, true, 'Alias nurlailibalqis91@gmail.com successfully verifies with PIN 2323');
-    assert.equal(nurlailiGmail.staff?.id, 'ST061', 'Alias resolves to same ST061 staff ID');
+    assert.equal(nurlailiGmail.success, false, 'Non-@mara.gov.my domain (gmail) must be strictly rejected');
+    assert.match(nurlailiGmail.errorMsg || '', /@mara\.gov\.my/, 'Error message clearly indicates @mara.gov.my requirement');
 
-    // Mobile input tolerance: mixed case and whitespace
+    // Official staff ID with @mara.gov.my prefix resolution
+    const nurlailiStaffId = await serverAuthVault.verifyStaff('st061@mara.gov.my', '2323');
+    assert.equal(nurlailiStaffId.success, true, 'st061@mara.gov.my successfully verifies with PIN 2323');
+
+    // Mobile input tolerance: mixed case and whitespace for @mara.gov.my
     const nurlailiMobile = await serverAuthVault.verifyStaff('  Nurlaili@mara.gov.my  ', ' 2323 ');
     assert.equal(nurlailiMobile.success, true, 'Mobile whitespace and capitalization cleanly handled');
 
-    console.log('  ✔ Gate 5 PASSED: Server-side scrypt (N=16384), 5-attempt rate limiter, fail-closed enforcement, zero client credential leakage, and universal alias resolution verified.\n');
+    console.log('  ✔ Gate 5 PASSED: Server-side scrypt (N=16384), 5-attempt rate limiter, fail-closed enforcement, zero client credential leakage, and strict @mara.gov.my sole ID enforcement verified.\n');
     passedGates++;
   } catch (err) {
     console.error('  ✘ Gate 5 FAILED:', err);

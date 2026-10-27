@@ -2,31 +2,37 @@ import { StaffUser } from '../types';
 import { INITIAL_STAFF_DATA } from '../data/staffData';
 
 /**
- * Universal Staff Email & Alias Resolution Matcher
- * Resolves lecturer and staff accounts regardless of whether they enter:
- * - Official MARA email: e.g. nurlaili@mara.gov.my, khairi.mohd@mara.gov.my
- * - Institutional email: e.g. nurlaili@kpmbp.edu.my, tahira.tarikh@kpmbp.edu.my
- * - Personal/Spreadsheet registered email: e.g. nurlailibalqis91@gmail.com, khaikerr@gmail.com
- * - Any configured email alias
- * - Staff ID: e.g. ST061, st061@mara.gov.my
+ * Official MARA Staff Email & ID Resolution Matcher
+ * Enforces @mara.gov.my as the sole ID domain for login and booking identity.
+ * Strictly disallows @gmail.com and @bpenawar.kpm.edu.my.
  */
 export function matchStaffByEmail(
   inputEmail: string,
   staffList: StaffUser[] = INITIAL_STAFF_DATA
 ): StaffUser | undefined {
   if (!inputEmail || typeof inputEmail !== 'string') return undefined;
-  const clean = inputEmail.trim().toLowerCase();
+  let clean = inputEmail.trim().toLowerCase();
   if (!clean) return undefined;
+
+  // Strictly block @gmail.com and @bpenawar.kpm.edu.my
+  if (clean.endsWith('@gmail.com') || clean.endsWith('@bpenawar.kpm.edu.my')) {
+    return undefined;
+  }
+
+  // If user entered username without domain (e.g. "syahmi.ismail" or "nurlaili"), normalize to @mara.gov.my
+  if (!clean.includes('@') && !clean.startsWith('st')) {
+    clean = `${clean}@mara.gov.my`;
+  }
 
   const effectiveList = staffList && staffList.length > 0 ? staffList : INITIAL_STAFF_DATA;
 
-  // 1. Direct match on primary email
+  // 1. Direct match on primary @mara.gov.my email
   let found = effectiveList.find(
     (s) => s.email && s.email.trim().toLowerCase() === clean
   );
   if (found) return found;
 
-  // 2. Direct match on aliases list
+  // 2. Direct match on remaining official aliases
   found = effectiveList.find(
     (s) =>
       s.aliases &&
@@ -34,35 +40,18 @@ export function matchStaffByEmail(
   );
   if (found) return found;
 
-  // 3. Domain interchangeability between @mara.gov.my and @kpmbp.edu.my
+  // 3. User entered staffId (e.g. ST061 or st061@mara.gov.my)
   const atIdx = clean.indexOf('@');
   if (atIdx !== -1) {
     const userPrefix = clean.substring(0, atIdx).trim();
     const domain = clean.substring(atIdx + 1).trim();
 
-    const altDomain =
-      domain === 'mara.gov.my'
-        ? 'kpmbp.edu.my'
-        : domain === 'kpmbp.edu.my'
-        ? 'mara.gov.my'
-        : null;
-
-    if (altDomain) {
-      const altEmail = `${userPrefix}@${altDomain}`;
-      found = effectiveList.find(
-        (s) =>
-          (s.email && s.email.trim().toLowerCase() === altEmail) ||
-          (s.aliases && s.aliases.some((a) => a && a.trim().toLowerCase() === altEmail))
-      );
+    if (domain === 'mara.gov.my') {
+      // Check if userPrefix matches staffId directly (e.g. st061@mara.gov.my)
+      found = effectiveList.find((s) => s.id && s.id.toLowerCase() === userPrefix);
       if (found) return found;
-    }
 
-    // Check if userPrefix matches staffId directly (e.g. st061@mara.gov.my)
-    found = effectiveList.find((s) => s.id && s.id.toLowerCase() === userPrefix);
-    if (found) return found;
-
-    // 4. Institutional prefix/name match for @mara.gov.my or @kpmbp.edu.my
-    if (domain === 'mara.gov.my' || domain === 'kpmbp.edu.my') {
+      // Match against official name tokens under @mara.gov.my
       const candidates = effectiveList.filter((s) => {
         if (!s.name) return false;
         const cleanName = s.name
