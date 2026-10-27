@@ -225,6 +225,7 @@ export class ServerRateLimiter {
 interface StaffCredentialRecord {
   staffId: string;
   email: string;
+  aliases?: string[];
   scryptHash: string;
   pinStatus: 'DEFAULT' | 'CUSTOM';
   pinChangedAt?: string;
@@ -251,6 +252,7 @@ export class StaffCredentialsVault {
       this.vault.set(staff.id.toLowerCase(), {
         staffId: staff.id,
         email: staff.email.trim().toLowerCase(),
+        aliases: staff.aliases ? staff.aliases.map((a) => a.trim().toLowerCase()) : undefined,
         scryptHash: defaultHash.encoded,
         pinStatus: staff.pinStatus || 'DEFAULT',
         pinChangedAt: staff.pinChangedAt,
@@ -298,11 +300,96 @@ export class StaffCredentialsVault {
   }
 
   /**
-   * Clears any active rate-limit lockout for a given staff member.
+   * Smart Staff Record Lookup
+   * Resolves staff records by:
+   * 1. Direct email match
+   * 2. Alias match (e.g. nurlailibalqis91@gmail.com and nurlaili@mara.gov.my)
+   * 3. Domain interchangeability between @mara.gov.my and @kpmbp.edu.my
+   * 4. Staff ID match (e.g. ST061 or st061@mara.gov.my)
+   * 5. Institutional prefix matching for @mara.gov.my or @kpmbp.edu.my
+   */
+  public findStaffRecord(cleanEmail: string): StaffCredentialRecord | undefined {
+    const emailNorm = cleanEmail.trim().toLowerCase();
+    if (!emailNorm) return undefined;
+
+    const allRecords = Array.from(this.vault.values());
+
+    // 1. Direct match on primary email
+    let record = allRecords.find((r) => r.email.toLowerCase() === emailNorm);
+    if (record) return record;
+
+    // 2. Direct match on configured aliases
+    record = allRecords.find(
+      (r) => r.aliases && r.aliases.some((a) => a.toLowerCase() === emailNorm)
+    );
+    if (record) return record;
+
+    // 3. Domain interchangeability (@mara.gov.my <-> @kpmbp.edu.my)
+    const atIdx = emailNorm.indexOf('@');
+    if (atIdx !== -1) {
+      const userPrefix = emailNorm.substring(0, atIdx).trim();
+      const domain = emailNorm.substring(atIdx + 1).trim();
+
+      const altDomain =
+        domain === 'mara.gov.my'
+          ? 'kpmbp.edu.my'
+          : domain === 'kpmbp.edu.my'
+          ? 'mara.gov.my'
+          : null;
+
+      if (altDomain) {
+        const altEmail = `${userPrefix}@${altDomain}`;
+        record = allRecords.find(
+          (r) =>
+            r.email.toLowerCase() === altEmail ||
+            (r.aliases && r.aliases.some((a) => a.toLowerCase() === altEmail))
+        );
+        if (record) return record;
+      }
+
+      // Check if userPrefix matches staffId (e.g. st061@mara.gov.my)
+      record = this.vault.get(userPrefix);
+      if (record) return record;
+
+      // 4. Match against INITIAL_STAFF_DATA aliases or name prefix for official domains
+      if (domain === 'mara.gov.my' || domain === 'kpmbp.edu.my') {
+        const staffFromInitial = INITIAL_STAFF_DATA.find((s) => {
+          if (s.id.toLowerCase() === userPrefix) return true;
+          if (s.aliases && s.aliases.some((a) => a.toLowerCase() === emailNorm)) return true;
+
+          const cleanTokens = s.name
+            .toLowerCase()
+            .replace(/dr\.|hj\.|hjh\.|bin|binti|bt\.|ibni|cmilt|afpm|m\.t\.a\.m|c\.a\.\(m\)/g, ' ')
+            .replace(/[^a-z0-9\s]/g, ' ')
+            .split(/\s+/)
+            .filter((t) => t.length >= 3);
+
+          return cleanTokens.some(
+            (token) => token === userPrefix || userPrefix.startsWith(token) || token.startsWith(userPrefix)
+          );
+        });
+
+        if (staffFromInitial) {
+          const matchedVaultRecord = this.vault.get(staffFromInitial.id.toLowerCase());
+          if (matchedVaultRecord) return matchedVaultRecord;
+        }
+      }
+    } else {
+      // Direct staffId match
+      record = this.vault.get(emailNorm);
+      if (record) return record;
+    }
+
+    return undefined;
+  }
+
+  /**
+   * Clears any active rate-limit lockout for a given staff member and clears IP locks.
    */
   public unlockStaff(staffId: string): boolean {
     const idLower = staffId.toLowerCase();
     this.rateLimiter.reset(`staff_${idLower}`);
+    this.rateLimiter.clearAll();
     return true;
   }
 
@@ -317,6 +404,7 @@ export class StaffCredentialsVault {
       role: rawStaff.role,
       department: rawStaff.department,
       phone: rawStaff.phone,
+      aliases: rawStaff.aliases,
       pinStatus: rawStaff.pinStatus || 'DEFAULT',
       pinChangedAt: rawStaff.pinChangedAt,
     };
@@ -344,10 +432,8 @@ export class StaffCredentialsVault {
       return { success: false, errorMsg: 'Email atau PIN tidak sah (mesti 4 digit nombor).' };
     }
 
-    // Lookup staff by email
-    const staffRecord = Array.from(this.vault.values()).find(
-      (r) => r.email === cleanEmail
-    );
+    // Lookup staff by email with smart alias and institutional domain resolution
+    const staffRecord = this.findStaffRecord(cleanEmail);
 
     const rateKey = staffRecord ? `staff_${staffRecord.staffId.toLowerCase()}` : `ip_${clientIp || 'unknown'}`;
     const rateCheck = this.rateLimiter.checkLimit(rateKey);
@@ -384,8 +470,11 @@ export class StaffCredentialsVault {
       };
     }
 
-    // Success: reset rate limit
+    // Success: reset rate limit for both staff account and client IP
     this.rateLimiter.reset(rateKey);
+    if (clientIp) {
+      this.rateLimiter.reset(`ip_${clientIp}`);
+    }
 
     const staffData = INITIAL_STAFF_DATA.find((s) => s.id === staffRecord.staffId) || {
       id: staffRecord.staffId,
@@ -399,6 +488,7 @@ export class StaffCredentialsVault {
 
     const sanitized = this.sanitizeStaffForClient({
       ...staffData,
+      email: cleanEmail.includes('@') ? cleanEmail : staffData.email,
       pinStatus: staffRecord.pinStatus,
       pinChangedAt: staffRecord.pinChangedAt,
     });
@@ -432,9 +522,7 @@ export class StaffCredentialsVault {
       return { success: false, errorMsg: 'Email atau PIN tidak sah (mesti 4 digit nombor).' };
     }
 
-    const staffRecord = Array.from(this.vault.values()).find(
-      (r) => r.email === cleanEmail
-    );
+    const staffRecord = this.findStaffRecord(cleanEmail);
 
     const rateKey = staffRecord ? `staff_${staffRecord.staffId.toLowerCase()}` : `ip_${clientIp || 'unknown'}`;
     const rateCheck = this.rateLimiter.checkLimit(rateKey);
@@ -471,6 +559,9 @@ export class StaffCredentialsVault {
     }
 
     this.rateLimiter.reset(rateKey);
+    if (clientIp) {
+      this.rateLimiter.reset(`ip_${clientIp}`);
+    }
 
     const staffData = INITIAL_STAFF_DATA.find((s) => s.id === staffRecord.staffId) || {
       id: staffRecord.staffId,
@@ -484,6 +575,7 @@ export class StaffCredentialsVault {
 
     const sanitized = this.sanitizeStaffForClient({
       ...staffData,
+      email: cleanEmail.includes('@') ? cleanEmail : staffData.email,
       pinStatus: staffRecord.pinStatus,
       pinChangedAt: staffRecord.pinChangedAt,
     });

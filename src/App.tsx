@@ -38,6 +38,7 @@ import {
   updateStoredBooking,
   mergeCloudBookingsWithPendingQueue
 } from './utils/storage';
+import { matchStaffByEmail } from './utils/staff-matcher';
 import { 
   subscribeToBookings, 
   subscribeToBlocks, 
@@ -309,9 +310,7 @@ export default function App() {
         return;
       }
       if (staffUsers.length > 0) {
-        const match = staffUsers.find(
-          (s) => s.email.trim().toLowerCase() === active.applicantEmail.trim().toLowerCase()
-        );
+        const match = matchStaffByEmail(active.applicantEmail, staffUsers);
         if (match && match.pinStatus === 'DEFAULT') {
           setMandatoryPinChangeStaff(match);
         } else {

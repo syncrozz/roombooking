@@ -114,6 +114,7 @@ export interface StaffUser {
   role: string;
   phone: string;
   email: string;
+  aliases?: string[];
   pinStatus: 'DEFAULT' | 'CUSTOM';
   pinChangedAt?: string;
 }

@@ -34,6 +34,7 @@ import {
   mergeCloudBookingsWithPendingQueue
 } from '../utils/storage';
 import { generateBookingIdempotencyKey, isSlotOverlapping } from '../utils/idempotency';
+import { matchStaffByEmail } from '../utils/staff-matcher';
 import firebaseConfig from '../../firebase-applet-config.json';
 
 const app = !getApps().length ? initializeApp(firebaseConfig) : getApp();
@@ -755,7 +756,7 @@ export async function verifyStaffCredentials(
   // 2. Resilient Static Host Verification Engine:
   // Used when deployed to static hosts (like bookbk.syncrozz.com) without Express reverse proxy
   const effectiveStaffList = staffList && staffList.length > 0 ? staffList : INITIAL_STAFF_DATA;
-  const matched = effectiveStaffList.find(s => (s.email || '').trim().toLowerCase() === cleanEmail);
+  const matched = matchStaffByEmail(cleanEmail, effectiveStaffList);
 
   if (!matched) {
     return { success: false, errorMsg: 'Email tidak dijumpai dalam senarai staf berdaftar.' };

@@ -3,6 +3,7 @@ import { AdHocBooking, BookingStatus, StaffUser } from '../types';
 import { formatDateMalay, formatWhatsAppMessage, generateWhatsAppLink, exportBookingsToCSV } from '../utils/availabilityEngine';
 import { verifyStaffCredentials } from '../lib/firebase';
 import { INITIAL_STAFF_DATA } from '../data/staffData';
+import { matchStaffByEmail } from '../utils/staff-matcher';
 import { getStoredActiveUser, saveActiveUser, clearActiveUser, subscribeToActiveUser, UserProfileHistory } from '../utils/storage';
 import { WhatsAppIcon } from './WhatsAppIcon';
 import { ForgotPinHelp } from './ForgotPinHelp';
@@ -94,7 +95,10 @@ export const MyBookingsView: React.FC<MyBookingsViewProps> = ({
     e.preventDefault();
     setLoginError(null);
 
-    const result = await verifyStaffCredentials(loginEmail, loginPin, staffList);
+    const cleanEmail = loginEmail.trim().toLowerCase();
+    const cleanPin = loginPin.trim().replace(/\D/g, '').slice(0, 4);
+
+    const result = await verifyStaffCredentials(cleanEmail, cleanPin, staffList);
     if (!result.success || !result.staff) {
       setLoginError(result.errorMsg || 'Email atau PIN tidak sah.');
       return;
@@ -113,7 +117,7 @@ export const MyBookingsView: React.FC<MyBookingsViewProps> = ({
     const profile: UserProfileHistory = {
       staffId: st.id,
       applicantName: st.name,
-      applicantEmail: st.email,
+      applicantEmail: cleanEmail.includes('@') ? cleanEmail : st.email,
       applicantRole: st.role,
       department: st.department,
       applicantPhone: st.phone,
@@ -137,7 +141,12 @@ export const MyBookingsView: React.FC<MyBookingsViewProps> = ({
     const userEmail = currentUser.applicantEmail?.toLowerCase().trim();
     const bookingEmail = booking.applicantEmail?.toLowerCase().trim();
     if (userEmail && bookingEmail) {
-      return userEmail === bookingEmail;
+      if (userEmail === bookingEmail) return true;
+      const userMatch = matchStaffByEmail(userEmail, staffList);
+      const bookingMatch = matchStaffByEmail(bookingEmail, staffList);
+      if (userMatch && bookingMatch && userMatch.id === bookingMatch.id) {
+        return true;
+      }
     }
     const userName = currentUser.applicantName?.toLowerCase().trim();
     const bookingName = booking.applicantName?.toLowerCase().trim();
@@ -434,8 +443,11 @@ export const MyBookingsView: React.FC<MyBookingsViewProps> = ({
                   <input
                     type="email"
                     required
+                    autoCapitalize="none"
+                    autoCorrect="off"
+                    spellCheck={false}
                     value={loginEmail}
-                    onChange={(e) => setLoginEmail(e.target.value)}
+                    onChange={(e) => setLoginEmail(e.target.value.trim().toLowerCase())}
                     placeholder="nama@mara.gov.my"
                     className="w-full bg-slate-50 border border-slate-300 rounded-lg pl-8 pr-3 py-1.5 text-slate-800 font-medium outline-none focus:ring-2 focus:ring-blue-500"
                   />
@@ -452,7 +464,9 @@ export const MyBookingsView: React.FC<MyBookingsViewProps> = ({
                   <input
                     type="password"
                     inputMode="numeric"
+                    pattern="[0-9]*"
                     maxLength={4}
+                    autoComplete="one-time-code"
                     required
                     value={loginPin}
                     onChange={(e) => setLoginPin(e.target.value.replace(/\D/g, '').slice(0, 4))}

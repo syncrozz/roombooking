@@ -351,7 +351,14 @@ const RAW_STAFF_DATA = [
     name: "Ahmad Khairi Bin Mohd",
     role: "Pensyarah",
     phone: "014-5313756",
-    email: "khaikerr@gmail.com",
+    email: "khairi.mohd@mara.gov.my",
+    aliases: [
+      "khaikerr@gmail.com",
+      "khairi.mohd@mara.gov.my",
+      "khairi@mara.gov.my",
+      "ahmad.khairi@mara.gov.my",
+      "khairi.mohd@kpmbp.edu.my"
+    ],
   },
   {
     id: "ST055",
@@ -407,7 +414,14 @@ const RAW_STAFF_DATA = [
     name: "Nurlaili Balqis Binti Supian Shaari",
     role: "Pensyarah",
     phone: "014-5274771",
-    email: "nurlailibalqis91@gmail.com",
+    email: "nurlaili@mara.gov.my",
+    aliases: [
+      "nurlailibalqis91@gmail.com",
+      "nurlaili@mara.gov.my",
+      "nurlailibalqis@mara.gov.my",
+      "nurlaili.balqis@mara.gov.my",
+      "nurlaili@kpmbp.edu.my"
+    ],
   },
   {
     id: "ST062",

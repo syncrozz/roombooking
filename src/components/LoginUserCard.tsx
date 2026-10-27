@@ -72,7 +72,10 @@ export const LoginUserCard: React.FC<LoginUserCardProps> = ({
     e.preventDefault();
     setErrorMsg(null);
 
-    const result = await verifyStaffCredentials(emailInput, pinInput, staffList);
+    const cleanEmail = emailInput.trim().toLowerCase();
+    const cleanPin = pinInput.trim().replace(/\D/g, '').slice(0, 4);
+
+    const result = await verifyStaffCredentials(cleanEmail, cleanPin, staffList);
 
     if (!result.success || !result.staff) {
       setErrorMsg(result.errorMsg || 'Email atau PIN tidak sah.');
@@ -227,8 +230,11 @@ export const LoginUserCard: React.FC<LoginUserCardProps> = ({
               <input
                 type="email"
                 required
+                autoCapitalize="none"
+                autoCorrect="off"
+                spellCheck={false}
                 value={emailInput}
-                onChange={(e) => setEmailInput(e.target.value)}
+                onChange={(e) => setEmailInput(e.target.value.trim().toLowerCase())}
                 placeholder="nama@mara.gov.my"
                 className="w-full pl-8 pr-3 py-1.5 bg-slate-800 border border-slate-700 rounded-lg text-xs text-white placeholder-slate-500 focus:outline-none focus:border-blue-500"
               />
@@ -247,7 +253,9 @@ export const LoginUserCard: React.FC<LoginUserCardProps> = ({
               <input
                 type="password"
                 inputMode="numeric"
+                pattern="[0-9]*"
                 maxLength={4}
+                autoComplete="one-time-code"
                 required
                 value={pinInput}
                 onChange={(e) => {

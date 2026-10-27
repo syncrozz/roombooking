@@ -29,6 +29,7 @@ import {
   UserProfileHistory 
 } from '../utils/storage';
 import { generateBookingIdempotencyKey } from '../utils/idempotency';
+import { matchStaffByEmail } from '../utils/staff-matcher';
 import { verifyStaffCredentials, setStaffSessionPin, getStaffSessionPin } from '../lib/firebase';
 import { INITIAL_STAFF_DATA } from '../data/staffData';
 import { ForgotPinHelp } from './ForgotPinHelp';
@@ -254,8 +255,8 @@ export const BookingModal: React.FC<BookingModalProps> = ({
       setDepartment('');
       return;
     }
-    // Auto-match staff metadata from list
-    const match = staffList.find(s => s.email.toLowerCase() === clean);
+    // Auto-match staff metadata from list with smart alias and institutional domain resolution
+    const match = matchStaffByEmail(clean, staffList);
     if (match) {
       setApplicantName(match.name);
       setApplicantRole(match.role);
@@ -988,6 +989,9 @@ export const BookingModal: React.FC<BookingModalProps> = ({
                     <input
                       type="email"
                       required
+                      autoCapitalize="none"
+                      autoCorrect="off"
+                      spellCheck={false}
                       placeholder="nama@mara.gov.my"
                       value={applicantEmail}
                       onChange={(e) => handleEmailInputChange(e.target.value)}
@@ -1008,7 +1012,9 @@ export const BookingModal: React.FC<BookingModalProps> = ({
                     <input
                       type="password"
                       inputMode="numeric"
+                      pattern="[0-9]*"
                       maxLength={4}
+                      autoComplete="one-time-code"
                       required
                       placeholder="••••"
                       value={pinInput}

@@ -401,7 +401,21 @@ async function runAllGateTests() {
     const verifyAfterReset = await serverAuthVault.verifyStaff(testStaff.email, '1234');
     assert.equal(verifyAfterReset.success, true, 'Staff PIN successfully reset to 1234');
 
-    console.log('  ✔ Gate 5 PASSED: Server-side scrypt (N=16384), 5-attempt rate limiter, fail-closed enforcement, and zero client credential leakage verified.\n');
+    // 10. Post-Fix Verification 4: Universal Email & Alias Resolution (Desktop & Mobile parity)
+    const nurlailiMara = await serverAuthVault.verifyStaff('nurlaili@mara.gov.my', '2323');
+    assert.equal(nurlailiMara.success, true, 'nurlaili@mara.gov.my successfully verifies with PIN 2323');
+    assert.equal(nurlailiMara.staff?.id, 'ST061', 'Resolves to ST061');
+    assert.equal(nurlailiMara.staff?.pinStatus, 'CUSTOM', 'ST061 has CUSTOM PIN status');
+
+    const nurlailiGmail = await serverAuthVault.verifyStaff('nurlailibalqis91@gmail.com', '2323');
+    assert.equal(nurlailiGmail.success, true, 'Alias nurlailibalqis91@gmail.com successfully verifies with PIN 2323');
+    assert.equal(nurlailiGmail.staff?.id, 'ST061', 'Alias resolves to same ST061 staff ID');
+
+    // Mobile input tolerance: mixed case and whitespace
+    const nurlailiMobile = await serverAuthVault.verifyStaff('  Nurlaili@mara.gov.my  ', ' 2323 ');
+    assert.equal(nurlailiMobile.success, true, 'Mobile whitespace and capitalization cleanly handled');
+
+    console.log('  ✔ Gate 5 PASSED: Server-side scrypt (N=16384), 5-attempt rate limiter, fail-closed enforcement, zero client credential leakage, and universal alias resolution verified.\n');
     passedGates++;
   } catch (err) {
     console.error('  ✘ Gate 5 FAILED:', err);
