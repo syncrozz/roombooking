@@ -77,7 +77,6 @@ export const QuickBookingSearch: React.FC<QuickBookingSearchProps> = ({
   const [minCapacity, setMinCapacity] = useState<number>(0);
   const [category, setCategory] = useState<RoomCategory | 'Semua'>('Semua');
   const [purpose, setPurpose] = useState<PurposeCategory>('Kelas');
-  const [isAircondOnly, setIsAircondOnly] = useState<boolean>(false);
   const [hasSearched, setHasSearched] = useState<boolean>(true);
   const [selectedPopupCheck, setSelectedPopupCheck] = useState<RoomAvailabilityCheck | null>(null);
 
@@ -109,8 +108,8 @@ export const QuickBookingSearch: React.FC<QuickBookingSearchProps> = ({
     minCapacity,
     category,
     purpose,
-    isAircondOnly: isAircondOnly,
-    isSmartClassroomOnly: isAircondOnly
+    isAircondOnly: false,
+    isSmartClassroomOnly: false
   };
 
   // If specific room selected
@@ -384,17 +383,7 @@ export const QuickBookingSearch: React.FC<QuickBookingSearchProps> = ({
                 ))}
               </select>
             </div>
-            <div className="flex items-center gap-3 pt-0.5">
-              <label className="inline-flex items-center gap-1.5 text-xs text-slate-700 cursor-pointer select-none">
-                <input
-                  type="checkbox"
-                  checked={isAircondOnly}
-                  onChange={(e) => setIsAircondOnly(e.target.checked)}
-                  className="rounded text-emerald-600 focus:ring-emerald-500 w-3.5 h-3.5"
-                />
-                <span className="font-semibold text-slate-800">💠 Aircond Sahaja</span>
-              </label>
-            </div>
+
           </div>
 
         </div>

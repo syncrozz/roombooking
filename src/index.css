@@ -11,3 +11,10 @@ body {
   font-family: 'Lexend', system-ui, -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, sans-serif;
 }
 
+/* Sembunyikan ikon kalendar asli pelayar agar tidak bertindih dengan ikon kalendar tersuai */
+input[type="date"]::-webkit-calendar-picker-indicator {
+  display: none !important;
+  -webkit-appearance: none;
+}
+
+

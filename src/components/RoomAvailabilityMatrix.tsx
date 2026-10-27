@@ -109,9 +109,7 @@ export const RoomAvailabilityMatrix: React.FC<RoomAvailabilityMatrixProps> = ({
   };
 
   const [categoryFilter, setCategoryFilter] = useState<RoomCategory | 'Semua'>('Semua');
-  const [periodFilter, setPeriodFilter] = useState<'ALL' | 'DAY' | 'NIGHT'>('ALL');
   const [searchQuery, setSearchQuery] = useState<string>('');
-  const [isAircondOnly, setIsAircondOnly] = useState<boolean>(false);
   const [selectedCellInfo, setSelectedCellInfo] = useState<{
     room: Room;
     startTime: string;
@@ -281,7 +279,6 @@ export const RoomAvailabilityMatrix: React.FC<RoomAvailabilityMatrixProps> = ({
   // Filtered rooms
   const filteredRooms = rooms.filter(r => {
     if (categoryFilter !== 'Semua' && r.category !== categoryFilter) return false;
-    if (isAircondOnly && !r.hasAircond) return false;
     if (searchQuery.trim() !== '') {
       const q = searchQuery.toLowerCase();
       return r.code.toLowerCase().includes(q) || r.name.toLowerCase().includes(q) || r.block.toLowerCase().includes(q);
@@ -289,37 +286,32 @@ export const RoomAvailabilityMatrix: React.FC<RoomAvailabilityMatrixProps> = ({
     return true;
   });
 
-  const activeSlots = periodFilter === 'ALL' 
-    ? ALL_BOOKING_TIME_SLOTS 
-    : periodFilter === 'DAY' 
-      ? DAY_TIME_SLOTS 
-      : NIGHT_TIME_SLOTS;
+  const activeSlots = ALL_BOOKING_TIME_SLOTS;
 
   return (
     <div className="space-y-6">
 
-      {/* Header Banner */}
-      <div className="bg-white rounded-2xl p-3.5 sm:p-4 shadow-md border border-slate-200 space-y-3">
-        {/* Baris 1: Tarikh + Navigasi Hari, Status Ruang & Pilihan Sesi */}
-        <div className="flex flex-wrap items-center justify-between gap-3 border-b border-slate-100 pb-3">
-          {/* Tarikh + Butang Pantas Semalam / Esok / Hari Ini */}
-          <div className="flex items-center gap-1.5 flex-wrap">
-            <div className="flex items-center bg-slate-50 border border-slate-200 hover:border-emerald-300 rounded-xl p-0.5 shadow-2xs transition-all">
+      {/* Header Banner - Responsive Unified Toolbar */}
+      <div className="bg-white rounded-xl p-2 sm:p-2.5 border border-slate-200 shadow-xs">
+        <div className="flex flex-wrap lg:flex-nowrap items-center gap-2 text-xs">
+          {/* 1. Kumpulan Tarikh: < [Ikon Kalendar + Tarikh + Hari] > + Hari Ini */}
+          <div className="order-1 lg:order-1 flex items-center gap-1.5 shrink-0 max-w-full">
+            <div className="flex items-center h-9 bg-slate-50 border border-slate-300 hover:border-emerald-400 rounded-lg p-0.5 shadow-2xs transition-all shrink-0">
               <button
                 type="button"
                 onClick={handlePrevDay}
-                className="p-1.5 hover:bg-white text-slate-600 hover:text-emerald-700 rounded-lg transition cursor-pointer"
+                className="h-full px-2 hover:bg-white text-slate-600 hover:text-emerald-700 rounded-md transition cursor-pointer flex items-center justify-center"
                 title="Hari Sebelumnya"
               >
-                <ChevronLeft className="w-4 h-4" />
+                <ChevronLeft className="w-3.5 h-3.5" />
               </button>
 
               <label 
                 htmlFor="matrix-date-input"
-                className="flex items-center gap-2 px-2 py-1 cursor-pointer group select-none"
+                className="h-full flex items-center gap-1.5 px-2 cursor-pointer group select-none"
                 title="Klik untuk memilih tarikh"
               >
-                <Calendar className="w-4 h-4 text-emerald-600 group-hover:scale-110 transition-transform shrink-0" />
+                <Calendar className="w-3.5 h-3.5 text-emerald-600 group-hover:scale-110 transition-transform shrink-0" />
                 <input
                   id="matrix-date-input"
                   type="date"
@@ -330,9 +322,9 @@ export const RoomAvailabilityMatrix: React.FC<RoomAvailabilityMatrixProps> = ({
                       (e.currentTarget as any).showPicker?.();
                     } catch {}
                   }}
-                  className="bg-transparent font-bold text-slate-900 text-sm outline-none cursor-pointer w-auto"
+                  className="bg-transparent font-bold text-slate-900 text-xs outline-none cursor-pointer w-[92px] sm:w-[98px] select-none [&::-webkit-calendar-picker-indicator]:hidden [&::-webkit-calendar-picker-indicator]:appearance-none"
                 />
-                <span className="text-xs bg-emerald-100 group-hover:bg-emerald-200 text-emerald-800 font-semibold px-2 py-0.5 rounded transition-colors select-none shrink-0">
+                <span className="text-[10px] sm:text-[11px] bg-emerald-100 group-hover:bg-emerald-200 text-emerald-800 font-semibold px-1.5 py-0.5 rounded transition-colors select-none shrink-0">
                   {getMalayDayOfWeek(selectedDate)}
                 </span>
               </label>
@@ -340,10 +332,10 @@ export const RoomAvailabilityMatrix: React.FC<RoomAvailabilityMatrixProps> = ({
               <button
                 type="button"
                 onClick={handleNextDay}
-                className="p-1.5 hover:bg-white text-slate-600 hover:text-emerald-700 rounded-lg transition cursor-pointer"
+                className="h-full px-2 hover:bg-white text-slate-600 hover:text-emerald-700 rounded-md transition cursor-pointer flex items-center justify-center"
                 title="Hari Berikutnya"
               >
-                <ChevronRight className="w-4 h-4" />
+                <ChevronRight className="w-3.5 h-3.5" />
               </button>
             </div>
 
@@ -351,126 +343,70 @@ export const RoomAvailabilityMatrix: React.FC<RoomAvailabilityMatrixProps> = ({
               <button
                 type="button"
                 onClick={handleToday}
-                className="text-xs bg-emerald-50 hover:bg-emerald-100 text-emerald-700 border border-emerald-200 font-bold px-2.5 py-1.5 rounded-xl transition shadow-2xs cursor-pointer"
+                className="h-9 text-[11px] bg-emerald-50 hover:bg-emerald-100 text-emerald-700 border border-emerald-200 font-bold px-2.5 rounded-lg transition shadow-2xs cursor-pointer shrink-0"
               >
                 Hari Ini
               </button>
             )}
+          </div>
 
-            <div className="hidden md:flex items-center gap-1.5 text-xs text-slate-500 pl-2 border-l border-slate-200">
-              <span className="font-medium">Memaparkan</span>
-              <span className="bg-slate-100 text-slate-800 font-bold px-2 py-0.5 rounded-md">
-                {filteredRooms.length} / {rooms.length} Ruang
+          {/* 2. Dropdown Kategori (Mobile: Baris 1 bersama tarikh / Desktop: Posisi 3 selepas carian) */}
+          <select
+            value={categoryFilter}
+            onChange={(e) => setCategoryFilter(e.target.value as RoomCategory | 'Semua')}
+            className="order-2 lg:order-3 h-9 bg-slate-50 border border-slate-300 rounded-lg px-2.5 text-xs font-medium text-slate-800 outline-none focus:border-emerald-500 focus:ring-2 focus:ring-emerald-500/20 shadow-2xs cursor-pointer flex-1 sm:flex-initial lg:w-auto shrink-0 max-w-full"
+          >
+            <option value="Semua">Semua ({rooms.length})</option>
+            <option value="Bilik Kuliah">Bilik Kuliah & Smart Class</option>
+            <option value="Makmal Komputer">Makmal Komputer (5)</option>
+            <option value="Dewan Kuliah">Dewan Kuliah (DKA & DKB)</option>
+            <option value="Ruang Khas">Ruang Khas (4)</option>
+            <option value="Surau">Surau (2)</option>
+          </select>
+
+          {/* 3. Kotak Carian Ruang (Mobile: Baris 2 lebar penuh / Desktop: Posisi 2 flex-1 max-w-[360px]) */}
+          <div className="order-3 lg:order-2 w-full lg:w-auto lg:flex-1 min-w-[200px] lg:max-w-[360px] relative h-9">
+            <div className="absolute inset-y-0 left-0 pl-2.5 flex items-center pointer-events-none">
+              <Search className="w-3.5 h-3.5 text-slate-400" />
+            </div>
+            <input
+              type="text"
+              placeholder="Cari ruang / bilik…"
+              value={searchQuery}
+              onChange={(e) => setSearchQuery(e.target.value)}
+              className="w-full h-9 bg-white border border-slate-300 focus:border-emerald-500 rounded-lg pl-8 pr-7 text-slate-900 font-medium text-xs placeholder:text-slate-400 outline-none focus:ring-2 focus:ring-emerald-500/20 transition-all"
+            />
+            {searchQuery && (
+              <button
+                type="button"
+                onClick={() => setSearchQuery('')}
+                className="absolute right-2 top-1/2 -translate-y-1/2 text-slate-400 hover:text-slate-600 p-0.5 rounded-full hover:bg-slate-100 transition cursor-pointer"
+                title="Kosongkan carian"
+              >
+                <X className="w-3 h-3" />
+              </button>
+            )}
+          </div>
+
+          {/* 4. Petunjuk Status (Mobile: Baris 3 kecil / Desktop: Hujung Kanan ml-auto) */}
+          <div className="order-4 lg:order-4 w-full lg:w-auto lg:ml-auto flex items-center gap-3 text-[11px] font-medium text-slate-700 shrink-0 pt-0.5 lg:pt-0">
+            <div className="flex items-center gap-1.5" title="Ruang kosong sedia ditempah">
+              <span className="w-2 h-2 rounded-full bg-emerald-500 shrink-0" />
+              <span>Kosong</span>
+            </div>
+            <div className="flex items-center gap-1.5" title="Jadual kuliah semester rasmi kolej">
+              <span className="w-2 h-2 rounded-full bg-rose-500 shrink-0" />
+              <span>Jadual</span>
+            </div>
+            <div className="flex items-center gap-1.5" title="Tempahan ad-hoc staf">
+              <span className="w-2 h-2 rounded-full bg-amber-400 shrink-0" />
+              <span>Ad-hoc</span>
+            </div>
+            {filteredRooms.length !== rooms.length && (
+              <span className="hidden xl:inline-block text-[10px] text-slate-400 pl-1 border-l border-slate-200">
+                {filteredRooms.length}/{rooms.length}
               </span>
-            </div>
-          </div>
-
-          {/* Session View Filter Toggle */}
-          <div className="flex items-center gap-1 bg-slate-100 p-1 rounded-xl border border-slate-200 text-xs">
-            <button
-              onClick={() => setPeriodFilter('ALL')}
-              className={`px-2.5 sm:px-3 py-1.5 rounded-lg text-xs font-bold transition flex items-center gap-1.5 cursor-pointer ${
-                periodFilter === 'ALL'
-                  ? 'bg-white text-slate-900 shadow-2xs'
-                  : 'text-slate-600 hover:text-slate-900'
-              }`}
-            >
-              <Building className="w-3.5 h-3.5 text-emerald-600 shrink-0" />
-              <span>Semua</span>
-            </button>
-            <button
-              onClick={() => setPeriodFilter('DAY')}
-              className={`px-2.5 sm:px-3 py-1.5 rounded-lg text-xs font-bold transition flex items-center gap-1.5 cursor-pointer ${
-                periodFilter === 'DAY'
-                  ? 'bg-amber-100 text-amber-950 shadow-2xs border border-amber-300'
-                  : 'text-slate-600 hover:text-amber-800'
-              }`}
-            >
-              <Sun className="w-3.5 h-3.5 text-amber-600 shrink-0" />
-              <span>Siang</span>
-            </button>
-            <button
-              onClick={() => setPeriodFilter('NIGHT')}
-              className={`px-2.5 sm:px-3 py-1.5 rounded-lg text-xs font-bold transition flex items-center gap-1.5 cursor-pointer ${
-                periodFilter === 'NIGHT'
-                  ? 'bg-indigo-900 text-white shadow-2xs'
-                  : 'text-slate-600 hover:text-indigo-800'
-              }`}
-            >
-              <Moon className="w-3.5 h-3.5 text-indigo-400 shrink-0" />
-              <span>Malam</span>
-            </button>
-          </div>
-        </div>
-
-        {/* Baris 2: Carian, Penapis Kategori, Aircond & Petunjuk Status (Harmoni & Seimbang) */}
-        <div className="flex flex-col lg:flex-row items-stretch lg:items-center justify-between gap-3 text-xs">
-          {/* Kawalan Penapis (Kiri & Tengah) */}
-          <div className="flex flex-wrap items-center gap-2.5 flex-1">
-            <div className="relative flex-1 min-w-[200px] sm:min-w-[260px] max-w-md">
-              <div className="absolute inset-y-0 left-0 pl-3 flex items-center pointer-events-none">
-                <div className="w-6 h-6 rounded-md bg-emerald-100 text-emerald-700 flex items-center justify-center">
-                  <Search className="w-3.5 h-3.5" />
-                </div>
-              </div>
-              <input
-                type="text"
-                placeholder="Cari ruang / bilik (cth: BK04, DKA, Makmal)..."
-                value={searchQuery}
-                onChange={(e) => setSearchQuery(e.target.value)}
-                className="w-full bg-white border-2 border-emerald-500 hover:border-emerald-600 focus:border-emerald-600 rounded-xl pl-11 pr-9 py-2 text-slate-900 font-semibold text-xs placeholder:text-slate-400 placeholder:font-medium outline-none ring-2 ring-emerald-500/20 focus:ring-4 focus:ring-emerald-500/30 shadow-xs transition-all"
-              />
-              {searchQuery && (
-                <button
-                  type="button"
-                  onClick={() => setSearchQuery('')}
-                  className="absolute right-2.5 top-1/2 -translate-y-1/2 text-slate-400 hover:text-slate-600 p-1 rounded-full hover:bg-slate-100 transition cursor-pointer"
-                  title="Kosongkan carian"
-                >
-                  <X className="w-3.5 h-3.5" />
-                </button>
-              )}
-            </div>
-
-            <select
-              value={categoryFilter}
-              onChange={(e) => setCategoryFilter(e.target.value as RoomCategory | 'Semua')}
-              className="bg-slate-50 border border-slate-300 rounded-xl px-3 py-2 font-medium text-slate-800 outline-none focus:ring-2 focus:ring-emerald-500 shadow-2xs"
-            >
-              <option value="Semua">Kategori: Semua ({rooms.length} Ruang)</option>
-              <option value="Bilik Kuliah">Bilik Kuliah & Smart Class</option>
-              <option value="Makmal Komputer">Makmal Komputer (5)</option>
-              <option value="Dewan Kuliah">Dewan Kuliah (DKA & DKB)</option>
-              <option value="Ruang Khas">Ruang Khas (4)</option>
-              <option value="Surau">Surau (2)</option>
-            </select>
-
-            <label className="inline-flex items-center gap-1.5 bg-slate-50 hover:bg-slate-100 border border-slate-200 px-3 py-2 rounded-xl cursor-pointer select-none transition shadow-2xs">
-              <input
-                type="checkbox"
-                checked={isAircondOnly}
-                onChange={(e) => setIsAircondOnly(e.target.checked)}
-                className="rounded text-emerald-600 focus:ring-emerald-500"
-              />
-              <span className="font-semibold text-slate-700">💠 Aircond Sahaja</span>
-            </label>
-          </div>
-
-          {/* Petunjuk Status (Kanan) - Menyempurnakan ruang mendatar secara seimbang */}
-          <div className="flex flex-wrap items-center gap-2.5 bg-slate-50 border border-slate-200/90 px-3 py-1.5 rounded-xl shadow-2xs text-slate-700 shrink-0 self-start lg:self-auto">
-            <span className="font-bold text-slate-800 text-[11px] uppercase tracking-wider">Petunjuk :</span>
-            <div className="flex items-center gap-1">
-              <span className="text-slate-700 font-medium">🟢 Kosong</span>
-            </div>
-            <div className="flex items-center gap-1" title="Jadual kuliah semester rasmi kolej">
-              <span className="text-slate-700 font-medium">🔴 Jadual</span>
-            </div>
-            <div className="flex items-center gap-1">
-              <span className="text-slate-700 font-medium">🟨 Ad-hoc</span>
-            </div>
-            <div className="flex items-center gap-1">
-              <span className="text-slate-700 font-medium">⚫ Sekatan Kolej</span>
-            </div>
+            )}
           </div>
         </div>
       </div>
@@ -480,55 +416,32 @@ export const RoomAvailabilityMatrix: React.FC<RoomAvailabilityMatrixProps> = ({
         <div className="overflow-auto max-h-[calc(100vh-220px)] min-h-[460px] relative">
           <table className="w-full text-left border-collapse">
             <thead className="bg-white">
-              {periodFilter === 'ALL' ? (
-                <>
-                  <tr className="border-b border-slate-200 h-9">
-                    <th rowSpan={2} className="py-2 px-3 sm:px-4 font-bold sticky left-0 top-0 z-30 bg-slate-100 text-slate-800 text-xs uppercase tracking-wider min-w-[120px] sm:min-w-[160px] border-r border-slate-200 shadow-sm">
-                      Ruang Kuliah
-                    </th>
-                    <th colSpan={DAY_TIME_SLOTS.length} className="py-2 px-3 font-bold text-center bg-amber-100/90 text-amber-950 border-r border-slate-200 text-xs tracking-wider sticky top-0 z-20 shadow-xs">
-                      ☀️ WAKTU SIANG (08:30 – 17:30)
-                    </th>
-                    <th colSpan={NIGHT_TIME_SLOTS.length} className="py-2 px-3 font-bold text-center bg-indigo-900 text-indigo-100 text-xs tracking-wider sticky top-0 z-20 shadow-xs">
-                      🌙 WAKTU MALAM (20:00 – 23:00)
-                    </th>
-                  </tr>
-                  <tr className="bg-slate-50 text-slate-700 text-xs border-b border-slate-200 divide-x divide-slate-200 h-9">
-                    {DAY_TIME_SLOTS.map(slot => (
-                      <th key={slot.id} className="py-2 px-2 font-bold text-center min-w-[105px] max-w-[115px] bg-amber-50 text-slate-900 sticky top-9 z-20 border-b border-slate-300 shadow-xs">
-                        <div className="text-slate-900 font-mono text-[11px] font-bold">{slot.start}</div>
-                      </th>
-                    ))}
-                    {NIGHT_TIME_SLOTS.map(slot => (
-                      <th key={slot.id} className="py-2 px-2 font-bold text-center min-w-[105px] max-w-[115px] bg-indigo-950 text-indigo-100 sticky top-9 z-20 border-b border-indigo-900 shadow-xs">
-                        <div className="text-indigo-200 font-mono text-[11px] flex items-center justify-center gap-1 font-bold">
-                          <Moon className="w-2.5 h-2.5 text-indigo-300" />
-                          <span>{slot.start}</span>
-                        </div>
-                      </th>
-                    ))}
-                  </tr>
-                </>
-              ) : (
-                <tr className="bg-slate-50 text-slate-700 text-xs uppercase tracking-wider border-b border-slate-200 divide-x divide-slate-200 h-10">
-                  <th className="py-2.5 px-2.5 sm:py-3 sm:px-4 font-bold sticky left-0 top-0 z-30 bg-slate-100 min-w-[120px] sm:min-w-[160px] border-r border-slate-200 shadow-sm">
-                    Ruang Kuliah
+              <tr className="border-b border-slate-200 h-9">
+                <th rowSpan={2} className="py-2 px-3 sm:px-4 font-bold sticky left-0 top-0 z-30 bg-slate-100 text-slate-800 text-xs uppercase tracking-wider min-w-[120px] sm:min-w-[160px] border-r border-slate-200 shadow-sm">
+                  Ruang Kuliah
+                </th>
+                <th colSpan={DAY_TIME_SLOTS.length} className="py-2 px-3 font-bold text-center bg-amber-100/90 text-amber-950 border-r border-slate-200 text-xs tracking-wider sticky top-0 z-20 shadow-xs">
+                  ☀️ WAKTU SIANG (08:30 – 17:30)
+                </th>
+                <th colSpan={NIGHT_TIME_SLOTS.length} className="py-2 px-3 font-bold text-center bg-indigo-900 text-indigo-100 text-xs tracking-wider sticky top-0 z-20 shadow-xs">
+                  🌙 WAKTU MALAM (20:00 – 23:00)
+                </th>
+              </tr>
+              <tr className="bg-slate-50 text-slate-700 text-xs border-b border-slate-200 divide-x divide-slate-200 h-9">
+                {DAY_TIME_SLOTS.map(slot => (
+                  <th key={slot.id} className="py-2 px-2 font-bold text-center min-w-[105px] max-w-[115px] bg-amber-50 text-slate-900 sticky top-9 z-20 border-b border-slate-300 shadow-xs">
+                    <div className="text-slate-900 font-mono text-[11px] font-bold">{slot.start}</div>
                   </th>
-                  {activeSlots.map(slot => (
-                    <th 
-                      key={slot.id} 
-                      className={`py-2.5 px-3 font-bold text-center min-w-[115px] sticky top-0 z-20 border-b border-slate-300 shadow-xs ${
-                        slot.period === 'NIGHT' ? 'bg-indigo-900 text-indigo-100' : 'bg-amber-100/90 text-slate-900'
-                      }`}
-                    >
-                      <div className="flex items-center justify-center gap-1 font-mono font-bold">
-                        {slot.period === 'NIGHT' && <Moon className="w-3 h-3 text-indigo-300" />}
-                        <span>{slot.start} – {slot.end}</span>
-                      </div>
-                    </th>
-                  ))}
-                </tr>
-              )}
+                ))}
+                {NIGHT_TIME_SLOTS.map(slot => (
+                  <th key={slot.id} className="py-2 px-2 font-bold text-center min-w-[105px] max-w-[115px] bg-indigo-950 text-indigo-100 sticky top-9 z-20 border-b border-indigo-900 shadow-xs">
+                    <div className="text-indigo-200 font-mono text-[11px] flex items-center justify-center gap-1 font-bold">
+                      <Moon className="w-2.5 h-2.5 text-indigo-300" />
+                      <span>{slot.start}</span>
+                    </div>
+                  </th>
+                ))}
+              </tr>
             </thead>
             <tbody className="divide-y divide-slate-200 text-xs">
               {filteredRooms.map(room => {
