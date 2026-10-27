@@ -588,7 +588,7 @@ export async function updateStaffPinInCloud(
         body: JSON.stringify({
           staffId,
           newPin,
-          currentPin: currentPin || getStaffSessionPin(staffId) || (pinStatus === 'CUSTOM' ? '1234' : undefined),
+          currentPin: currentPin || getStaffSessionPin(staffId) || '1234',
           adminPasscode,
         }),
       });

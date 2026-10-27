@@ -15,6 +15,7 @@ export const SetPinModal: React.FC<SetPinModalProps> = ({
   isOpen,
   onSuccess
 }) => {
+  const [currentPinInput, setCurrentPinInput] = useState<string>(() => getStaffSessionPin(staff.id) || '');
   const [newPin, setNewPin] = useState<string>('');
   const [confirmPin, setConfirmPin] = useState<string>('');
   const [errorMsg, setErrorMsg] = useState<string | null>(null);
@@ -26,8 +27,16 @@ export const SetPinModal: React.FC<SetPinModalProps> = ({
     e.preventDefault();
     setErrorMsg(null);
 
+    const cleanCurrent = currentPinInput.trim();
     const cleanNewPin = newPin.trim();
     const cleanConfirm = confirmPin.trim();
+
+    // Verify current PIN provided when staff already has custom PIN
+    const activeCurrentPin = staff.pinStatus === 'DEFAULT' ? '1234' : (cleanCurrent || getStaffSessionPin(staff.id) || '');
+    if (staff.pinStatus === 'CUSTOM' && !activeCurrentPin) {
+      setErrorMsg('Sila masukkan PIN semasa anda.');
+      return;
+    }
 
     // 1. Validate exactly 4 numeric digits
     if (!/^\d{4}$/.test(cleanNewPin)) {
@@ -57,8 +66,7 @@ export const SetPinModal: React.FC<SetPinModalProps> = ({
     setIsSaving(true);
     try {
       // Update in Cloud Firestore via Server Scrypt Vault
-      const currentPin = getStaffSessionPin(staff.id) || (staff.pinStatus === 'DEFAULT' ? '1234' : undefined);
-      await updateStaffPinInCloud(staff.id, cleanNewPin, 'CUSTOM', currentPin);
+      await updateStaffPinInCloud(staff.id, cleanNewPin, 'CUSTOM', activeCurrentPin);
 
       const updatedStaff: StaffUser = {
         ...staff,
@@ -83,9 +91,9 @@ export const SetPinModal: React.FC<SetPinModalProps> = ({
       }
 
       onSuccess(updatedStaff);
-    } catch (err) {
+    } catch (err: any) {
       console.error('Error updating staff PIN:', err);
-      setErrorMsg('Ralat menyimpan PIN baharu ke pangkalan data. Sila cuba sebentar lagi.');
+      setErrorMsg(err?.message || 'Ralat menyimpan PIN baharu ke pangkalan data. Sila pastikan PIN semasa adalah betul.');
     } finally {
       setIsSaving(false);
     }
@@ -111,11 +119,39 @@ export const SetPinModal: React.FC<SetPinModalProps> = ({
 
         {/* Mandatory Notification Message */}
         <div className="p-3 bg-amber-50 border border-amber-200 rounded-xl text-xs text-amber-900 leading-relaxed font-medium">
-          Untuk keselamatan akaun anda, sila tetapkan PIN 4-digit baharu.
+          {staff.pinStatus === 'DEFAULT' ? (
+            <span>Untuk keselamatan akaun anda, sila gantikan PIN lalai (<strong>1234</strong>) dengan PIN 4-digit baharu.</span>
+          ) : (
+            <span>Sila masukkan PIN semasa anda dan tetapkan PIN 4-digit baharu.</span>
+          )}
         </div>
 
         {/* Change PIN Form */}
         <form onSubmit={handleSubmit} className="space-y-3 text-xs">
+          {staff.pinStatus === 'CUSTOM' && (
+            <div>
+              <label className="block font-bold text-slate-700 mb-1">
+                PIN Semasa (Kata Laluan Sekarang)
+              </label>
+              <div className="relative">
+                <KeyRound className="w-4 h-4 text-slate-400 absolute left-3 top-2.5" />
+                <input
+                  type="password"
+                  inputMode="numeric"
+                  maxLength={4}
+                  required
+                  value={currentPinInput}
+                  onChange={(e) => {
+                    setCurrentPinInput(e.target.value.replace(/\D/g, '').slice(0, 4));
+                    setErrorMsg(null);
+                  }}
+                  placeholder="••••"
+                  className="w-full bg-slate-50 border border-slate-300 rounded-xl pl-9 pr-3 py-2 text-slate-900 font-mono text-sm font-bold tracking-widest outline-none focus:ring-2 focus:ring-blue-500"
+                />
+              </div>
+            </div>
+          )}
+
           <div>
             <label className="block font-bold text-slate-700 mb-1">
               PIN Baharu
@@ -127,7 +163,7 @@ export const SetPinModal: React.FC<SetPinModalProps> = ({
                 inputMode="numeric"
                 maxLength={4}
                 required
-                autoFocus
+                autoFocus={staff.pinStatus === 'DEFAULT'}
                 value={newPin}
                 onChange={(e) => {
                   setNewPin(e.target.value.replace(/\D/g, '').slice(0, 4));
@@ -141,7 +177,7 @@ export const SetPinModal: React.FC<SetPinModalProps> = ({
 
           <div>
             <label className="block font-bold text-slate-700 mb-1">
-              Sahkan PIN
+              Sahkan PIN Baharu
             </label>
             <div className="relative">
               <KeyRound className="w-4 h-4 text-slate-400 absolute left-3 top-2.5" />

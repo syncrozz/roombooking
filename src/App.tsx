@@ -328,9 +328,11 @@ export default function App() {
   }, [staffUsers]);
 
   const handlePinChangeSuccess = (updatedStaff: StaffUser) => {
-    setStaffUsers((prev) =>
-      prev.map((s) => (s.id === updatedStaff.id ? updatedStaff : s))
-    );
+    setStaffUsers((prev) => {
+      const updated = prev.map((s) => (s.id === updatedStaff.id ? updatedStaff : s));
+      saveStoredStaffUsers(updated);
+      return updated;
+    });
     setMandatoryPinChangeStaff(null);
     showToast(`✅ PIN keselamatan berjaya ditetapkan untuk ${updatedStaff.name}.`);
   };

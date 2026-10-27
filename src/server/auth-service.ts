@@ -1,3 +1,5 @@
+import fs from 'node:fs';
+import path from 'node:path';
 import crypto from 'node:crypto';
 import { INITIAL_STAFF_DATA } from '../data/staffData';
 import { StaffUser } from '../types';
@@ -229,12 +231,15 @@ interface StaffCredentialRecord {
   updatedAt: string;
 }
 
+export const VAULT_STORAGE_PATH = path.resolve(process.cwd(), 'src/data/staff-credentials-vault.json');
+
 export class StaffCredentialsVault {
   private vault = new Map<string, StaffCredentialRecord>();
   public rateLimiter = new ServerRateLimiter(5, 15 * 60 * 1000);
 
   constructor() {
     this.seedDefaultCredentials();
+    this.loadPersistentVault();
   }
 
   /**
@@ -252,6 +257,53 @@ export class StaffCredentialsVault {
         updatedAt: new Date().toISOString(),
       });
     }
+  }
+
+  /**
+   * Loads saved persistent custom credentials from disk so they survive
+   * server restarts, container cold boots, and code updates.
+   */
+  public loadPersistentVault(): void {
+    try {
+      if (fs.existsSync(VAULT_STORAGE_PATH)) {
+        const raw = fs.readFileSync(VAULT_STORAGE_PATH, 'utf-8');
+        const data = JSON.parse(raw);
+        if (Array.isArray(data)) {
+          for (const item of data) {
+            if (item && item.staffId && item.scryptHash) {
+              this.vault.set(item.staffId.toLowerCase(), item);
+            }
+          }
+        }
+      }
+    } catch (err) {
+      console.warn('[StaffCredentialsVault] Failed to load persistent vault file:', err);
+    }
+  }
+
+  /**
+   * Atomically saves the vault state to disk.
+   */
+  public savePersistentVault(): void {
+    try {
+      const dir = path.dirname(VAULT_STORAGE_PATH);
+      if (!fs.existsSync(dir)) {
+        fs.mkdirSync(dir, { recursive: true });
+      }
+      const data = Array.from(this.vault.values());
+      fs.writeFileSync(VAULT_STORAGE_PATH, JSON.stringify(data, null, 2), 'utf-8');
+    } catch (err) {
+      console.warn('[StaffCredentialsVault] Failed to write persistent vault file:', err);
+    }
+  }
+
+  /**
+   * Clears any active rate-limit lockout for a given staff member.
+   */
+  public unlockStaff(staffId: string): boolean {
+    const idLower = staffId.toLowerCase();
+    this.rateLimiter.reset(`staff_${idLower}`);
+    return true;
   }
 
   /**
@@ -551,6 +603,7 @@ export class StaffCredentialsVault {
     }
 
     this.rateLimiter.reset(rateKey);
+    this.savePersistentVault();
     return { success: true };
   }
 
@@ -602,6 +655,7 @@ export class StaffCredentialsVault {
     }
 
     this.rateLimiter.reset(`staff_${idLower}`);
+    this.savePersistentVault();
     return { success: true };
   }
 

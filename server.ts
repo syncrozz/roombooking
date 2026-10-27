@@ -111,6 +111,28 @@ async function startServer() {
     }
   });
 
+  // Secure Server-Side Staff Unlock Endpoint (Unlocks 15-min rate limit lock)
+  app.post('/api/auth/staff-unlock', async (req, res) => {
+    try {
+      const { staffId, adminPasscode } = req.body || {};
+      const headerPasscode = req.headers['x-admin-passcode'] as string | undefined;
+
+      if (!staffId) {
+        return res.status(400).json({ success: false, errorMsg: 'staffId diperlukan.' });
+      }
+
+      if ((adminPasscode || headerPasscode) !== '5313') {
+        return res.status(403).json({ success: false, errorMsg: 'Passcode Pentadbir diperlukan.' });
+      }
+
+      serverAuthVault.unlockStaff(staffId);
+      return res.status(200).json({ success: true, message: `Sekatan akaun ${staffId} telah dinyahkunci.` });
+    } catch (err) {
+      console.error('Error during staff unlock:', err);
+      return res.status(500).json({ success: false, errorMsg: 'Ralat pelayan dalaman.' });
+    }
+  });
+
   // Development: Mount Vite middlewares for SPA HMR & bundle serving
   if (process.env.NODE_ENV !== 'production') {
     const { createServer: createViteServer } = await import('vite');
