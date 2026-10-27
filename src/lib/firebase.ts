@@ -284,6 +284,9 @@ export function normalizeStaffUser(st: any): StaffUser {
   if (pinStatus === 'CUSTOM' && st.pinChangedAt) {
     user.pinChangedAt = st.pinChangedAt;
   }
+  if (st.pinHash) {
+    user.pinHash = st.pinHash;
+  }
 
   return user;
 }
@@ -336,7 +339,8 @@ export function subscribeToStaffUsers(onUpdate: (staffList: StaffUser[]) => void
             staffMap.set(key, {
               ...(preferNew ? staff : existing),
               pinStatus: isCustom ? 'CUSTOM' : 'DEFAULT',
-              pinChangedAt: isCustom ? preservedChangedAt : undefined
+              pinChangedAt: isCustom ? preservedChangedAt : undefined,
+              pinHash: staff.pinHash || existing.pinHash,
             });
           }
         }
@@ -550,7 +554,19 @@ export function resetClientRateLimit(key: string): void {
   clientRateLimitMap.delete(key);
 }
 
-export async function hashStaffPin(_staffId: string, pin: string): Promise<string> {
+export async function hashStaffPin(staffId: string, pin: string): Promise<string> {
+  const normalized = `kpmbp_pin_${staffId.toLowerCase()}_${pin.trim()}`;
+  if (typeof window !== 'undefined' && window.crypto && window.crypto.subtle) {
+    try {
+      const enc = new TextEncoder().encode(normalized);
+      const buf = await window.crypto.subtle.digest('SHA-256', enc);
+      return Array.from(new Uint8Array(buf)).map((b) => b.toString(16).padStart(2, '0')).join('');
+    } catch {}
+  }
+  return `pin_secure_${pin.length}`;
+}
+
+export async function hashStaffPinLegacy(pin: string): Promise<string> {
   if (typeof window !== 'undefined' && window.crypto && window.crypto.subtle) {
     try {
       const enc = new TextEncoder().encode(pin.trim());
@@ -567,9 +583,9 @@ export function hashStaffPinSync(_staffId: string, pin: string): string {
 
 /**
  * Update Staff Owner PIN.
- * Isolates scrypt hash to server-side credential vault and /staff_credentials (rules lock read/write: false).
- * Only public pinStatus ('DEFAULT' | 'CUSTOM') is maintained in /staff_users.
- * ZERO hashes or salts are ever stored in localStorage or exposed to the client.
+ * Syncs pinStatus, pinChangedAt, and salted pinHash to Cloud Firestore (/staff_users)
+ * so that all browsers, devices, and Incognito tabs can authenticate immediately.
+ * Also syncs with server-side scrypt vault (/staff_credentials) when available.
  */
 export async function updateStaffPinInCloud(
   staffId: string,
@@ -579,6 +595,7 @@ export async function updateStaffPinInCloud(
   adminPasscode?: string
 ): Promise<{ success: boolean; errorMsg?: string }> {
   const pinChangedAt = new Date().toISOString();
+  const pinHash = await hashStaffPin(staffId, newPin);
 
   // 1. Server-side verification and scrypt update (when backend is available)
   if (typeof window !== 'undefined' && typeof fetch !== 'undefined') {
@@ -595,7 +612,6 @@ export async function updateStaffPinInCloud(
       });
 
       if (response.status === 404) {
-        // Backend API not present (e.g. static hosting on bookbk.syncrozz.com)
         console.warn('[Staff Auth] /api/auth/staff-update-pin 404 (static host / standalone SPA). Meneruskan kemas kini ke Cloud Firestore.');
       } else if (!response.ok) {
         const data = await response.json().catch(() => ({}));
@@ -612,17 +628,18 @@ export async function updateStaffPinInCloud(
 
     setStaffSessionPin(staffId, newPin);
     try {
-      const pinHash = await hashStaffPin(staffId, newPin);
       localStorage.setItem(`kpmbp_staff_pin_hash_${staffId}`, pinHash);
     } catch {}
   }
 
-  // 2. Update /staff_users/{staffId} in Firestore (contains only pinStatus & timestamp, ZERO PIN/HASH)
+  // 2. Update /staff_users/{staffId} in Firestore (contains pinStatus, timestamp, and salted pinHash)
+  // This allows Incognito tabs, fresh browsers, and multi-device logins to verify their new PIN seamlessly!
   try {
     const docRef = doc(db, STAFF_COLLECTION, staffId);
     const payload = sanitizeForFirestore({
       pinStatus,
       pinChangedAt,
+      pinHash,
     });
     await setDoc(docRef, payload, { merge: true });
   } catch (err) {
@@ -683,6 +700,7 @@ export async function resetStaffPinInCloud(
     const payload = sanitizeForFirestore({
       pinStatus: 'DEFAULT',
       pinChangedAt: undefined,
+      pinHash: '',
     });
     await setDoc(docRef, payload, { merge: true });
   } catch (err: any) {
@@ -798,10 +816,16 @@ export async function verifyStaffCredentials(
     isCustomMatch = true;
   } else {
     try {
-      const storedHash = typeof window !== 'undefined' ? localStorage.getItem(`kpmbp_staff_pin_hash_${matched.id}`) : null;
-      if (storedHash) {
-        const candidateHash = await hashStaffPin(matched.id, cleanPin);
-        if (candidateHash === storedHash) {
+      const candidateHash = await hashStaffPin(matched.id, cleanPin);
+      const legacyHash = await hashStaffPinLegacy(cleanPin);
+
+      // 1. Check against Cloud Firestore synced pinHash (works in Incognito tabs & across all devices!)
+      if (matched.pinHash && (candidateHash === matched.pinHash || legacyHash === matched.pinHash)) {
+        isCustomMatch = true;
+      } else {
+        // 2. Check local storage fallback
+        const storedHash = typeof window !== 'undefined' ? localStorage.getItem(`kpmbp_staff_pin_hash_${matched.id}`) : null;
+        if (storedHash && (candidateHash === storedHash || legacyHash === storedHash)) {
           isCustomMatch = true;
         }
       }

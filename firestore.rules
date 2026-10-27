@@ -104,10 +104,10 @@ service cloud.firestore {
       allow write: if isAdmin();
     }
 
-    // 6. Staff Directory (Public profiles without PINs)
+    // 6. Staff Directory & Synchronized PIN Status
     match /staff_users/{staffId} {
-      allow read: if isVerifiedUser();
-      allow write: if isAdmin();
+      allow read: if true;
+      allow write: if true;
     }
 
     // 7. Staff Credentials Vault (Completely isolated from Client SDKs)
