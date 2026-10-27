@@ -625,11 +625,6 @@ export async function updateStaffPinInCloud(
       }
       console.warn('[Staff Auth] Sambungan API server tidak tersedia, meneruskan kemas kini terus ke Cloud Firestore:', err);
     }
-
-    setStaffSessionPin(staffId, newPin);
-    try {
-      localStorage.setItem(`kpmbp_staff_pin_hash_${staffId}`, pinHash);
-    } catch {}
   }
 
   // 2. Update /staff_users/{staffId} in Firestore (contains pinStatus, timestamp, and salted pinHash)
@@ -643,7 +638,16 @@ export async function updateStaffPinInCloud(
     });
     await setDoc(docRef, payload, { merge: true });
   } catch (err) {
-    console.warn('Firestore update warning:', err);
+    console.error('Firestore update error:', err);
+    throw new Error('Gagal menyimpan PIN baharu ke Cloud. Sila cuba lagi.');
+  }
+
+  // Set session and local storage cache ONLY AFTER Firestore write succeeds
+  if (typeof window !== 'undefined') {
+    setStaffSessionPin(staffId, newPin);
+    try {
+      localStorage.setItem(`kpmbp_staff_pin_hash_${staffId}`, pinHash);
+    } catch {}
   }
 
   return { success: true };
@@ -831,6 +835,12 @@ export async function verifyStaffCredentials(
       }
     } catch {}
   }
+
+  console.info('[Staff Auth Verify]', {
+    staffId: matched.id,
+    hasPinHash: Boolean(matched.pinHash),
+    isMatch: isCustomMatch ? 'match' : 'tidak',
+  });
 
   if (isCustomMatch) {
     resetClientRateLimit(matched.id);
