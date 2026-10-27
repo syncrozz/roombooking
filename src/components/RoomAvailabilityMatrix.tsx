@@ -276,15 +276,37 @@ export const RoomAvailabilityMatrix: React.FC<RoomAvailabilityMatrixProps> = ({
     return () => window.removeEventListener('keydown', handleKeyDown);
   }, [selectedCellInfo]);
 
-  // Filtered rooms
-  const filteredRooms = rooms.filter(r => {
-    if (categoryFilter !== 'Semua' && r.category !== categoryFilter) return false;
-    if (searchQuery.trim() !== '') {
-      const q = searchQuery.toLowerCase();
-      return r.code.toLowerCase().includes(q) || r.name.toLowerCase().includes(q) || r.block.toLowerCase().includes(q);
-    }
-    return true;
-  });
+  // Keutamaan susunan kategori Matrix paparan: 1. Bilik Kuliah, 2. Ruang Khas, 3. Makmal Komputer
+  const CATEGORY_ORDER: Record<string, number> = {
+    'Bilik Kuliah': 1,
+    'Dewan Kuliah': 1,
+    'Ruang Khas': 2,
+    'Surau': 2,
+    'Makmal Komputer': 3,
+  };
+
+  // Filtered and category-sorted rooms
+  const filteredRooms = rooms
+    .filter(r => {
+      if (categoryFilter !== 'Semua') {
+        if (categoryFilter === 'Bilik Kuliah' && r.category !== 'Bilik Kuliah' && r.category !== 'Dewan Kuliah') return false;
+        if (categoryFilter === 'Ruang Khas' && r.category !== 'Ruang Khas' && r.category !== 'Surau') return false;
+        if (categoryFilter === 'Makmal Komputer' && r.category !== 'Makmal Komputer') return false;
+      }
+      if (searchQuery.trim() !== '') {
+        const q = searchQuery.toLowerCase();
+        return r.code.toLowerCase().includes(q) || r.name.toLowerCase().includes(q) || r.block.toLowerCase().includes(q);
+      }
+      return true;
+    })
+    .sort((a, b) => {
+      const orderA = CATEGORY_ORDER[a.category] ?? 99;
+      const orderB = CATEGORY_ORDER[b.category] ?? 99;
+      if (orderA !== orderB) {
+        return orderA - orderB;
+      }
+      return 0; // Kekalkan susunan asal dalam kategori yang sama
+    });
 
   const activeSlots = ALL_BOOKING_TIME_SLOTS;
 
@@ -353,15 +375,13 @@ export const RoomAvailabilityMatrix: React.FC<RoomAvailabilityMatrixProps> = ({
           {/* 2. Dropdown Kategori (Mobile: Baris 1 bersama tarikh / Desktop: Posisi 3 selepas carian) */}
           <select
             value={categoryFilter}
-            onChange={(e) => setCategoryFilter(e.target.value as RoomCategory | 'Semua')}
+            onChange={(e) => setCategoryFilter(e.target.value as any)}
             className="order-2 lg:order-3 h-9 bg-slate-50 border border-slate-300 rounded-lg px-2.5 text-xs font-medium text-slate-800 outline-none focus:border-emerald-500 focus:ring-2 focus:ring-emerald-500/20 shadow-2xs cursor-pointer flex-1 sm:flex-initial lg:w-auto shrink-0 max-w-full"
           >
             <option value="Semua">Semua ({rooms.length})</option>
-            <option value="Bilik Kuliah">Bilik Kuliah & Smart Class</option>
-            <option value="Makmal Komputer">Makmal Komputer (5)</option>
-            <option value="Dewan Kuliah">Dewan Kuliah (DKA & DKB)</option>
-            <option value="Ruang Khas">Ruang Khas (4)</option>
-            <option value="Surau">Surau (2)</option>
+            <option value="Bilik Kuliah">Bilik Kuliah</option>
+            <option value="Ruang Khas">Ruang Khas</option>
+            <option value="Makmal Komputer">Makmal Komputer</option>
           </select>
 
           {/* 3. Kotak Carian Ruang (Mobile: Baris 2 lebar penuh / Desktop: Posisi 2 flex-1 max-w-[360px]) */}

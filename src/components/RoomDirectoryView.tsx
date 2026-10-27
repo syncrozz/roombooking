@@ -81,9 +81,9 @@ export const RoomDirectoryView: React.FC<RoomDirectoryViewProps> = ({
             >
               <option value="Semua">Kategori: Semua ({rooms.length} Ruang)</option>
               <option value="Bilik Kuliah">🏫 Bilik Kuliah (BK01 – BK28, Smart Classroom)</option>
+              <option value="Ruang Khas">🎓 Ruang Khas (Aras 1 Perpustakaan, Bilik Kota Tinggi, Dewan Seminar, Mini Seminar, Bilik Inkubator)</option>
               <option value="Makmal Komputer">💻 Makmal Komputer (Alfa, Beta, Sigma, Gamma, Delta)</option>
               <option value="Dewan Kuliah">🏛️ Dewan Utama & Dewan Kuliah (Dewan Besar, DKA, DKB)</option>
-              <option value="Ruang Khas">🎓 Ruang Khas (Aras 1 Perpustakaan, Bilik Kota Tinggi, Dewan Seminar, Mini Seminar, Bilik Inkubator)</option>
               <option value="Surau">🕌 Surau (Surau 1 & Surau 2)</option>
             </select>
           </div>

@@ -128,7 +128,7 @@ export const QuickBookingSearch: React.FC<QuickBookingSearchProps> = ({
     .filter(r => {
       if (category !== 'Semua' && r.category !== category) return false;
       if (minCapacity > 0 && r.capacity < minCapacity) return false;
-      if (isAircondOnly && !r.hasAircond) return false;
+      if (searchParams.isAircondOnly && !r.hasAircond) return false;
       return true;
     })
     .map(r => checkRoomAvailability(r, selectedDate, startTime, endTime, academicSchedule, adhocBookings, institutionalBlocks));
