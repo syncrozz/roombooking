@@ -992,7 +992,7 @@ export const BookingModal: React.FC<BookingModalProps> = ({
                       autoCapitalize="none"
                       autoCorrect="off"
                       spellCheck={false}
-                      placeholder="nama@mara.gov.my"
+                      placeholder="nama@mara.gov.my atau e-mel CSV berdaftar"
                       value={applicantEmail}
                       onChange={(e) => handleEmailInputChange(e.target.value)}
                       className="w-full bg-white border border-slate-300 rounded-lg pl-8 pr-2 py-1.5 text-slate-900 font-bold outline-none focus:ring-2 focus:ring-blue-500"

@@ -8,6 +8,7 @@ import {
 } from '../utils/storage';
 import { StaffUser } from '../types';
 import { INITIAL_STAFF_DATA } from '../data/staffData';
+import { matchStaffByEmail } from '../utils/staff-matcher';
 import { verifyStaffCredentials, setStaffSessionPin, getStaffSessionPin } from '../lib/firebase';
 import { ForgotPinHelp } from './ForgotPinHelp';
 import { WhatsAppIcon } from './WhatsAppIcon';
@@ -75,19 +76,21 @@ export const LoginUserCard: React.FC<LoginUserCardProps> = ({
     let cleanEmail = emailInput.trim().toLowerCase();
     const cleanPin = pinInput.trim().replace(/\D/g, '').slice(0, 4);
 
-    if (cleanEmail.endsWith('@gmail.com') || cleanEmail.endsWith('@bpenawar.kpm.edu.my')) {
-      setErrorMsg('Akaun @gmail.com dan @bpenawar.kpm.edu.my telah dimansuhkan. Sila gunakan e-mel rasmi @mara.gov.my.');
+    if (!cleanEmail) {
+      setErrorMsg('Sila masukkan e-mel staf berdaftar.');
       return;
     }
 
-    if (cleanEmail.includes('@') && !cleanEmail.endsWith('@mara.gov.my')) {
-      setErrorMsg('Hanya e-mel rasmi @mara.gov.my dibenarkan sebagai ID tunggal log masuk.');
+    if (!cleanPin || cleanPin.length !== 4) {
+      setErrorMsg('Sila masukkan 4 digit PIN keselamatan.');
       return;
     }
 
-    if (!cleanEmail.includes('@') && !cleanEmail.startsWith('st')) {
-      cleanEmail = `${cleanEmail}@mara.gov.my`;
-      setEmailInput(cleanEmail);
+    // Verify that the email is registered in staff sources / CSV
+    const preMatch = matchStaffByEmail(cleanEmail, staffList);
+    if (!preMatch) {
+      setErrorMsg('E-mel ini tidak didaftarkan dalam senarai staf sumber CSV.');
+      return;
     }
 
     const result = await verifyStaffCredentials(cleanEmail, cleanPin, staffList);
@@ -238,7 +241,7 @@ export const LoginUserCard: React.FC<LoginUserCardProps> = ({
         <form onSubmit={handleVerifyAndLogin} className="p-3.5 space-y-3 bg-slate-950/60">
           <div>
             <label className="block text-[11px] font-bold text-slate-300 mb-1">
-              ID E-mel Rasmi (@mara.gov.my)
+              E-mel Staf (Sumber CSV)
             </label>
             <div className="relative">
               <Mail className="w-3.5 h-3.5 text-slate-400 absolute left-2.5 top-2.5" />
@@ -250,12 +253,12 @@ export const LoginUserCard: React.FC<LoginUserCardProps> = ({
                 spellCheck={false}
                 value={emailInput}
                 onChange={(e) => setEmailInput(e.target.value.trim().toLowerCase())}
-                placeholder="nama@mara.gov.my"
+                placeholder="nama@mara.gov.my atau e-mel CSV berdaftar"
                 className="w-full pl-8 pr-3 py-1.5 bg-slate-800 border border-slate-700 rounded-lg text-xs text-white placeholder-slate-500 focus:outline-none focus:border-blue-500"
               />
             </div>
             <span className="text-[10px] text-slate-400 mt-1 block">
-              ID tunggal rasmi: <span className="text-blue-300 font-mono">nama@mara.gov.my</span>
+              E-mel yang didaftarkan dalam sumber CSV staf
             </span>
           </div>
 

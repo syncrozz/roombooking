@@ -702,6 +702,15 @@ export default function App() {
       setStaffUsers(finalStaffList);
       saveStoredStaffUsers(finalStaffList);
 
+      // Also sync to server-side credential vault if server API is reachable
+      if (typeof window !== 'undefined' && typeof fetch !== 'undefined') {
+        fetch('/api/auth/staff-sync', {
+          method: 'POST',
+          headers: { 'Content-Type': 'application/json' },
+          body: JSON.stringify({ staffList: finalStaffList, mode }),
+        }).catch(() => {});
+      }
+
       if (mode === 'replace') {
         showToast(`🟢 Mod Ganti Semua: ${result.written} rekod staf disimpan, ${result.deleted} rekod lama dipadamkan dari Cloud.`);
       } else {

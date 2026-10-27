@@ -133,6 +133,21 @@ async function startServer() {
     }
   });
 
+  // Secure Server-Side Staff Sync Endpoint (Syncs staff list imported from CSV)
+  app.post('/api/auth/staff-sync', async (req, res) => {
+    try {
+      const { staffList, mode } = req.body || {};
+      if (Array.isArray(staffList)) {
+        serverAuthVault.syncStaffFromList(staffList, mode);
+        return res.status(200).json({ success: true, count: staffList.length });
+      }
+      return res.status(400).json({ success: false, errorMsg: 'staffList array diperlukan.' });
+    } catch (err) {
+      console.error('Error during staff sync:', err);
+      return res.status(500).json({ success: false, errorMsg: 'Ralat pelayan dalaman.' });
+    }
+  });
+
   // Development: Mount Vite middlewares for SPA HMR & bundle serving
   if (process.env.NODE_ENV !== 'production') {
     const { createServer: createViteServer } = await import('vite');

@@ -300,75 +300,146 @@ export class StaffCredentialsVault {
   }
 
   /**
-   * Official MARA Staff Record Lookup
-   * Enforces @mara.gov.my as the sole ID domain for login.
-   * Strictly disallows @gmail.com and @bpenawar.kpm.edu.my.
+   * Official Staff Record Lookup
+   * Resolves email against registered staff records from CSV / staff sources.
+   * Accepts any valid email registered in the staff source data.
    */
   public findStaffRecord(cleanEmail: string): StaffCredentialRecord | undefined {
     let emailNorm = cleanEmail.trim().toLowerCase();
     if (!emailNorm) return undefined;
 
-    // Strictly reject @gmail.com and @bpenawar.kpm.edu.my
-    if (emailNorm.endsWith('@gmail.com') || emailNorm.endsWith('@bpenawar.kpm.edu.my')) {
-      return undefined;
-    }
-
-    // Auto-normalize username prefix without domain (e.g. "syahmi.ismail") to @mara.gov.my
-    if (!emailNorm.includes('@') && !emailNorm.startsWith('st')) {
-      emailNorm = `${emailNorm}@mara.gov.my`;
-    }
-
     this.loadPersistentVault();
     const allRecords = Array.from(this.vault.values());
 
-    // 1. Direct match on primary @mara.gov.my email
-    let record = allRecords.find((r) => r.email.toLowerCase() === emailNorm);
+    // 1. Direct match on primary email in sources/vault
+    let record = allRecords.find((r) => r.email && r.email.toLowerCase() === emailNorm);
     if (record) return record;
 
-    // 2. Direct match on configured aliases (strictly filtered)
+    // 2. Direct match on registered aliases in sources/vault
     record = allRecords.find(
-      (r) => r.aliases && r.aliases.some((a) => a.toLowerCase() === emailNorm)
+      (r) => r.aliases && r.aliases.some((a) => a && a.toLowerCase() === emailNorm)
     );
     if (record) return record;
 
-    // 3. User entered staffId or institutional prefix under @mara.gov.my
-    const atIdx = emailNorm.indexOf('@');
-    if (atIdx !== -1) {
+    // 3. User entered staffId directly (e.g. ST061 or st001)
+    record = this.vault.get(emailNorm);
+    if (record) return record;
+
+    // 4. If full email entered (with @ domain):
+    // Allow official staffId prefix resolution (e.g. st061@mara.gov.my or st061@kpmbp.edu.my)
+    if (emailNorm.includes('@')) {
+      const atIdx = emailNorm.indexOf('@');
       const userPrefix = emailNorm.substring(0, atIdx).trim();
       const domain = emailNorm.substring(atIdx + 1).trim();
 
-      if (domain === 'mara.gov.my') {
-        // Check if userPrefix matches staffId (e.g. st061@mara.gov.my)
+      if (domain === 'mara.gov.my' || domain === 'kpmbp.edu.my') {
         record = this.vault.get(userPrefix);
         if (record) return record;
-
-        // Match against official name tokens under @mara.gov.my
-        const staffFromInitial = INITIAL_STAFF_DATA.find((s) => {
-          if (s.id.toLowerCase() === userPrefix) return true;
-          const cleanTokens = s.name
-            .toLowerCase()
-            .replace(/dr\.|hj\.|hjh\.|bin|binti|bt\.|ibni|cmilt|afpm|m\.t\.a\.m|c\.a\.\(m\)/g, ' ')
-            .replace(/[^a-z0-9\s]/g, ' ')
-            .split(/\s+/)
-            .filter((t) => t.length >= 3);
-
-          return cleanTokens.some(
-            (token) => token === userPrefix || userPrefix.startsWith(token) || token.startsWith(userPrefix)
-          );
-        });
-
-        if (staffFromInitial) {
-          const matchedVaultRecord = this.vault.get(staffFromInitial.id.toLowerCase());
-          if (matchedVaultRecord) return matchedVaultRecord;
-        }
       }
-    } else {
-      // Direct staffId match
-      record = this.vault.get(emailNorm);
-      if (record) return record;
+      // Any other email with domain that is not in sources/vault is unregistered
+      return undefined;
     }
 
+    // 5. If entered without @ (username or name token):
+    const userPrefix = emailNorm;
+
+    // Match prefix against primary email username in records
+    record = allRecords.find((r) => {
+      if (!r.email) return false;
+      return r.email.split('@')[0].trim().toLowerCase() === userPrefix;
+    });
+    if (record) return record;
+
+    // Match prefix against aliases username in records
+    record = allRecords.find((r) => {
+      if (!r.aliases) return false;
+      return r.aliases.some((a) => a && a.split('@')[0].trim().toLowerCase() === userPrefix);
+    });
+    if (record) return record;
+
+    // Match against official name tokens under INITIAL_STAFF_DATA
+    const staffFromInitial = INITIAL_STAFF_DATA.find((s) => {
+      if (s.id.toLowerCase() === userPrefix) return true;
+      const cleanTokens = s.name
+        .toLowerCase()
+        .replace(/dr\.|hj\.|hjh\.|bin|binti|bt\.|ibni|cmilt|afpm|m\.t\.a\.m|c\.a\.\(m\)/g, ' ')
+        .replace(/[^a-z0-9\s]/g, ' ')
+        .split(/\s+/)
+        .filter((t) => t.length >= 3);
+
+      return cleanTokens.some(
+        (token) => token === userPrefix || userPrefix.startsWith(token) || token.startsWith(userPrefix)
+      );
+    });
+
+    if (staffFromInitial) {
+      const matchedVaultRecord = this.vault.get(staffFromInitial.id.toLowerCase());
+      if (matchedVaultRecord) return matchedVaultRecord;
+    }
+
+    // Fallback: if entered without @, check against @mara.gov.my
+    const mara = `${emailNorm}@mara.gov.my`;
+    record = allRecords.find((r) => r.email && r.email.toLowerCase() === mara);
+    if (record) return record;
+    record = allRecords.find((r) => r.aliases && r.aliases.some((a) => a && a.toLowerCase() === mara));
+    if (record) return record;
+
     return undefined;
+  }
+
+  /**
+   * Synchronizes external staff list (e.g. from CSV upload) into vault with default PIN (1234)
+   * while preserving existing custom PIN credentials.
+   */
+  public syncStaffFromList(staffList: StaffUser[], mode: 'merge' | 'replace' = 'merge'): void {
+    if (mode === 'replace') {
+      const existingMap = new Map(this.vault);
+      this.vault.clear();
+      for (const st of staffList) {
+        if (!st.id) continue;
+        const idLower = st.id.toLowerCase();
+        const existing = existingMap.get(idLower);
+        const scryptHash = existing ? existing.scryptHash : hashPinScryptSync('1234').encoded;
+        const pinStatus = existing ? existing.pinStatus : (st.pinStatus || 'DEFAULT');
+        this.vault.set(idLower, {
+          staffId: st.id,
+          email: (st.email || '').trim().toLowerCase(),
+          aliases: st.aliases ? st.aliases.map((a) => a.trim().toLowerCase()) : undefined,
+          scryptHash,
+          pinStatus,
+          pinChangedAt: existing?.pinChangedAt || st.pinChangedAt,
+          updatedAt: new Date().toISOString(),
+        });
+      }
+    } else {
+      // Merge mode
+      for (const st of staffList) {
+        if (!st.id) continue;
+        const idLower = st.id.toLowerCase();
+        const existing = this.vault.get(idLower);
+        if (existing) {
+          existing.email = (st.email || '').trim().toLowerCase();
+          if (st.aliases) {
+            existing.aliases = st.aliases.map((a) => a.trim().toLowerCase());
+          }
+          if (st.pinStatus === 'DEFAULT') {
+            existing.pinStatus = 'DEFAULT';
+            existing.scryptHash = hashPinScryptSync('1234').encoded;
+          }
+        } else {
+          this.vault.set(idLower, {
+            staffId: st.id,
+            email: (st.email || '').trim().toLowerCase(),
+            aliases: st.aliases ? st.aliases.map((a) => a.trim().toLowerCase()) : undefined,
+            scryptHash: hashPinScryptSync('1234').encoded,
+            pinStatus: st.pinStatus || 'DEFAULT',
+            pinChangedAt: st.pinChangedAt,
+            updatedAt: new Date().toISOString(),
+          });
+        }
+      }
+    }
+    this.savePersistentVault();
   }
 
   /**
@@ -392,7 +463,7 @@ export class StaffCredentialsVault {
       role: rawStaff.role,
       department: rawStaff.department,
       phone: rawStaff.phone,
-      aliases: rawStaff.aliases ? rawStaff.aliases.filter((a: string) => !a.includes('@gmail.com') && !a.includes('@bpenawar.kpm.edu.my')) : undefined,
+      aliases: rawStaff.aliases ? rawStaff.aliases.map((a: string) => a.trim().toLowerCase()) : undefined,
       pinStatus: rawStaff.pinStatus || 'DEFAULT',
       pinChangedAt: rawStaff.pinChangedAt,
     };
@@ -420,11 +491,7 @@ export class StaffCredentialsVault {
       return { success: false, errorMsg: 'Email atau PIN tidak sah (mesti 4 digit nombor).' };
     }
 
-    if (cleanEmail.includes('@') && !cleanEmail.endsWith('@mara.gov.my')) {
-      return { success: false, errorMsg: 'Hanya e-mel rasmi @mara.gov.my dibenarkan sebagai ID log masuk.' };
-    }
-
-    // Lookup staff by email with smart alias and institutional domain resolution
+    // Lookup staff by email with smart alias and CSV registered records resolution
     const staffRecord = this.findStaffRecord(cleanEmail);
 
     const rateKey = staffRecord ? `staff_${staffRecord.staffId.toLowerCase()}` : `ip_${clientIp || 'unknown'}`;
@@ -440,7 +507,7 @@ export class StaffCredentialsVault {
 
     if (!staffRecord) {
       this.rateLimiter.recordFailure(rateKey);
-      return { success: false, errorMsg: 'Email atau PIN tidak sah.' };
+      return { success: false, errorMsg: 'E-mel tidak didaftarkan dalam senarai staf sumber CSV.' };
     }
 
     // Verify scrypt hash
@@ -514,10 +581,7 @@ export class StaffCredentialsVault {
       return { success: false, errorMsg: 'Email atau PIN tidak sah (mesti 4 digit nombor).' };
     }
 
-    if (cleanEmail.includes('@') && !cleanEmail.endsWith('@mara.gov.my')) {
-      return { success: false, errorMsg: 'Hanya e-mel rasmi @mara.gov.my dibenarkan sebagai ID log masuk.' };
-    }
-
+    // Lookup staff by email with smart alias and CSV registered records resolution
     const staffRecord = this.findStaffRecord(cleanEmail);
 
     const rateKey = staffRecord ? `staff_${staffRecord.staffId.toLowerCase()}` : `ip_${clientIp || 'unknown'}`;
@@ -533,7 +597,7 @@ export class StaffCredentialsVault {
 
     if (!staffRecord) {
       this.rateLimiter.recordFailure(rateKey);
-      return { success: false, errorMsg: 'Email atau PIN tidak sah.' };
+      return { success: false, errorMsg: 'E-mel tidak didaftarkan dalam senarai staf sumber CSV.' };
     }
 
     const isValid = verifyPinScryptSync(cleanPin, staffRecord.scryptHash);

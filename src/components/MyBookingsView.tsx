@@ -448,7 +448,7 @@ export const MyBookingsView: React.FC<MyBookingsViewProps> = ({
                     spellCheck={false}
                     value={loginEmail}
                     onChange={(e) => setLoginEmail(e.target.value.trim().toLowerCase())}
-                    placeholder="nama@mara.gov.my"
+                    placeholder="nama@mara.gov.my atau e-mel CSV berdaftar"
                     className="w-full bg-slate-50 border border-slate-300 rounded-lg pl-8 pr-3 py-1.5 text-slate-800 font-medium outline-none focus:ring-2 focus:ring-blue-500"
                   />
                 </div>
