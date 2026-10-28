@@ -1,12 +1,8 @@
 {
-  "projectId": "gen-lang-client-0739778545",
-  "appId": "1:592122598840:web:8877fee7a78426ac1feb4d",
-  "apiKey": "AIzaSyDf_pqCAHfWSS2vvzpXYVHMlFbKuBpWKBk",
-  "authDomain": "gen-lang-client-0739778545.firebaseapp.com",
-  "firestoreDatabaseId": "ai-studio-roombooking-97f4bb58-dafe-4302-97e8-c41ec2110d2c",
-  "storageBucket": "gen-lang-client-0739778545.firebasestorage.app",
-  "messagingSenderId": "592122598840",
-  "measurementId": "",
-  "oAuthClientId": "592122598840-s7lpfj27a5jlorfr66ld7ua42qnigujc.apps.googleusercontent.com",
-  "recaptchaSiteKey": ""
+  "projectId": "kpmbp-data-hub",
+  "appId": "1:844282045290:web:8f983c248ee25d94e1bb13",
+  "apiKey": "AIzaSyBTjB6HAFJV8C2uQ9tl9vlfpwmaqbnQQ0o",
+  "authDomain": "kpmbp-data-hub.firebaseapp.com",
+  "storageBucket": "kpmbp-data-hub.firebasestorage.app",
+  "messagingSenderId": "844282045290"
 }
