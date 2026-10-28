@@ -13,7 +13,7 @@ export function getStoredRooms(): Room[] {
       const parsed = JSON.parse(data);
       if (Array.isArray(parsed) && parsed.length > 0) {
         // Ensure key exam halls and seminar venues are present
-        const requiredVenues = ['DEWAN_BESAR', 'SRI_PENAWAR', 'DEWAN_SEMINAR', 'MINI_SEMINAR'];
+        const requiredVenues = ['DEWAN_BESAR', 'SRI_PENAWAR', 'DEWAN_SEMINAR', 'MINI_SEMINAR', 'BILIK_MESYUARAT'];
         let hasChanges = false;
         for (const reqId of requiredVenues) {
           const exists = parsed.some(r => r.id === reqId || r.code === reqId);

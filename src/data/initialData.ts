@@ -245,6 +245,45 @@ export const INITIAL_ROOMS: Room[] = [
     hasAircond: true,
     notes: 'Pusat inkubator keusahawanan dan inovasi pelajar/staf'
   },
+  {
+    id: 'BILIK_MESYUARAT',
+    code: 'B. MESYUARAT',
+    name: 'Bilik Mesyuarat',
+    category: 'Ruang Khas',
+    capacity: 25,
+    block: 'Bangunan Pentadbiran',
+    level: 1,
+    facilities: [
+      'Meja Mesyuarat Utama',
+      'Pendingin Hawa (Aircond)',
+      'Smart TV / Skrin Paparan',
+      'Sistem Audio Persidangan',
+      'Papan Putih Kaca',
+      'Capaian Wi-Fi KPMBP'
+    ],
+    hasAircond: true,
+    isSmartClassroom: false,
+    notes: 'Bilik mesyuarat rasmi pentadbiran dan perbincangan jabatan'
+  },
+  {
+    id: 'BILIK_GERAKAN',
+    code: 'B. GERAKAN',
+    name: 'Bilik Gerakan',
+    category: 'Ruang Khas',
+    capacity: 30,
+    block: 'Bangunan Pentadbiran',
+    level: 1,
+    facilities: [
+      'Meja Mesyuarat U-Shape',
+      'Pendingin Hawa (Aircond)',
+      'Projektor LCD',
+      'Papan Putih Kaca',
+      'Capaian Wi-Fi KPMBP'
+    ],
+    hasAircond: true,
+    isSmartClassroom: false,
+    notes: 'Bilik gerakan operasi dan mesyuarat strategik kolej'
+  },
 
   // Surau (2 surau)
   {

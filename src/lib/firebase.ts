@@ -1529,6 +1529,7 @@ export async function fetchScheduleOnceWithCache(): Promise<AcademicScheduleSlot
 
 /**
  * Bulk save or update rooms to Cloud Firestore.
+ * Throws explicit error if commit fails so that caller can handle and inform the user.
  */
 export async function bulkSaveRoomsToCloud(rooms: Room[]): Promise<void> {
   invalidateStaticCache(ROOMS_COLLECTION);
@@ -1543,8 +1544,78 @@ export async function bulkSaveRoomsToCloud(rooms: Room[]): Promise<void> {
       });
       await batch.commit();
     }
-  } catch (err) {
-    console.warn('Rooms saved locally (Cloud sync skipped / quota exceeded).');
+  } catch (err: any) {
+    console.error('Failed to save rooms to Cloud Firestore:', err);
+    const code = err?.code || 'unknown';
+    const message = err?.message || String(err);
+    throw new Error(`[${code}] ${message}`);
+  }
+}
+
+/**
+ * One-time admin seeding of rooms directory to Cloud Firestore.
+ * Performs a write batch and immediately verifies that Firestore document count matches the sent count.
+ */
+export async function seedRoomsToCloud(rooms: Room[]): Promise<{ count: number }> {
+  invalidateStaticCache(ROOMS_COLLECTION);
+  if (!rooms || rooms.length === 0) {
+    throw new Error('Tiada data ruang untuk dimuat naik.');
+  }
+
+  // 1. Batch write all rooms
+  const batchSize = 450;
+  for (let i = 0; i < rooms.length; i += batchSize) {
+    const chunk = rooms.slice(i, i + batchSize);
+    const batch = writeBatch(db);
+    chunk.forEach((r) => {
+      const ref = doc(db, ROOMS_COLLECTION, r.id);
+      batch.set(ref, sanitizeForFirestore(r), { merge: true });
+    });
+    await batch.commit();
+  }
+
+  // 2. Direct verification via getDocs (bypassing any local static cache)
+  const snap = await getDocs(collection(db, ROOMS_COLLECTION));
+  const cloudCount = snap.size;
+
+  if (cloudCount < rooms.length) {
+    throw new Error(`Pengesahan gagal: Hanya ${cloudCount} daripada ${rooms.length} ruang berjaya dimuat naik ke Cloud.`);
+  }
+
+  // Save verified copy to local storage cache
+  saveStoredRooms(rooms);
+  return { count: cloudCount };
+}
+
+/**
+ * Delete specified room documents from Cloud Firestore.
+ */
+export async function deleteRoomsFromCloud(roomIds: string[]): Promise<void> {
+  invalidateStaticCache(ROOMS_COLLECTION);
+  if (!roomIds || roomIds.length === 0) return;
+  const batchSize = 450;
+  for (let i = 0; i < roomIds.length; i += batchSize) {
+    const chunk = roomIds.slice(i, i + batchSize);
+    const batch = writeBatch(db);
+    chunk.forEach((id) => {
+      const ref = doc(db, ROOMS_COLLECTION, id);
+      batch.delete(ref);
+    });
+    await batch.commit();
+  }
+}
+
+/**
+ * Direct query to Firestore to get real-time room count and IDs for diagnostics.
+ */
+export async function getDirectFirestoreRoomsCount(): Promise<{ count: number; ids: string[]; error?: string }> {
+  try {
+    const snap = await getDocs(collection(db, ROOMS_COLLECTION));
+    const ids: string[] = [];
+    snap.forEach((d) => ids.push(d.id));
+    return { count: snap.size, ids };
+  } catch (err: any) {
+    return { count: -1, ids: [], error: err?.message || String(err) };
   }
 }
 

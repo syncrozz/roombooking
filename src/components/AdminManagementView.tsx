@@ -8,9 +8,10 @@ import {
 } from '../types';
 import { formatDateMalay, exportBookingsToCSV } from '../utils/availabilityEngine';
 import { parseTimetableCSV, exportTimetableToStandardGridCSV } from '../utils/timetableCsvParser';
-import { MASTER_TIMETABLE_CSV, STANDARD_GRID_TEMPLATE_CSV } from '../data/initialData';
+import { MASTER_TIMETABLE_CSV, STANDARD_GRID_TEMPLATE_CSV, INITIAL_ROOMS } from '../data/initialData';
 import { CloudSyncModal } from './CloudSyncModal';
-import { updateStaffPinInCloud, resetStaffPinInCloud } from '../lib/firebase';
+import { updateStaffPinInCloud, resetStaffPinInCloud, getDirectFirestoreRoomsCount } from '../lib/firebase';
+import { getStoredRooms } from '../utils/storage';
 import { WhatsAppIcon } from './WhatsAppIcon';
 import { 
   ShieldCheck, 
@@ -68,6 +69,8 @@ interface AdminManagementViewProps {
   onSyncAcademicSchedule?: (schedule: AcademicScheduleSlot[], mode?: 'merge' | 'replace') => Promise<void> | void;
   onClearAcademicSchedule?: () => Promise<void> | void;
   onSyncRooms?: (rooms: Room[], mode?: 'merge' | 'replace') => Promise<void> | void;
+  onSeedRoomsToCloud?: (rooms: Room[]) => Promise<{ count: number }>;
+  onRefreshRoomsFromCloud?: () => Promise<void>;
   onAddBlock?: (block: Omit<InstitutionalBlock, 'id'>) => Promise<void> | void;
   onBatchAddBlocks?: (blocks: Omit<InstitutionalBlock, 'id'>[]) => Promise<void> | void;
   onDeleteBlock?: (id: string) => Promise<void> | void;
@@ -90,6 +93,8 @@ export const AdminManagementView: React.FC<AdminManagementViewProps> = ({
   onSyncAcademicSchedule,
   onClearAcademicSchedule,
   onSyncRooms,
+  onSeedRoomsToCloud,
+  onRefreshRoomsFromCloud,
   onAddBlock,
   onBatchAddBlocks,
   onDeleteBlock,
@@ -160,6 +165,25 @@ export const AdminManagementView: React.FC<AdminManagementViewProps> = ({
   const [roomSyncSuccessMsg, setRoomSyncSuccessMsg] = useState<string | null>(null);
   const [roomSyncMode, setRoomSyncMode] = useState<'merge' | 'replace'>('merge');
   const [roomSearchTerm, setRoomSearchTerm] = useState<string>('');
+
+  // Room Seeding, Diagnostics & Cloud Sync State
+  const [showSeedModal, setShowSeedModal] = useState<boolean>(false);
+  const [seedRoomsList, setSeedRoomsList] = useState<Room[]>([]);
+  const [isSeedingRooms, setIsSeedingRooms] = useState<boolean>(false);
+  const [seedErrorMsg, setSeedErrorMsg] = useState<string | null>(null);
+
+  const [showDiagModal, setShowDiagModal] = useState<boolean>(false);
+  const [isDiagLoading, setIsDiagLoading] = useState<boolean>(false);
+  const [diagInfo, setDiagInfo] = useState<{
+    localCount: number;
+    cloudCount: number;
+    initialCount: number;
+    cacheTs: string | null;
+    diffs: { id: string; name: string; inLocal: boolean; inCloud: boolean; inInitial: boolean }[];
+    error?: string;
+  } | null>(null);
+
+  const [isRefreshingRooms, setIsRefreshingRooms] = useState<boolean>(false);
 
   // Ad-Hoc Bookings CSV & Restoration State
   const bookingCsvInputRef = useRef<HTMLInputElement>(null);
@@ -706,6 +730,113 @@ ST003,Pengajian Am,Cik Siti Sarah Binti Razak,Pensyarah,013-5558899,siti.sarah@k
       setRoomParseErrors(['Gagal menyinkronkan data ruang ke pangkalan data.']);
     } finally {
       setIsSyncingRooms(false);
+    }
+  };
+
+  // Open Room Seeding Modal from Admin's LocalStorage
+  const handleOpenSeedModal = () => {
+    setSeedErrorMsg(null);
+    let list: Room[] = [];
+    try {
+      const raw = localStorage.getItem('kpmbp_rooms_v4');
+      if (raw) {
+        const parsed = JSON.parse(raw);
+        if (Array.isArray(parsed) && parsed.length > 0) {
+          list = parsed;
+        }
+      }
+    } catch {}
+    if (list.length === 0) {
+      list = rooms.length > 0 ? rooms : getStoredRooms();
+    }
+    setSeedRoomsList(list);
+    setShowSeedModal(true);
+  };
+
+  // Confirm and Execute Room Seeding to Cloud Firestore with verification
+  const handleConfirmSeedRooms = async () => {
+    if (seedRoomsList.length === 0) return;
+    setIsSeedingRooms(true);
+    setSeedErrorMsg(null);
+    try {
+      if (onSeedRoomsToCloud) {
+        await onSeedRoomsToCloud(seedRoomsList);
+      }
+      setShowSeedModal(false);
+    } catch (err: any) {
+      setSeedErrorMsg(err?.message || 'Ralat semasa memuat naik data ke Cloud Firestore.');
+    } finally {
+      setIsSeedingRooms(false);
+    }
+  };
+
+  // Run Real-Time Room Diagnostics across LocalStorage, Cloud Firestore, and Initial Data
+  const handleRunDiagnosis = async () => {
+    setIsDiagLoading(true);
+    setShowDiagModal(true);
+    try {
+      let localList: Room[] = [];
+      try {
+        const raw = localStorage.getItem('kpmbp_rooms_v4');
+        if (raw) localList = JSON.parse(raw);
+      } catch {}
+      if (localList.length === 0) localList = rooms;
+
+      const directRes = await getDirectFirestoreRoomsCount();
+      const initialRooms = INITIAL_ROOMS;
+      const cacheTs = localStorage.getItem('kpmbp_cloud_cache_ts_rooms');
+
+      const localMap = new Map(localList.map(r => [r.id.toUpperCase(), r]));
+      const cloudSet = new Set(directRes.ids.map(id => id.toUpperCase()));
+      const initialMap = new Map(initialRooms.map(r => [r.id.toUpperCase(), r]));
+
+      const allIds = new Set([
+        ...localList.map(r => r.id.toUpperCase()),
+        ...directRes.ids.map(id => id.toUpperCase()),
+        ...initialRooms.map(r => r.id.toUpperCase())
+      ]);
+
+      const diffs: { id: string; name: string; inLocal: boolean; inCloud: boolean; inInitial: boolean }[] = [];
+      allIds.forEach(id => {
+        const inLocal = localMap.has(id);
+        const inCloud = cloudSet.has(id);
+        const inInitial = initialMap.has(id);
+        if (!inLocal || !inCloud || !inInitial) {
+          const roomObj = localMap.get(id) || initialMap.get(id);
+          diffs.push({
+            id,
+            name: roomObj?.name || id,
+            inLocal,
+            inCloud,
+            inInitial
+          });
+        }
+      });
+
+      setDiagInfo({
+        localCount: localList.length,
+        cloudCount: directRes.count,
+        initialCount: initialRooms.length,
+        cacheTs: cacheTs ? new Date(Number(cacheTs)).toLocaleString() : null,
+        diffs,
+        error: directRes.error
+      });
+    } catch (e: any) {
+      console.error('Diagnosis error:', e);
+    } finally {
+      setIsDiagLoading(false);
+    }
+  };
+
+  // Re-sync Room Directory Fresh from Cloud
+  const handleRefreshFromCloudClick = async () => {
+    setIsRefreshingRooms(true);
+    try {
+      if (onRefreshRoomsFromCloud) {
+        await onRefreshRoomsFromCloud();
+      }
+    } finally {
+      setIsRefreshingRooms(false);
     }
   };
 
@@ -2000,12 +2131,40 @@ ST003,Pengajian Am,Cik Siti Sarah Binti Razak,Pensyarah,013-5558899,siti.sarah@k
 
           <div className="flex flex-wrap items-center gap-2 shrink-0">
             <button
+              onClick={handleRunDiagnosis}
+              className="bg-indigo-50 hover:bg-indigo-100 text-indigo-900 border border-indigo-300 text-xs font-bold py-2 px-3 rounded-xl transition flex items-center gap-1.5 shadow-xs cursor-pointer"
+              title="Periksa integriti data bilik antara LocalStorage, Firestore Cloud, dan Kod Asal"
+            >
+              <Search className="w-3.5 h-3.5 text-indigo-600" />
+              <span>Diagnostik Ruang</span>
+            </button>
+
+            <button
+              onClick={handleOpenSeedModal}
+              className="bg-emerald-600 hover:bg-emerald-700 text-white text-xs font-bold py-2 px-3.5 rounded-xl transition flex items-center gap-1.5 shadow-md shadow-emerald-600/20 cursor-pointer"
+              title="Seed 47 ruang dari pelayar ini ke Cloud Firestore sekali sahaja"
+            >
+              <UploadCloud className="w-4 h-4" />
+              <span>Seed Ruang ke Cloud</span>
+            </button>
+
+            <button
+              onClick={handleRefreshFromCloudClick}
+              disabled={isRefreshingRooms}
+              className="bg-sky-50 hover:bg-sky-100 text-sky-900 border border-sky-300 text-xs font-bold py-2 px-3 rounded-xl transition flex items-center gap-1.5 shadow-xs cursor-pointer disabled:opacity-50"
+              title="Kosongkan cache pelayar dan segerak semula senarai ruang terus dari Firestore"
+            >
+              <RefreshCw className={`w-3.5 h-3.5 text-sky-600 ${isRefreshingRooms ? 'animate-spin' : ''}`} />
+              <span>Segerak Semula dari Cloud</span>
+            </button>
+
+            <button
               onClick={handleExportRoomsListCSV}
               className="bg-slate-50 hover:bg-slate-100 text-slate-800 border border-slate-300 text-xs font-bold py-2 px-3.5 rounded-xl transition flex items-center gap-2 shadow-xs cursor-pointer"
               title="Eksport senarai penuh ruang semasa ke fail CSV"
             >
               <FileSpreadsheet className="w-4 h-4 text-cyan-600" />
-              <span>Eksport CSV Ruang Semasa (.csv)</span>
+              <span>Eksport CSV</span>
             </button>
 
             <button
@@ -2014,7 +2173,7 @@ ST003,Pengajian Am,Cik Siti Sarah Binti Razak,Pensyarah,013-5558899,siti.sarah@k
               title="Muat turun templat CSV piawai dengan contoh penetapan aras"
             >
               <Download className="w-4 h-4" />
-              <span>Muat Turun Templat CSV Ruang (.csv)</span>
+              <span>Templat CSV</span>
             </button>
           </div>
         </div>
@@ -2299,7 +2458,7 @@ ST003,Pengajian Am,Cik Siti Sarah Binti Razak,Pensyarah,013-5558899,siti.sarah@k
             <div>
               <h4 className="font-extrabold text-slate-900 text-xs flex items-center gap-1.5">
                 <Building className="w-4 h-4 text-cyan-600" />
-                Senarai Direktori 42 Ruang Semasa dalam Sistem:
+                Senarai Direktori {rooms.length} Ruang Semasa dalam Sistem:
               </h4>
               <p className="text-[11px] text-slate-500 mt-0.5">
                 Semak aras, blok, dan kapasiti semasa bagi setiap bilik di sini.
@@ -2369,6 +2528,249 @@ ST003,Pengajian Am,Cik Siti Sarah Binti Razak,Pensyarah,013-5558899,siti.sarah@k
           </div>
         </div>
       </div>
+
+      {/* MODAL: SEED RUANG KE CLOUD FIRESTORE */}
+      {showSeedModal && (
+        <div className="fixed inset-0 z-50 flex items-center justify-center p-4 bg-slate-900/60 backdrop-blur-xs">
+          <div className="bg-white rounded-2xl max-w-2xl w-full p-6 shadow-2xl border border-slate-200 space-y-4 max-h-[90vh] flex flex-col">
+            <div className="flex items-start justify-between gap-3 border-b border-slate-100 pb-3">
+              <div className="flex items-center gap-2.5">
+                <div className="w-10 h-10 rounded-xl bg-emerald-100 text-emerald-700 flex items-center justify-center shrink-0">
+                  <UploadCloud className="w-5 h-5" />
+                </div>
+                <div>
+                  <h4 className="text-base font-extrabold text-slate-900">
+                    Seed Direktori Ruang ke Cloud Firestore
+                  </h4>
+                  <p className="text-xs text-slate-500">
+                    Muat naik {seedRoomsList.length} ruang dari pelayar ini terus ke Cloud koleksi <code className="text-emerald-700 font-bold">rooms</code>.
+                  </p>
+                </div>
+              </div>
+              <button
+                onClick={() => setShowSeedModal(false)}
+                className="text-slate-400 hover:text-slate-600 p-1 rounded-lg transition cursor-pointer"
+              >
+                <XCircle className="w-5 h-5" />
+              </button>
+            </div>
+
+            <div className="bg-emerald-50 border border-emerald-200 rounded-xl p-3 text-xs text-emerald-900 space-y-1">
+              <p className="font-bold flex items-center gap-1.5">
+                <CheckCircle2 className="w-4 h-4 text-emerald-600 shrink-0" />
+                <span>Pengesahan Senarai Ruang Pelayar Ini ({seedRoomsList.length} Ruang Dikesan)</span>
+              </p>
+              <p className="text-[11px] text-emerald-800 leading-relaxed">
+                Tindakan ini dijalankan sekali sahaja oleh Pentadbir Kolej untuk membina asas koleksi rasmi di Firestore. Selepas penulisan berjaya, sistem akan terus menyemak bilangan dokumen dari Cloud (<code className="font-mono">getDocs</code>) sebelum mengesahkan kejayaan.
+              </p>
+            </div>
+
+            {seedErrorMsg && (
+              <div className="p-3 bg-rose-50 border border-rose-200 rounded-xl text-rose-900 text-xs font-semibold flex items-center gap-2">
+                <AlertTriangle className="w-4 h-4 text-rose-600 shrink-0" />
+                <span>{seedErrorMsg}</span>
+              </div>
+            )}
+
+            <div className="flex-1 overflow-y-auto border border-slate-200 rounded-xl max-h-64">
+              <table className="w-full text-left text-xs divide-y divide-slate-200">
+                <thead className="bg-slate-50 text-slate-700 sticky top-0 text-[11px]">
+                  <tr>
+                    <th className="p-2 text-center w-10">No</th>
+                    <th className="p-2">Kod Ruang</th>
+                    <th className="p-2">Nama Ruang</th>
+                    <th className="p-2">Kategori</th>
+                    <th className="p-2">Aras</th>
+                  </tr>
+                </thead>
+                <tbody className="divide-y divide-slate-100 font-mono text-[11px]">
+                  {seedRoomsList.map((rm, idx) => (
+                    <tr key={rm.id || idx} className="hover:bg-slate-50/80">
+                      <td className="p-2 text-center text-slate-400">{idx + 1}</td>
+                      <td className="p-2 font-bold text-cyan-950">{rm.code}</td>
+                      <td className="p-2 text-slate-800 font-sans">{rm.name}</td>
+                      <td className="p-2 text-slate-600 font-sans">{rm.category}</td>
+                      <td className="p-2 text-slate-500 font-sans">{formatLevel(rm.level)}</td>
+                    </tr>
+                  ))}
+                </tbody>
+              </table>
+            </div>
+
+            <div className="flex items-center justify-end gap-2.5 pt-2 border-t border-slate-100">
+              <button
+                type="button"
+                onClick={() => setShowSeedModal(false)}
+                disabled={isSeedingRooms}
+                className="px-4 py-2 text-xs font-bold text-slate-600 hover:text-slate-800 bg-slate-100 hover:bg-slate-200 rounded-xl transition cursor-pointer"
+              >
+                Batal
+              </button>
+              <button
+                type="button"
+                disabled={isSeedingRooms}
+                onClick={handleConfirmSeedRooms}
+                className="px-5 py-2 text-xs font-extrabold text-white bg-emerald-600 hover:bg-emerald-700 disabled:opacity-50 rounded-xl shadow-md shadow-emerald-600/20 transition flex items-center gap-2 cursor-pointer"
+              >
+                {isSeedingRooms ? (
+                  <>
+                    <RefreshCw className="w-3.5 h-3.5 animate-spin" />
+                    <span>Menulis &amp; Mengesahkan Dokumen...</span>
+                  </>
+                ) : (
+                  <>
+                    <UploadCloud className="w-4 h-4" />
+                    <span>Sahkan &amp; Seed {seedRoomsList.length} Ruang ke Cloud</span>
+                  </>
+                )}
+              </button>
+            </div>
+          </div>
+        </div>
+      )}
+
+      {/* MODAL: DIAGNOSTIK RUANG */}
+      {showDiagModal && (
+        <div className="fixed inset-0 z-50 flex items-center justify-center p-4 bg-slate-900/60 backdrop-blur-xs">
+          <div className="bg-white rounded-2xl max-w-2xl w-full p-6 shadow-2xl border border-slate-200 space-y-4 max-h-[90vh] flex flex-col">
+            <div className="flex items-start justify-between gap-3 border-b border-slate-100 pb-3">
+              <div className="flex items-center gap-2.5">
+                <div className="w-10 h-10 rounded-xl bg-indigo-100 text-indigo-700 flex items-center justify-center shrink-0">
+                  <Search className="w-5 h-5" />
+                </div>
+                <div>
+                  <h4 className="text-base font-extrabold text-slate-900">
+                    Diagnostik Integriti Data Ruang
+                  </h4>
+                  <p className="text-xs text-slate-500">
+                    Perbandingan langsung antara LocalStorage, Cloud Firestore, dan Initial Data
+                  </p>
+                </div>
+              </div>
+              <button
+                onClick={() => setShowDiagModal(false)}
+                className="text-slate-400 hover:text-slate-600 p-1 rounded-lg transition cursor-pointer"
+              >
+                <XCircle className="w-5 h-5" />
+              </button>
+            </div>
+
+            {isDiagLoading ? (
+              <div className="p-12 text-center text-xs text-slate-500 flex flex-col items-center gap-3">
+                <RefreshCw className="w-6 h-6 animate-spin text-indigo-600" />
+                <span>Membuat semakan query langsung ke Firestore Cloud...</span>
+              </div>
+            ) : diagInfo ? (
+              <div className="space-y-4 overflow-y-auto pr-1">
+                {/* 4 Status Cards */}
+                <div className="grid grid-cols-2 sm:grid-cols-4 gap-2.5 text-center">
+                  <div className="p-3 bg-slate-50 border border-slate-200 rounded-xl">
+                    <span className="text-[10px] font-bold text-slate-500 uppercase block">(a) LocalStorage</span>
+                    <strong className="text-xl font-extrabold text-slate-900">{diagInfo.localCount}</strong>
+                    <span className="text-[10px] text-slate-500 block">kpmbp_rooms_v4</span>
+                  </div>
+
+                  <div className="p-3 bg-cyan-50 border border-cyan-200 rounded-xl">
+                    <span className="text-[10px] font-bold text-cyan-800 uppercase block">(b) Cloud Firestore</span>
+                    <strong className="text-xl font-extrabold text-cyan-950">
+                      {diagInfo.cloudCount === -1 ? 'Ralat' : diagInfo.cloudCount}
+                    </strong>
+                    <span className="text-[10px] text-cyan-700 block">koleksi 'rooms'</span>
+                  </div>
+
+                  <div className="p-3 bg-indigo-50 border border-indigo-200 rounded-xl">
+                    <span className="text-[10px] font-bold text-indigo-800 uppercase block">(c) INITIAL_ROOMS</span>
+                    <strong className="text-xl font-extrabold text-indigo-950">{diagInfo.initialCount}</strong>
+                    <span className="text-[10px] text-indigo-700 block">kod rasmi</span>
+                  </div>
+
+                  <div className="p-3 bg-amber-50 border border-amber-200 rounded-xl">
+                    <span className="text-[10px] font-bold text-amber-800 uppercase block">(e) Cache TS</span>
+                    <span className="text-[11px] font-bold text-amber-950 block truncate" title={diagInfo.cacheTs || 'Tiada'}>
+                      {diagInfo.cacheTs ? 'Aktif' : 'Tiada'}
+                    </span>
+                    <span className="text-[9.5px] text-amber-700 block truncate">{diagInfo.cacheTs || 'Luput'}</span>
+                  </div>
+                </div>
+
+                {diagInfo.error && (
+                  <div className="p-3 bg-rose-50 border border-rose-200 rounded-xl text-rose-900 text-xs">
+                    <strong>Ralat Firestore:</strong> {diagInfo.error}
+                  </div>
+                )}
+
+                {/* Differences Table (d) */}
+                <div className="border border-slate-200 rounded-xl p-3 bg-slate-50/50 space-y-2">
+                  <h5 className="font-extrabold text-xs text-slate-900 flex items-center justify-between">
+                    <span>(d) Senarai Perbezaan ID Antara Ketiga-Tiga Sumber:</span>
+                    <span className="px-2 py-0.5 rounded text-[10.5px] font-bold bg-slate-200 text-slate-800">
+                      {diagInfo.diffs.length} perbezaan dikesan
+                    </span>
+                  </h5>
+
+                  {diagInfo.diffs.length === 0 ? (
+                    <div className="p-4 bg-emerald-50 border border-emerald-200 rounded-lg text-emerald-900 text-xs font-semibold flex items-center gap-2">
+                      <CheckCircle2 className="w-4 h-4 text-emerald-600 shrink-0" />
+                      <span>Semua sumber data selaras sepenuhnya! Tiada perbezaan ID dikesan.</span>
+                    </div>
+                  ) : (
+                    <div className="max-h-48 overflow-y-auto border border-slate-200 rounded-lg bg-white">
+                      <table className="w-full text-left text-xs divide-y divide-slate-200">
+                        <thead className="bg-slate-100 text-slate-700 text-[10.5px] sticky top-0">
+                          <tr>
+                            <th className="p-2">ID Ruang</th>
+                            <th className="p-2">Nama</th>
+                            <th className="p-2 text-center">LocalStorage</th>
+                            <th className="p-2 text-center">Firestore Cloud</th>
+                            <th className="p-2 text-center">INITIAL_ROOMS</th>
+                          </tr>
+                        </thead>
+                        <tbody className="divide-y divide-slate-100 text-[11px]">
+                          {diagInfo.diffs.map((d) => (
+                            <tr key={d.id} className="hover:bg-slate-50">
+                              <td className="p-2 font-mono font-bold text-slate-900">{d.id}</td>
+                              <td className="p-2 text-slate-700">{d.name}</td>
+                              <td className="p-2 text-center font-bold">
+                                {d.inLocal ? <span className="text-emerald-600">YA</span> : <span className="text-slate-400">TIDAK</span>}
+                              </td>
+                              <td className="p-2 text-center font-bold">
+                                {d.inCloud ? <span className="text-emerald-600">YA</span> : <span className="text-rose-600">TIDAK</span>}
+                              </td>
+                              <td className="p-2 text-center font-bold">
+                                {d.inInitial ? <span className="text-emerald-600">YA</span> : <span className="text-slate-400">TIDAK</span>}
+                              </td>
+                            </tr>
+                          ))}
+                        </tbody>
+                      </table>
+                    </div>
+                  )}
+                </div>
+              </div>
+            ) : null}
+
+            <div className="flex items-center justify-between pt-2 border-t border-slate-100">
+              <button
+                type="button"
+                onClick={handleRunDiagnosis}
+                disabled={isDiagLoading}
+                className="px-3.5 py-1.5 text-xs font-bold text-indigo-700 bg-indigo-50 hover:bg-indigo-100 rounded-xl transition flex items-center gap-1.5 cursor-pointer"
+              >
+                <RefreshCw className={`w-3.5 h-3.5 ${isDiagLoading ? 'animate-spin' : ''}`} />
+                <span>Muat Semula Semakan</span>
+              </button>
+
+              <button
+                type="button"
+                onClick={() => setShowDiagModal(false)}
+                className="px-4 py-2 text-xs font-bold text-slate-700 bg-slate-100 hover:bg-slate-200 rounded-xl transition cursor-pointer"
+              >
+                Tutup
+              </button>
+            </div>
+          </div>
+        </div>
+      )}
 
       {/* SECTION: PENGURUSAN SEKATAN INSTITUSI & PEPERIKSAAN AKHIR (CADANGAN 1) */}
       <div id="section-admin-blocks" className="bg-white rounded-2xl p-6 shadow-md border border-slate-200 space-y-6">

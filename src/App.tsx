@@ -46,6 +46,9 @@ import {
   subscribeToSchedule,
   subscribeToRooms,
   bulkSaveRoomsToCloud,
+  seedRoomsToCloud,
+  deleteRoomsFromCloud,
+  fetchRoomsOnceWithCache,
   seedInitialStaffUsers,
   bulkSaveStaffUsersToCloud,
   bulkSaveScheduleToCloud,
@@ -796,6 +799,44 @@ export default function App() {
 
       finalRooms = [...updatedExisting, ...brandNew];
     } else {
+      // In replace mode, check if any deleted rooms are referenced by active bookings or schedule
+      const newRoomIds = new Set(newRooms.map(r => r.id.toUpperCase()));
+      const newRoomCodes = new Set(newRooms.map(r => r.code.toUpperCase()));
+      const roomsToDelete = rooms.filter(r => !newRoomIds.has(r.id.toUpperCase()) && !newRoomCodes.has(r.code.toUpperCase()));
+
+      if (roomsToDelete.length > 0) {
+        const conflicts: string[] = [];
+        roomsToDelete.forEach(deletedRoom => {
+          const bookingCount = adhocBookings.filter(b => 
+            (b.roomId && b.roomId.toUpperCase() === deletedRoom.id.toUpperCase()) ||
+            (b.roomName && b.roomName.toUpperCase() === deletedRoom.name.toUpperCase())
+          ).length;
+          const scheduleCount = academicSchedule.filter(s =>
+            (s.roomId && s.roomId.toUpperCase() === deletedRoom.id.toUpperCase())
+          ).length;
+
+          if (bookingCount > 0 || scheduleCount > 0) {
+            conflicts.push(`• ${deletedRoom.name} (${deletedRoom.id}): ${bookingCount} tempahan, ${scheduleCount} slot jadual`);
+          }
+        });
+
+        if (conflicts.length > 0) {
+          const proceed = window.confirm(
+            `⚠️ AMARAN: RUANG MEMPUNYAI RUJUKAN AKTIF!\n\nRuang berikut akan dipadamkan dalam mod 'Ganti Semua' tetapi masih mempunyai rekod berkaitan:\n\n${conflicts.join('\n')}\n\nMemadamkan ruang ini boleh menyebabkan tempahan/jadual kehilangan maklumat bilik.\n\nAdakah anda pasti mahu memadamkan ruang ini daripada Cloud?`
+          );
+          if (!proceed) {
+            showToast('ℹ️ Operasi ganti ruang dibatalkan untuk melindungi integriti tempahan.');
+            return;
+          }
+        }
+
+        try {
+          await deleteRoomsFromCloud(roomsToDelete.map(r => r.id));
+        } catch (delErr: any) {
+          console.warn('Gagal memadam dokumen ruang lama dari Cloud:', delErr);
+        }
+      }
+
       finalRooms = newRooms;
     }
 
@@ -804,10 +845,46 @@ export default function App() {
 
     try {
       await bulkSaveRoomsToCloud(finalRooms);
-      showToast(`🟢 ${newRooms.length} maklumat ruang kuliah berjaya disinkronkan & disimpan ke Cloud!`);
-    } catch (err) {
+      showToast(`🟢 ${finalRooms.length} maklumat ruang kuliah berjaya disinkronkan & disimpan ke Cloud!`);
+    } catch (err: any) {
       console.error('Error syncing rooms to cloud:', err);
-      showToast(`🟢 Maklumat ruang disimpan secara tempatan.`);
+      const errorMsg = err instanceof Error ? err.message : String(err);
+      showToast(`🔴 Ralat Cloud: ${errorMsg}. Maklumat ruang disimpan secara tempatan.`);
+      throw err;
+    }
+  };
+
+  // Seed actual rooms list to Cloud Firestore (with verification)
+  const handleSeedRoomsToCloud = async (roomsToSeed: Room[]): Promise<{ count: number }> => {
+    try {
+      const res = await seedRoomsToCloud(roomsToSeed);
+      setRooms(roomsToSeed);
+      saveStoredRooms(roomsToSeed);
+      showToast(`🟢 Berjaya! ${res.count} ruang telah disahkan disimpan dalam Cloud Firestore.`);
+      return res;
+    } catch (err: any) {
+      const msg = err instanceof Error ? err.message : String(err);
+      console.error('Ralat seed ruang ke cloud:', err);
+      showToast(`🔴 Gagal Seed: ${msg}`);
+      throw err;
+    }
+  };
+
+  // Resync fresh rooms list from Cloud Firestore
+  const handleRefreshRoomsFromCloud = async (): Promise<void> => {
+    try {
+      invalidateStaticCache('rooms');
+      const cloudRooms = await fetchRoomsOnceWithCache();
+      if (cloudRooms && cloudRooms.length > 0) {
+        setRooms(cloudRooms);
+        saveStoredRooms(cloudRooms);
+        showToast(`🟢 Direktori ruang berjaya disegerakkan semula dari Cloud (${cloudRooms.length} ruang).`);
+      } else {
+        showToast(`ℹ️ Tiada data ruang ditemui di Cloud.`);
+      }
+    } catch (err: any) {
+      console.error('Ralat refresh rooms dari cloud:', err);
+      showToast(`🔴 Gagal menyegerakkan semula dari Cloud.`);
     }
   };
 
@@ -1009,6 +1086,8 @@ export default function App() {
               onSyncAcademicSchedule={handleSyncAcademicSchedule}
               onClearAcademicSchedule={handleClearAcademicSchedule}
               onSyncRooms={handleSyncRooms}
+              onSeedRoomsToCloud={handleSeedRoomsToCloud}
+              onRefreshRoomsFromCloud={handleRefreshRoomsFromCloud}
               onAddBlock={handleAddBlock}
               onBatchAddBlocks={handleBatchAddBlocks}
               onDeleteBlock={handleDeleteBlock}
