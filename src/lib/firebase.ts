@@ -355,6 +355,9 @@ export function normalizeStaffUser(st: any): StaffUser {
   if (pinStatus === 'CUSTOM' && st.pinChangedAt) {
     user.pinChangedAt = st.pinChangedAt;
   }
+  if (pinStatus === 'CUSTOM' && st.pinHash) {
+    user.pinHash = st.pinHash;
+  }
 
   return user;
 }
@@ -403,10 +406,12 @@ export function subscribeToStaffUsers(onUpdate: (staffList: StaffUser[]) => void
             const preferNew = staff.email.includes('@mara.gov.my') || (!existing.email.includes('@mara.gov.my') && staff.email);
             const isCustom = existing.pinStatus === 'CUSTOM' || staff.pinStatus === 'CUSTOM';
             const preservedChangedAt = existing.pinChangedAt || staff.pinChangedAt;
+            const preservedPinHash = isCustom ? (staff.pinHash || existing.pinHash) : undefined;
             staffMap.set(key, {
               ...(preferNew ? staff : existing),
               pinStatus: isCustom ? 'CUSTOM' : 'DEFAULT',
               pinChangedAt: isCustom ? preservedChangedAt : undefined,
+              pinHash: preservedPinHash,
             });
           }
         }
@@ -623,10 +628,11 @@ export function resetClientRateLimit(key: string): void {
 
 export async function hashStaffPin(staffId: string, pin: string): Promise<string> {
   const normalized = `kpmbp_pin_${staffId.toLowerCase()}_${pin.trim()}`;
-  if (typeof window !== 'undefined' && window.crypto && window.crypto.subtle) {
+  const subtle = (typeof window !== 'undefined' && window.crypto?.subtle) || (typeof globalThis !== 'undefined' && globalThis.crypto?.subtle);
+  if (subtle) {
     try {
       const enc = new TextEncoder().encode(normalized);
-      const buf = await window.crypto.subtle.digest('SHA-256', enc);
+      const buf = await subtle.digest('SHA-256', enc);
       return Array.from(new Uint8Array(buf)).map((b) => b.toString(16).padStart(2, '0')).join('');
     } catch {}
   }
@@ -634,10 +640,11 @@ export async function hashStaffPin(staffId: string, pin: string): Promise<string
 }
 
 export async function hashStaffPinLegacy(pin: string): Promise<string> {
-  if (typeof window !== 'undefined' && window.crypto && window.crypto.subtle) {
+  const subtle = (typeof window !== 'undefined' && window.crypto?.subtle) || (typeof globalThis !== 'undefined' && globalThis.crypto?.subtle);
+  if (subtle) {
     try {
       const enc = new TextEncoder().encode(pin.trim());
-      const buf = await window.crypto.subtle.digest('SHA-256', enc);
+      const buf = await subtle.digest('SHA-256', enc);
       return Array.from(new Uint8Array(buf)).map((b) => b.toString(16).padStart(2, '0')).join('');
     } catch {}
   }
@@ -693,21 +700,29 @@ export async function updateStaffPinInCloud(
     }
   }
 
-  // 2. Update operational profile in /staff_users/{staffId} (ZERO credential/hash leakage)
+  // 2. Update operational profile in /staff_users/{staffId}
+  const pinHash = pinStatus === 'CUSTOM' ? await hashStaffPin(staffId, newPin) : undefined;
   try {
     const docRef = doc(db, STAFF_COLLECTION, staffId);
     const payload = sanitizeForFirestore({
       pinStatus,
       pinChangedAt,
+      pinHash,
     });
     await setDoc(docRef, payload, { merge: true });
   } catch (err) {
-    console.warn('Firestore staff status update warning (offline or permission required):', err);
+    console.error('Firestore staff status update error:', err);
+    throw new Error('Gagal menyimpan PIN baharu ke Cloud. Sila cuba lagi.');
   }
 
-  // Set session PIN in memory for the active browser session
+  // Set session PIN in memory for the active browser session and local fallback ONLY AFTER Firestore write succeeds
   if (typeof window !== 'undefined') {
     setStaffSessionPin(staffId, newPin);
+    if (pinHash) {
+      try {
+        localStorage.setItem(`kpmbp_staff_pin_hash_${staffId.toLowerCase()}`, pinHash);
+      } catch {}
+    }
   }
 
   return { success: true };
@@ -874,10 +889,26 @@ export async function verifyStaffCredentials(
     }
   }
 
-  // (B) Staff on CUSTOM PIN status: verified against active session memory
+  // (B) Staff on CUSTOM PIN status: verified against active session memory or hash
   const sessionPin = getStaffSessionPin(matched.id);
-  if (sessionPin && sessionPin === cleanPin) {
+  const isSessionMatch = Boolean(sessionPin && sessionPin === cleanPin);
+
+  const candidateHash = await hashStaffPin(matched.id, cleanPin);
+  const expectedHash = matched.pinHash || (typeof window !== 'undefined' ? localStorage.getItem(`kpmbp_staff_pin_hash_${matched.id.toLowerCase()}`) : null);
+
+  let isHashMatch = Boolean(expectedHash && expectedHash === candidateHash);
+  if (!isHashMatch && expectedHash) {
+    const legacyHash = await hashStaffPinLegacy(cleanPin);
+    if (legacyHash === expectedHash) {
+      isHashMatch = true;
+    }
+  }
+
+  console.info(`[Staff Auth Custom PIN] ID: ${matched.id}, pinHash wujud: ${Boolean(matched.pinHash)}, perbandingan hash: ${isHashMatch ? 'match' : 'tidak'}`);
+
+  if (isSessionMatch || isHashMatch) {
     resetClientRateLimit(matched.id);
+    setStaffSessionPin(matched.id, cleanPin);
     return {
       success: true,
       staff: sanitizeStaffForClient(matched),

@@ -494,7 +494,8 @@ export function deduplicateStaffById(list: StaffUser[]): StaffUser[] {
         phone: st.phone || '',
         email: st.email || '',
         pinStatus: st.pinStatus === 'CUSTOM' ? 'CUSTOM' : 'DEFAULT',
-        pinChangedAt: st.pinStatus === 'CUSTOM' ? st.pinChangedAt : undefined
+        pinChangedAt: st.pinStatus === 'CUSTOM' ? st.pinChangedAt : undefined,
+        pinHash: st.pinStatus === 'CUSTOM' ? st.pinHash : undefined
       });
     } else {
       // Identity is Staff ID: resolve duplicate record
@@ -515,7 +516,8 @@ export function deduplicateStaffById(list: StaffUser[]): StaffUser[] {
         phone: st.phone || existing.phone,
         email: chosenEmail,
         pinStatus: isCustom ? 'CUSTOM' : 'DEFAULT',
-        pinChangedAt: isCustom ? chosenChangedAt : undefined
+        pinChangedAt: isCustom ? chosenChangedAt : undefined,
+        pinHash: isCustom ? (st.pinHash || existing.pinHash) : undefined
       });
     }
   });
