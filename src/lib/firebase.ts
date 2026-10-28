@@ -388,7 +388,8 @@ export function sanitizeForFirestore<T extends Record<string, any>>(obj: T): Rec
  */
 export function subscribeToStaffUsers(onUpdate: (staffList: StaffUser[]) => void): () => void {
   try {
-    return fetchOnceWithTtl(STAFF_COLLECTION, (snapshot) => {
+    const colRef = collection(db, STAFF_COLLECTION);
+    return onSnapshot(colRef, (snapshot) => {
       recordSnapshotSuccess(STAFF_COLLECTION);
       if (snapshot.empty) {
         // SES v4.4: NO DATA RESURRECTION. An empty database is valid.
@@ -409,7 +410,7 @@ export function subscribeToStaffUsers(onUpdate: (staffList: StaffUser[]) => void
             // Prefer official @mara.gov.my email if available
             const preferNew = staff.email.includes('@mara.gov.my') || (!existing.email.includes('@mara.gov.my') && staff.email);
             const isCustom = existing.pinStatus === 'CUSTOM' || staff.pinStatus === 'CUSTOM';
-            const preservedChangedAt = existing.pinChangedAt || staff.pinChangedAt;
+            const preservedChangedAt = staff.pinStatus === 'CUSTOM' ? (staff.pinChangedAt || existing.pinChangedAt) : (existing.pinChangedAt || staff.pinChangedAt);
             const preservedPinHash = isCustom ? (staff.pinHash || existing.pinHash) : undefined;
             staffMap.set(key, {
               ...(preferNew ? staff : existing),
@@ -420,7 +421,9 @@ export function subscribeToStaffUsers(onUpdate: (staffList: StaffUser[]) => void
           }
         }
       });
-      onUpdate(Array.from(staffMap.values()));
+      const result = Array.from(staffMap.values());
+      onUpdate(result);
+      saveStoredStaffUsers(result);
     }, (error) => {
       reportSnapshotFallbackError(STAFF_COLLECTION, error);
       const localStaff = getStoredStaffUsers();
@@ -435,6 +438,32 @@ export function subscribeToStaffUsers(onUpdate: (staffList: StaffUser[]) => void
       onUpdate(localStaff);
     }
     return () => {};
+  }
+}
+
+/**
+ * On-demand manual refresh of registered staff from Cloud Firestore.
+ */
+export async function refreshStaffUsersFromCloud(): Promise<StaffUser[]> {
+  try {
+    invalidateStaticCache(STAFF_COLLECTION);
+    const snap = await getDocs(collection(db, STAFF_COLLECTION));
+    if (snap.empty) return [];
+    const staffMap = new Map<string, StaffUser>();
+    snap.forEach((docSnap) => {
+      const raw = docSnap.data();
+      const staff = normalizeStaffUser({ id: raw.id || docSnap.id, ...raw });
+      const key = (staff.id || '').trim().toLowerCase();
+      if (key) {
+        staffMap.set(key, staff);
+      }
+    });
+    const result = Array.from(staffMap.values());
+    saveStoredStaffUsers(result);
+    return result;
+  } catch (err) {
+    console.warn('[Staff Cloud Refresh] Error:', err);
+    return getStoredStaffUsers() || [];
   }
 }
 

@@ -67,7 +67,8 @@ import {
   testFirebaseConnection,
   ConnectionStatusState,
   syncPendingBookingsQueue,
-  saveScheduleSlotToCloud
+  saveScheduleSlotToCloud,
+  refreshStaffUsersFromCloud
 } from './lib/firebase';
 import { INITIAL_STAFF_DATA } from './data/staffData';
 
@@ -888,6 +889,24 @@ export default function App() {
     }
   };
 
+  // Resync fresh staff list from Cloud Firestore
+  const handleRefreshStaffFromCloud = async (): Promise<void> => {
+    try {
+      const refreshed = await refreshStaffUsersFromCloud();
+      if (refreshed && refreshed.length > 0) {
+        const deduplicated = deduplicateStaffById(refreshed);
+        setStaffUsers(deduplicated);
+        saveStoredStaffUsers(deduplicated);
+        showToast(`🟢 Data staf dan status PIN terkini telah disegerakkan dari Cloud (${deduplicated.length} rekod).`);
+      } else {
+        showToast(`ℹ️ Tiada rekod staf ditemui di Cloud.`);
+      }
+    } catch (err: any) {
+      console.error('Ralat refresh staf dari cloud:', err);
+      showToast(`🔴 Gagal menyegerakkan staf dari Cloud.`);
+    }
+  };
+
   // Reset to defaults (Strict Zero Demo Data)
   const handleResetData = async () => {
     resetToDefaults();
@@ -1095,6 +1114,7 @@ export default function App() {
               onLogoutAdmin={handleLogoutAdmin}
               onSyncBookings={handleSyncBookings}
               onNavigateTab={handleSelectTab}
+              onRefreshStaffFromCloud={handleRefreshStaffFromCloud}
             />
           )}
         </main>

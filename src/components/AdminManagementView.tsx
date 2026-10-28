@@ -78,6 +78,7 @@ interface AdminManagementViewProps {
   onLogoutAdmin?: () => void;
   onSyncBookings?: (bookings: AdHocBooking[], mode?: 'merge' | 'replace') => Promise<void> | void;
   onNavigateTab?: (tab: any) => void;
+  onRefreshStaffFromCloud?: () => Promise<void>;
 }
 
 export const AdminManagementView: React.FC<AdminManagementViewProps> = ({
@@ -101,7 +102,8 @@ export const AdminManagementView: React.FC<AdminManagementViewProps> = ({
   onDeleteBatchBlocks,
   onLogoutAdmin,
   onSyncBookings,
-  onNavigateTab
+  onNavigateTab,
+  onRefreshStaffFromCloud
 }) => {
   const pendingBookings = bookings.filter(b => b.status === 'PENDING');
 
@@ -132,6 +134,7 @@ export const AdminManagementView: React.FC<AdminManagementViewProps> = ({
   const [blockSuccessMsg, setBlockSuccessMsg] = useState<string | null>(null);
   const [blockSearchTerm, setBlockSearchTerm] = useState<string>('');
   const [blockFilterCategory, setBlockFilterCategory] = useState<'ALL' | 'EXAM' | 'INSTITUTIONAL' | 'MAINTENANCE'>('ALL');
+  const [isRefreshingStaff, setIsRefreshingStaff] = useState<boolean>(false);
 
   // Timetable CSV Sync State
   const [scheduleCsvFile, setScheduleCsvFile] = useState<File | null>(null);
@@ -2033,6 +2036,26 @@ ST003,Pengajian Am,Cik Siti Sarah Binti Razak,Pensyarah,013-5558899,siti.sarah@k
                 <RotateCcw className={`w-3.5 h-3.5 text-amber-600 ${isResettingAllPins ? 'animate-spin' : ''}`} />
                 <span>{isResettingAllPins ? 'Sedang Memproses...' : 'Set Semua PIN Lalai (1234)'}</span>
               </button>
+
+              {onRefreshStaffFromCloud && (
+                <button
+                  type="button"
+                  onClick={async () => {
+                    setIsRefreshingStaff(true);
+                    try {
+                      await onRefreshStaffFromCloud();
+                    } finally {
+                      setIsRefreshingStaff(false);
+                    }
+                  }}
+                  disabled={isRefreshingStaff}
+                  className="px-3 py-1.5 rounded-xl bg-blue-50 hover:bg-blue-100 text-blue-900 border border-blue-300 text-xs font-bold transition flex items-center gap-1.5 cursor-pointer shadow-xs disabled:opacity-50"
+                  title="Segarkan data staf dan status keselamatan PIN terkini dari Cloud Firestore"
+                >
+                  <RefreshCw className={`w-3.5 h-3.5 text-blue-600 ${isRefreshingStaff ? 'animate-spin' : ''}`} />
+                  <span>{isRefreshingStaff ? 'Menyegerakkan...' : 'Segarkan dari Cloud'}</span>
+                </button>
+              )}
 
               <div className="relative w-full sm:w-64">
                 <Search className="w-3.5 h-3.5 text-slate-400 absolute left-3 top-1/2 -translate-y-1/2" />
