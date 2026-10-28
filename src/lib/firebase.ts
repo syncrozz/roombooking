@@ -43,6 +43,8 @@ const app = !getApps().length ? initializeApp(firebaseConfig) : getApp();
 
 export const auth = getAuth(app);
 
+const USE_SERVER_AUTH = false;
+
 // Suppress Firestore internal diagnostic log warnings to prevent transient connection retry notifications
 try {
   setLogLevel('silent');
@@ -671,7 +673,7 @@ export async function updateStaffPinInCloud(
   const pinChangedAt = new Date().toISOString();
 
   // 1. Server-side verification and scrypt update in secure vault
-  if (typeof window !== 'undefined' && typeof fetch !== 'undefined') {
+  if (USE_SERVER_AUTH && typeof window !== 'undefined' && typeof fetch !== 'undefined') {
     try {
       const response = await fetch('/api/auth/staff-update-pin', {
         method: 'POST',
@@ -741,7 +743,7 @@ export async function resetStaffPinInCloud(
   }
 
   // 1. Try server-side reset if API endpoint is hosted
-  if (typeof window !== 'undefined' && typeof fetch !== 'undefined') {
+  if (USE_SERVER_AUTH && typeof window !== 'undefined' && typeof fetch !== 'undefined') {
     try {
       const response = await fetch('/api/auth/staff-reset-pin', {
         method: 'POST',
@@ -763,10 +765,13 @@ export async function resetStaffPinInCloud(
       }
       console.warn('[Staff Auth] Sambungan ke pelayan auth gagal:', err);
     }
+  }
 
-    // Clear local session pin for this staff
+  // Clear local session pin and cached pinHash for this staff
+  if (typeof window !== 'undefined') {
     try {
       sessionStorage.removeItem(`${SESSION_PIN_KEY_PREFIX}${staffId}`);
+      localStorage.removeItem(`kpmbp_staff_pin_hash_${staffId.toLowerCase()}`);
     } catch {}
   }
 
@@ -776,10 +781,12 @@ export async function resetStaffPinInCloud(
     const payload = sanitizeForFirestore({
       pinStatus: 'DEFAULT',
       pinChangedAt: undefined,
+      pinHash: '',
     });
     await setDoc(docRef, payload, { merge: true });
   } catch (err: any) {
-    console.warn('Firestore reset warning (offline or permission required):', err);
+    console.error('Firestore staff PIN reset error:', err);
+    throw new Error('Gagal menetapkan semula PIN staf dalam Cloud. Sila cuba lagi.');
   }
 
   return { success: true };
@@ -806,7 +813,7 @@ export async function verifyStaffCredentials(
 
 
   // 1. In browser: try secure server endpoint if running
-  if (typeof window !== 'undefined' && typeof fetch !== 'undefined') {
+  if (USE_SERVER_AUTH && typeof window !== 'undefined' && typeof fetch !== 'undefined') {
     try {
       const response = await fetch('/api/auth/staff-verify', {
         method: 'POST',
