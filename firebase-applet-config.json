@@ -3,6 +3,7 @@
   "appId": "1:844282045290:web:8f983c248ee25d94e1bb13",
   "apiKey": "AIzaSyBTjB6HAFJV8C2uQ9tl9vlfpwmaqbnQQ0o",
   "authDomain": "kpmbp-data-hub.firebaseapp.com",
+  "firestoreDatabaseId": "(default)",
   "storageBucket": "kpmbp-data-hub.firebasestorage.app",
   "messagingSenderId": "844282045290"
 }

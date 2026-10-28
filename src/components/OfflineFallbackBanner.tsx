@@ -88,6 +88,10 @@ export const OfflineFallbackBanner: React.FC<OfflineFallbackBannerProps> = ({
     title = 'Akses Pangkalan Data Ditolak';
     message = 'Akses pangkalan data ditolak. Sila log masuk semula atau hubungi admin.';
     icon = <ShieldAlert className="w-5 h-5 text-amber-700 shrink-0" />;
+  } else if (errorCode.includes('not-found')) {
+    title = 'Pangkalan Data Belum Diaktifkan';
+    message = 'Firestore Database belum diwujudkan dalam projek Firebase (kpmbp-data-hub). Sila klik "Create Database" di Firebase Console.';
+    icon = <Database className="w-5 h-5 text-amber-700 shrink-0" />;
   } else if (errorCode.includes('unavailable') || errorCode.includes('network') || errorCode.includes('failed-precondition')) {
     title = 'Tiada Sambungan Pangkalan Data';
     message = 'Tiada sambungan ke pangkalan data. Data ditunjukkan dari simpanan pelayar.';

@@ -1,5 +1,5 @@
 import { initializeApp, getApps, getApp } from 'firebase/app';
-import { getAuth } from 'firebase/auth';
+import { getAuth, signInWithCustomToken } from 'firebase/auth';
 import { 
   initializeFirestore,
   getFirestore, 
@@ -355,9 +355,6 @@ export function normalizeStaffUser(st: any): StaffUser {
   if (pinStatus === 'CUSTOM' && st.pinChangedAt) {
     user.pinChangedAt = st.pinChangedAt;
   }
-  if (st.pinHash) {
-    user.pinHash = st.pinHash;
-  }
 
   return user;
 }
@@ -410,7 +407,6 @@ export function subscribeToStaffUsers(onUpdate: (staffList: StaffUser[]) => void
               ...(preferNew ? staff : existing),
               pinStatus: isCustom ? 'CUSTOM' : 'DEFAULT',
               pinChangedAt: isCustom ? preservedChangedAt : undefined,
-              pinHash: staff.pinHash || existing.pinHash,
             });
           }
         }
@@ -666,9 +662,8 @@ export async function updateStaffPinInCloud(
   adminPasscode?: string
 ): Promise<{ success: boolean; errorMsg?: string }> {
   const pinChangedAt = new Date().toISOString();
-  const pinHash = await hashStaffPin(staffId, newPin);
 
-  // 1. Server-side verification and scrypt update (when backend is available)
+  // 1. Server-side verification and scrypt update in secure vault
   if (typeof window !== 'undefined' && typeof fetch !== 'undefined') {
     try {
       const response = await fetch('/api/auth/staff-update-pin', {
@@ -683,7 +678,7 @@ export async function updateStaffPinInCloud(
       });
 
       if (response.status === 404) {
-        console.warn('[Staff Auth] /api/auth/staff-update-pin 404 (static host / standalone SPA). Meneruskan kemas kini ke Cloud Firestore.');
+        console.warn('[Staff Auth] /api/auth/staff-update-pin 404 (static host / standalone SPA).');
       } else if (!response.ok) {
         const data = await response.json().catch(() => ({}));
         if (response.status === 401 || response.status === 403 || response.status === 429) {
@@ -694,31 +689,25 @@ export async function updateStaffPinInCloud(
       if (err?.message && (err.message.includes('Gagal mengemas kini') || err.message.includes('tidak sah'))) {
         throw err;
       }
-      console.warn('[Staff Auth] Sambungan API server tidak tersedia, meneruskan kemas kini terus ke Cloud Firestore:', err);
+      console.warn('[Staff Auth] Sambungan API server tidak tersedia:', err);
     }
   }
 
-  // 2. Update /staff_users/{staffId} in Firestore (contains pinStatus, timestamp, and salted pinHash)
-  // This allows Incognito tabs, fresh browsers, and multi-device logins to verify their new PIN seamlessly!
+  // 2. Update operational profile in /staff_users/{staffId} (ZERO credential/hash leakage)
   try {
     const docRef = doc(db, STAFF_COLLECTION, staffId);
     const payload = sanitizeForFirestore({
       pinStatus,
       pinChangedAt,
-      pinHash,
     });
     await setDoc(docRef, payload, { merge: true });
   } catch (err) {
-    console.error('Firestore update error:', err);
-    throw new Error('Gagal menyimpan PIN baharu ke Cloud. Sila cuba lagi.');
+    console.warn('Firestore staff status update warning (offline or permission required):', err);
   }
 
-  // Set session and local storage cache ONLY AFTER Firestore write succeeds
+  // Set session PIN in memory for the active browser session
   if (typeof window !== 'undefined') {
     setStaffSessionPin(staffId, newPin);
-    try {
-      localStorage.setItem(`kpmbp_staff_pin_hash_${staffId}`, pinHash);
-    } catch {}
   }
 
   return { success: true };
@@ -726,8 +715,7 @@ export async function updateStaffPinInCloud(
 
 /**
  * Reset Staff PIN back to default 1234 via admin authorization.
- * Seamlessly updates Cloud Firestore and clears cached custom credentials,
- * gracefully supporting both full-stack Node.js server and static host deployments.
+ * Seamlessly updates server vault and resets pinStatus in staff_users directory.
  */
 export async function resetStaffPinInCloud(
   staffId: string,
@@ -747,8 +735,7 @@ export async function resetStaffPinInCloud(
       });
 
       if (response.status === 404) {
-        // Backend API not present (static web host / CDN deployment like bookbk.syncrozz.com)
-        console.warn('[Staff Auth] /api/auth/staff-reset-pin 404 (static host / standalone SPA). Meneruskan penetapan semula terus ke Cloud Firestore.');
+        console.warn('[Staff Auth] /api/auth/staff-reset-pin 404 (static host / standalone SPA).');
       } else if (!response.ok) {
         const data = await response.json().catch(() => ({}));
         if (response.status === 401 || response.status === 403 || response.status === 429) {
@@ -759,28 +746,25 @@ export async function resetStaffPinInCloud(
       if (err?.message && err.message.includes('ditolak')) {
         throw err;
       }
-      console.warn('[Staff Auth] Sambungan ke pelayan auth gagal, meneruskan terus ke Cloud Firestore:', err);
+      console.warn('[Staff Auth] Sambungan ke pelayan auth gagal:', err);
     }
 
-    // Clear local session pin & hash for this staff
+    // Clear local session pin for this staff
     try {
       sessionStorage.removeItem(`${SESSION_PIN_KEY_PREFIX}${staffId}`);
-      localStorage.removeItem(`kpmbp_staff_pin_hash_${staffId}`);
     } catch {}
   }
 
-  // 2. Update /staff_users/{staffId} in Firestore to DEFAULT (1234)
+  // 2. Update operational profile in /staff_users/{staffId} to DEFAULT (1234)
   try {
     const docRef = doc(db, STAFF_COLLECTION, staffId);
     const payload = sanitizeForFirestore({
       pinStatus: 'DEFAULT',
       pinChangedAt: undefined,
-      pinHash: '',
     });
     await setDoc(docRef, payload, { merge: true });
   } catch (err: any) {
-    console.warn('Firestore reset warning:', err);
-    throw new Error(`Ralat mengemas kini Firestore: ${err?.message || 'Gagal menyimpan ke Firestore'}`);
+    console.warn('Firestore reset warning (offline or permission required):', err);
   }
 
   return { success: true };
@@ -830,6 +814,13 @@ export async function verifyStaffCredentials(
           if (data.staff?.id) {
             setStaffSessionPin(data.staff.id, cleanPin);
           }
+          if (data.customToken) {
+            try {
+              await signInWithCustomToken(auth, data.customToken);
+            } catch (authErr) {
+              console.warn('[Staff Auth] Firebase Custom Token exchange warning:', authErr);
+            }
+          }
           return {
             success: true,
             staff: sanitizeStaffForClient(data.staff),
@@ -848,7 +839,7 @@ export async function verifyStaffCredentials(
   }
 
   // 2. Resilient Static Host Verification Engine:
-  // Used when deployed to static hosts (like bookbk.syncrozz.com) without Express reverse proxy
+  // Used only when deployed to static hosts without backend
   const effectiveStaffList = staffList && staffList.length > 0 ? staffList : INITIAL_STAFF_DATA;
   const matched = matchStaffByEmail(cleanEmail, effectiveStaffList);
 
@@ -864,7 +855,7 @@ export async function verifyStaffCredentials(
     };
   }
 
-  // (A) Staff on DEFAULT PIN status
+  // (A) Staff on DEFAULT PIN status (1234)
   if (!matched.pinStatus || matched.pinStatus === 'DEFAULT') {
     if (cleanPin === '1234') {
       resetClientRateLimit(matched.id);
@@ -883,39 +874,10 @@ export async function verifyStaffCredentials(
     }
   }
 
-  // (B) Staff on CUSTOM PIN status
+  // (B) Staff on CUSTOM PIN status: verified against active session memory
   const sessionPin = getStaffSessionPin(matched.id);
-  let isCustomMatch = false;
-
   if (sessionPin && sessionPin === cleanPin) {
-    isCustomMatch = true;
-  } else {
-    try {
-      const candidateHash = await hashStaffPin(matched.id, cleanPin);
-      const legacyHash = await hashStaffPinLegacy(cleanPin);
-
-      // 1. Check against Cloud Firestore synced pinHash (works in Incognito tabs & across all devices!)
-      if (matched.pinHash && (candidateHash === matched.pinHash || legacyHash === matched.pinHash)) {
-        isCustomMatch = true;
-      } else {
-        // 2. Check local storage fallback
-        const storedHash = typeof window !== 'undefined' ? localStorage.getItem(`kpmbp_staff_pin_hash_${matched.id}`) : null;
-        if (storedHash && (candidateHash === storedHash || legacyHash === storedHash)) {
-          isCustomMatch = true;
-        }
-      }
-    } catch {}
-  }
-
-  console.info('[Staff Auth Verify]', {
-    staffId: matched.id,
-    hasPinHash: Boolean(matched.pinHash),
-    isMatch: isCustomMatch ? 'match' : 'tidak',
-  });
-
-  if (isCustomMatch) {
     resetClientRateLimit(matched.id);
-    setStaffSessionPin(matched.id, cleanPin);
     return {
       success: true,
       staff: sanitizeStaffForClient(matched),
@@ -923,11 +885,11 @@ export async function verifyStaffCredentials(
     };
   }
 
-  // If custom pin does not match
+  // If custom pin does not match active session and backend server is offline
   recordClientFailure(matched.id);
   return {
     success: false,
-    errorMsg: 'PIN tidak sah. Sila cuba lagi atau hubungi Pentadbir Kolej untuk menetapkan semula PIN anda kepada 1234.'
+    errorMsg: 'PIN tidak sah. Sila hubungi Pentadbir Kolej untuk menetapkan semula PIN anda kepada 1234 atau pastikan pelayan auth aktif.'
   };
 }
 

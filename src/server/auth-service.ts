@@ -1,6 +1,8 @@
 import fs from 'node:fs';
 import path from 'node:path';
 import crypto from 'node:crypto';
+import { initializeApp as initAdminApp, getApps as getAdminApps, cert } from 'firebase-admin/app';
+import { getAuth as getAdminAuth } from 'firebase-admin/auth';
 import { INITIAL_STAFF_DATA } from '../data/staffData';
 import { StaffUser } from '../types';
 
@@ -827,3 +829,59 @@ export class StaffCredentialsVault {
 
 // Export singleton server vault instance
 export const serverAuthVault = new StaffCredentialsVault();
+
+/**
+ * Firebase Admin SDK Token Bridge
+ * Generates an authenticated Firebase Custom Token bound strictly to validated staff identity.
+ * Fails closed if token signing credentials (iam.serviceAccounts.signBlob or Service Account key)
+ * are not configured on the host.
+ */
+export async function createStaffFirebaseCustomToken(staff: StaffUser): Promise<{
+  customToken?: string;
+  error?: string;
+  prerequisiteMissing?: boolean;
+}> {
+  try {
+    let adminApp;
+    const existingApps = getAdminApps();
+    if (existingApps.length > 0) {
+      adminApp = existingApps[0];
+    } else {
+      const saKey = process.env.FIREBASE_SERVICE_ACCOUNT_KEY;
+      if (saKey) {
+        try {
+          const parsed = JSON.parse(saKey);
+          adminApp = initAdminApp({
+            credential: cert(parsed),
+            projectId: parsed.project_id || 'kpmbp-data-hub',
+          });
+        } catch {
+          adminApp = initAdminApp({ projectId: 'kpmbp-data-hub' });
+        }
+      } else {
+        adminApp = initAdminApp({ projectId: 'kpmbp-data-hub' });
+      }
+    }
+
+    const adminAuth = getAdminAuth(adminApp);
+    const uid = `staff_${staff.id.toLowerCase()}`;
+    const claims = {
+      staffId: staff.id,
+      email: staff.email,
+      department: staff.department,
+      role: staff.role,
+      email_verified: true,
+      isAdmin: staff.email.toLowerCase() === 'festivalseni.kpmbp@gmail.com' || (staff.role || '').toLowerCase().includes('admin'),
+    };
+
+    const customToken = await adminAuth.createCustomToken(uid, claims);
+    return { customToken };
+  } catch (err: any) {
+    const errMsg = err?.message || String(err);
+    const isMissingPrereq = errMsg.includes('signBlob') || errMsg.includes('credential') || errMsg.includes('permission');
+    return {
+      prerequisiteMissing: isMissingPrereq,
+      error: errMsg,
+    };
+  }
+}

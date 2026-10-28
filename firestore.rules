@@ -104,10 +104,10 @@ service cloud.firestore {
       allow write: if isAdmin();
     }
 
-    // 6. Staff Directory & Synchronized PIN Status
+    // 6. Staff Directory (Public Operational Directory - Read-only for clients, Write restricted to Admin)
     match /staff_users/{staffId} {
       allow read: if true;
-      allow write: if true;
+      allow write: if isAdmin();
     }
 
     // 7. Staff Credentials Vault (Completely isolated from Client SDKs)
