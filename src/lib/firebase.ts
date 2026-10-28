@@ -9,8 +9,6 @@ import {
   deleteDoc, 
   onSnapshot, 
   getDocs,
-  query,
-  where,
   writeBatch,
   getDocFromServer,
   runTransaction,
@@ -67,75 +65,6 @@ const ROOMS_COLLECTION = 'rooms';
 const SCHEDULE_COLLECTION = 'schedule';
 const BLOCKS_COLLECTION = 'blocks';
 const STAFF_COLLECTION = 'staff_users';
-
-/**
- * Optimasi Kuota Firestore (Spark 50,000 bacaan/hari)
- * Data statik (staf, bilik, jadual) tidak lagi guna onSnapshot berterusan.
- * Ia dibaca sekali guna getDocs, kemudian dicache dalam localStorage mengikut TTL.
- */
-const STATIC_CACHE_TTL_MS = {
-  [STAFF_COLLECTION]: 60 * 60 * 1000,        // 1 jam
-  [ROOMS_COLLECTION]: 6 * 60 * 60 * 1000,    // 6 jam
-  [SCHEDULE_COLLECTION]: 6 * 60 * 60 * 1000, // 6 jam
-} as Record<string, number>;
-const CACHE_TS_PREFIX = 'kpmbp_cloud_cache_ts_';
-
-// Bilangan hari ke belakang untuk tempahan yang dilanggan (tempahan lama tidak dibaca lagi)
-const BOOKING_LOOKBACK_DAYS = 30;
-
-function isStaticCacheFresh(key: string): boolean {
-  try {
-    const ts = Number(localStorage.getItem(CACHE_TS_PREFIX + key) || 0);
-    const ttl = STATIC_CACHE_TTL_MS[key] ?? 0;
-    return ts > 0 && Date.now() >= ts && Date.now() - ts < ttl;
-  } catch {
-    return false;
-  }
-}
-
-function markStaticCacheFresh(key: string): void {
-  try { localStorage.setItem(CACHE_TS_PREFIX + key, String(Date.now())); } catch {}
-}
-
-/** Paksa bacaan semula daripada Firestore pada muat seterusnya (satu koleksi atau semua). */
-export function invalidateStaticCache(key?: string): void {
-  try {
-    const keys = key ? [key] : Object.keys(STATIC_CACHE_TTL_MS);
-    keys.forEach((k) => localStorage.removeItem(CACHE_TS_PREFIX + k));
-  } catch {}
-}
-
-/**
- * Baca koleksi sekali sahaja (getDocs) jika cache sudah tamat tempoh.
- * Jika cache masih segar, TIADA bacaan Firestore dibuat (App guna data localStorage).
- */
-function fetchOnceWithTtl(
-  key: string,
-  onSnap: (snapshot: any) => void,
-  onErr: (error: unknown) => void
-): () => void {
-  if (isStaticCacheFresh(key)) return () => {};
-  let cancelled = false;
-  getDocs(collection(db, key))
-    .then((snap) => {
-      if (cancelled) return;
-      if (!snap.empty) markStaticCacheFresh(key);
-      onSnap(snap);
-    })
-    .catch((err) => {
-      if (!cancelled) onErr(err);
-    });
-  return () => { cancelled = true; };
-}
-
-function getBookingCutoffDate(): string {
-  const d = new Date();
-  d.setDate(d.getDate() - BOOKING_LOOKBACK_DAYS);
-  const y = d.getFullYear();
-  const m = String(d.getMonth() + 1).padStart(2, '0');
-  const day = String(d.getDate()).padStart(2, '0');
-  return `${y}-${m}-${day}`;
-}
 
 /**
  * Global Firestore Connection Status Types & Subscription
@@ -384,7 +313,8 @@ export function sanitizeForFirestore<T extends Record<string, any>>(obj: T): Rec
  */
 export function subscribeToStaffUsers(onUpdate: (staffList: StaffUser[]) => void): () => void {
   try {
-    return fetchOnceWithTtl(STAFF_COLLECTION, (snapshot) => {
+    const colRef = collection(db, STAFF_COLLECTION);
+    return onSnapshot(colRef, (snapshot) => {
       recordSnapshotSuccess(STAFF_COLLECTION);
       if (snapshot.empty) {
         // SES v4.4: NO DATA RESURRECTION. An empty database is valid.
@@ -458,7 +388,6 @@ export async function bulkSaveStaffUsersToCloud(
   mode: 'merge' | 'replace' = 'merge',
   resetAllPins: boolean = false
 ): Promise<{ written: number; deleted: number; updatedList: StaffUser[] }> {
-  invalidateStaticCache(STAFF_COLLECTION);
   try {
     const colRef = collection(db, STAFF_COLLECTION);
     const existingSnap = await getDocs(colRef);
@@ -696,6 +625,11 @@ export async function updateStaffPinInCloud(
       }
       console.warn('[Staff Auth] Sambungan API server tidak tersedia, meneruskan kemas kini terus ke Cloud Firestore:', err);
     }
+
+    setStaffSessionPin(staffId, newPin);
+    try {
+      localStorage.setItem(`kpmbp_staff_pin_hash_${staffId}`, pinHash);
+    } catch {}
   }
 
   // 2. Update /staff_users/{staffId} in Firestore (contains pinStatus, timestamp, and salted pinHash)
@@ -709,16 +643,7 @@ export async function updateStaffPinInCloud(
     });
     await setDoc(docRef, payload, { merge: true });
   } catch (err) {
-    console.error('Firestore update error:', err);
-    throw new Error('Gagal menyimpan PIN baharu ke Cloud. Sila cuba lagi.');
-  }
-
-  // Set session and local storage cache ONLY AFTER Firestore write succeeds
-  if (typeof window !== 'undefined') {
-    setStaffSessionPin(staffId, newPin);
-    try {
-      localStorage.setItem(`kpmbp_staff_pin_hash_${staffId}`, pinHash);
-    } catch {}
+    console.warn('Firestore update warning:', err);
   }
 
   return { success: true };
@@ -907,12 +832,6 @@ export async function verifyStaffCredentials(
     } catch {}
   }
 
-  console.info('[Staff Auth Verify]', {
-    staffId: matched.id,
-    hasPinHash: Boolean(matched.pinHash),
-    isMatch: isCustomMatch ? 'match' : 'tidak',
-  });
-
   if (isCustomMatch) {
     resetClientRateLimit(matched.id);
     setStaffSessionPin(matched.id, cleanPin);
@@ -953,11 +872,7 @@ export function verifyStaffCredentialsLocally(
  */
 export function subscribeToBookings(onUpdate: (bookings: AdHocBooking[]) => void): () => void {
   try {
-    // Hanya tempahan dalam BOOKING_LOOKBACK_DAYS hari lepas dan akan datang (kurangkan bacaan)
-    const colRef = query(
-      collection(db, BOOKINGS_COLLECTION),
-      where('date', '>=', getBookingCutoffDate())
-    );
+    const colRef = collection(db, BOOKINGS_COLLECTION);
     
     return onSnapshot(colRef, (snapshot) => {
       recordSnapshotSuccess(BOOKINGS_COLLECTION);
@@ -1258,7 +1173,8 @@ let hasLoadedScheduleOnce = false;
  */
 export function subscribeToSchedule(onUpdate: (schedule: AcademicScheduleSlot[]) => void): () => void {
   try {
-    return fetchOnceWithTtl(SCHEDULE_COLLECTION, (snapshot) => {
+    const colRef = collection(db, SCHEDULE_COLLECTION);
+    return onSnapshot(colRef, (snapshot) => {
       recordSnapshotSuccess(SCHEDULE_COLLECTION);
       if (snapshot.empty) {
         const isCustomized = typeof window !== 'undefined' && localStorage.getItem('kpmbp_schedule_customized') === 'true';
@@ -1297,7 +1213,6 @@ export async function bulkSaveScheduleToCloud(
   schedule: AcademicScheduleSlot[],
   mode: 'replace' | 'merge' = 'merge'
 ): Promise<void> {
-  invalidateStaticCache(SCHEDULE_COLLECTION);
   try {
     const colRef = collection(db, SCHEDULE_COLLECTION);
     const existing = await getDocs(colRef);
@@ -1353,7 +1268,6 @@ export async function bulkSaveScheduleToCloud(
  * Completely purge/clear all Academic Schedule slots from Cloud Firestore.
  */
 export async function clearAllScheduleFromCloud(): Promise<void> {
-  invalidateStaticCache(SCHEDULE_COLLECTION);
   try {
     const colRef = collection(db, SCHEDULE_COLLECTION);
     const existing = await getDocs(colRef);
@@ -1377,7 +1291,6 @@ export async function clearAllScheduleFromCloud(): Promise<void> {
  * Save or update a single Academic Schedule slot in Cloud Firestore.
  */
 export async function saveScheduleSlotToCloud(slot: AcademicScheduleSlot): Promise<void> {
-  invalidateStaticCache(SCHEDULE_COLLECTION);
   try {
     const docId = slot.id || `SCH-${slot.roomId}-${slot.dayOfWeek}-${slot.startTime}`.replace(/[^a-zA-Z0-9_-]/g, '_');
     const ref = doc(db, SCHEDULE_COLLECTION, docId);
@@ -1435,7 +1348,8 @@ export async function cleanObsoleteDemoRecordsFromCloud(): Promise<void> {
  */
 export function subscribeToRooms(onUpdate: (rooms: Room[]) => void): () => void {
   try {
-    return fetchOnceWithTtl(ROOMS_COLLECTION, (snapshot) => {
+    const colRef = collection(db, ROOMS_COLLECTION);
+    return onSnapshot(colRef, (snapshot) => {
       recordSnapshotSuccess(ROOMS_COLLECTION);
       if (!snapshot.empty) {
         const cloudRooms: Room[] = [];
@@ -1504,7 +1418,6 @@ export async function fetchScheduleOnceWithCache(): Promise<AcademicScheduleSlot
  * Bulk save or update rooms to Cloud Firestore.
  */
 export async function bulkSaveRoomsToCloud(rooms: Room[]): Promise<void> {
-  invalidateStaticCache(ROOMS_COLLECTION);
   try {
     const batchSize = 450;
     for (let i = 0; i < rooms.length; i += batchSize) {

@@ -1,8 +1,8 @@
 {
   "id": "/",
-  "name": "BookBK KPMBP — Tempahan Bilik Kuliah",
-  "short_name": "BookBK",
-  "description": "Semak ketersediaan dan tempah bilik kuliah KPMBP dalam talian. Pantas, mudah dan bebas pertembungan jadual.",
+  "name": "KPMBP SmartHub — Sistem Semakan & Tempahan Ruang",
+  "short_name": "KPMBP SmartHub",
+  "description": "Sistem Semakan Ketersediaan & Tempahan 42 Ruang Kuliah KPM Bandar Penawar",
   "start_url": "/",
   "scope": "/",
   "display": "standalone",

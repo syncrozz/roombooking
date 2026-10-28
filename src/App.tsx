@@ -58,7 +58,6 @@ import {
   bulkDeleteBlocksFromCloud,
   cleanObsoleteDemoRecordsFromCloud,
   subscribeToConnectionStatus,
-  invalidateStaticCache,
   getConnectionStatus,
   testFirebaseConnection,
   ConnectionStatusState,
@@ -278,7 +277,6 @@ export default function App() {
   }, [handleSyncPendingQueue]);
 
   const handleRetryConnection = async () => {
-    invalidateStaticCache();
     setIsRetryingConnection(true);
     showToast('🔄 Menghubungkan semula ke Cloud Firestore...');
     try {

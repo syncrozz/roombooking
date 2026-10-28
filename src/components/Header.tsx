@@ -4,6 +4,13 @@ import { CloudSyncModal } from './CloudSyncModal';
 import { StaffUser } from '../types';
 import { getStoredActiveUser, clearActiveUser, subscribeToActiveUser } from '../utils/storage';
 import { 
+  LayoutDashboard,
+  CalendarDays, 
+  BookOpen, 
+  Lock,
+  QrCode, 
+  SlidersHorizontal, 
+  ShieldCheck, 
   Menu,
   X,
   User,
@@ -63,6 +70,15 @@ export const Header: React.FC<HeaderProps> = ({
     return () => window.removeEventListener('keydown', handleKeyDown);
   }, []);
 
+  // Standard navigation items (horizontal sequence)
+  const mainNavItems = [
+    { id: 'dashboard' as ActiveTab, label: 'Dashboard', icon: LayoutDashboard },
+    { id: 'matrix' as ActiveTab, label: 'Calendar', icon: CalendarDays },
+    { id: 'academic' as ActiveTab, label: 'Locked', icon: Lock },
+    { id: 'mybookings' as ActiveTab, label: 'My Booking', icon: QrCode },
+    { id: 'directory' as ActiveTab, label: 'Direktori', icon: SlidersHorizontal },
+  ];
+
   const handleTabClick = (tab: ActiveTab) => {
     setActiveTab(tab);
     setMobileMenuOpen(false);
@@ -101,7 +117,50 @@ export const Header: React.FC<HeaderProps> = ({
             </button>
           </div>
 
-          {/* Navigasi bahagian atas dipadamkan kerana fungsi navigasi telah disediakan oleh QuickNavGrid di bahagian bawah */}
+          {/* 2. Middle: Horizontal Navigation Links (Desktop & Tablet) */}
+          <nav className="hidden xl:flex items-center gap-1.5 overflow-x-auto no-scrollbar py-1">
+            {mainNavItems.map((item) => {
+              const Icon = item.icon;
+              const isActive = activeTab === item.id;
+              return (
+                <button
+                  key={item.id}
+                  onClick={() => handleTabClick(item.id)}
+                  className={`px-3 py-2 rounded-lg text-xs font-semibold flex items-center gap-2 transition-all whitespace-nowrap cursor-pointer ${
+                    isActive
+                      ? 'bg-blue-600 text-white shadow-sm shadow-blue-900/40'
+                      : 'text-slate-300 hover:text-white hover:bg-slate-800'
+                  }`}
+                >
+                  <Icon className={`w-3.5 h-3.5 ${isActive ? 'text-white' : 'text-slate-400'}`} />
+                  <span>{item.label}</span>
+                </button>
+              );
+            })}
+          </nav>
+
+          {/* For Medium screens (Laptop/Tablet): Compact Horizontal Nav */}
+          <nav className="hidden md:flex xl:hidden items-center gap-1 overflow-x-auto no-scrollbar py-1">
+            {mainNavItems.map((item) => {
+              const Icon = item.icon;
+              const isActive = activeTab === item.id;
+              return (
+                <button
+                  key={item.id}
+                  onClick={() => handleTabClick(item.id)}
+                  title={item.label}
+                  className={`px-2.5 py-1.5 rounded-lg text-xs font-semibold flex items-center gap-1.5 transition-all whitespace-nowrap cursor-pointer ${
+                    isActive
+                      ? 'bg-blue-600 text-white shadow-sm'
+                      : 'text-slate-300 hover:text-white hover:bg-slate-800'
+                  }`}
+                >
+                  <Icon className="w-3.5 h-3.5" />
+                  <span className="hidden lg:inline">{item.label}</span>
+                </button>
+              );
+            })}
+          </nav>
 
           {/* 3. Right: Admin Access (Distinct Amber Style) & Profile Card / Mobile Toggle */}
           <div className="flex items-center gap-2 sm:gap-3 shrink-0">
@@ -211,20 +270,76 @@ export const Header: React.FC<HeaderProps> = ({
         </div>
       </div>
 
-      {/* Mobile Drawer / Staff Account */}
+      {/* Mobile Drawer / Dropdown Navigation */}
       {mobileMenuOpen && (
         <div className="md:hidden border-t border-slate-800 bg-slate-900 px-4 py-4 space-y-3 animate-in slide-in-from-top duration-200">
-          <div className="flex items-center justify-between pb-2 border-b border-slate-800">
-            <span className="text-[11px] font-bold text-slate-400 uppercase tracking-wider">Akaun Staf Pengguna</span>
-            <button 
-              onClick={() => setMobileMenuOpen(false)} 
-              className="text-slate-400 hover:text-white p-1"
-              aria-label="Tutup menu akaun"
+          <div className="text-[11px] font-bold text-slate-500 uppercase tracking-wider px-2">
+            Menu Navigasi
+          </div>
+          <div className="grid grid-cols-1 gap-1">
+            {mainNavItems.map((item) => {
+              const Icon = item.icon;
+              const isActive = activeTab === item.id;
+              return (
+                <button
+                  key={item.id}
+                  onClick={() => handleTabClick(item.id)}
+                  className={`w-full px-3 py-2.5 rounded-lg flex items-center justify-between text-left transition-all ${
+                    isActive
+                      ? 'bg-blue-600 text-white font-semibold'
+                      : 'text-slate-300 hover:bg-slate-800 font-medium'
+                  }`}
+                >
+                  <div className="flex items-center gap-3">
+                    <Icon className="w-4 h-4" />
+                    <span className="text-xs">{item.label}</span>
+                  </div>
+                </button>
+              );
+            })}
+
+            {/* Admin in mobile menu */}
+            <button
+              onClick={() => {
+                if (activeTab === 'admin' && isAdmin) {
+                  if (onLogoutAdmin) {
+                    onLogoutAdmin();
+                  } else {
+                    handleTabClick('dashboard');
+                  }
+                  setMobileMenuOpen(false);
+                } else {
+                  handleTabClick('admin');
+                }
+              }}
+              className={`w-full px-3 py-2.5 rounded-lg flex items-center justify-between text-left transition-all mt-2 border ${
+                activeTab === 'admin'
+                  ? 'bg-amber-400 text-slate-950 font-bold border-amber-300'
+                  : 'bg-amber-500 text-slate-950 font-bold border-amber-400'
+              }`}
             >
-              <X className="w-4 h-4" />
+              <div className="flex items-center gap-3">
+                {activeTab === 'admin' && isAdmin ? (
+                  <>
+                    <LogOut className="w-4 h-4" />
+                    <span className="text-xs">Logout Admin</span>
+                  </>
+                ) : (
+                  <>
+                    <ShieldCheck className="w-4 h-4" />
+                    <span className="text-xs">Admin Access</span>
+                  </>
+                )}
+              </div>
+              {pendingCount > 0 && (
+                <span className="px-2 py-0.5 bg-red-600 text-white font-extrabold rounded-full text-[10px]">
+                  {pendingCount} Menunggu
+                </span>
+              )}
             </button>
           </div>
-          <div>
+
+          <div className="pt-3 border-t border-slate-800">
             <LoginUserCard 
               staffList={staffList} 
               compact={true} 
