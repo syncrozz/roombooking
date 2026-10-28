@@ -9,6 +9,7 @@ import {
   deleteDoc, 
   onSnapshot, 
   getDocs,
+  getDoc,
   query,
   where,
   writeBatch,
@@ -28,6 +29,7 @@ import {
   getStoredRooms,
   saveStoredRooms,
   getStoredStaffUsers,
+  saveStoredStaffUsers,
   getStoredPendingBookingQueue,
   enqueuePendingBooking,
   dequeuePendingBooking,
@@ -717,12 +719,24 @@ export async function updateStaffPinInCloud(
     throw new Error('Gagal menyimpan PIN baharu ke Cloud. Sila cuba lagi.');
   }
 
+  // Invalidate local static cache so fresh staff data is pulled on next read
+  invalidateStaticCache(STAFF_COLLECTION);
+
   // Set session PIN in memory for the active browser session and local fallback ONLY AFTER Firestore write succeeds
   if (typeof window !== 'undefined') {
     setStaffSessionPin(staffId, newPin);
     if (pinHash) {
       try {
         localStorage.setItem(`kpmbp_staff_pin_hash_${staffId.toLowerCase()}`, pinHash);
+        const stored = getStoredStaffUsers();
+        if (stored && stored.length > 0) {
+          const updatedList = stored.map((s) =>
+            s.id.toLowerCase() === staffId.toLowerCase()
+              ? { ...s, pinStatus, pinHash, pinChangedAt }
+              : s
+          );
+          saveStoredStaffUsers(updatedList);
+        }
       } catch {}
     }
   }
@@ -877,9 +891,54 @@ export async function verifyStaffCredentials(
     };
   }
 
-  // (A) Staff on DEFAULT PIN status (1234)
-  if (!matched.pinStatus || matched.pinStatus === 'DEFAULT') {
-    if (cleanPin === '1234') {
+  const sessionPin = getStaffSessionPin(matched.id);
+  const isSessionMatch = Boolean(sessionPin && sessionPin === cleanPin);
+
+  const candidateHash = await hashStaffPin(matched.id, cleanPin);
+  const localExpectedHash = matched.pinHash || (typeof window !== 'undefined' ? localStorage.getItem(`kpmbp_staff_pin_hash_${matched.id.toLowerCase()}`) : null);
+
+  let isLocalHashMatch = Boolean(localExpectedHash && localExpectedHash === candidateHash);
+  if (!isLocalHashMatch && localExpectedHash) {
+    const legacyHash = await hashStaffPinLegacy(cleanPin);
+    if (legacyHash === localExpectedHash) {
+      isLocalHashMatch = true;
+    }
+  }
+
+  // Fast Path 1: Local Session or Local Hash match (Already authenticated on this device)
+  if (isSessionMatch || isLocalHashMatch) {
+    resetClientRateLimit(matched.id);
+    setStaffSessionPin(matched.id, cleanPin);
+    return {
+      success: true,
+      staff: sanitizeStaffForClient(matched),
+      isDefaultPin: matched.pinStatus === 'DEFAULT' && cleanPin === '1234',
+    };
+  }
+
+  // Fast Path 2: Default PIN check, but verify Cloud first if cleanPin !== '1234'
+  if ((!matched.pinStatus || matched.pinStatus === 'DEFAULT') && cleanPin === '1234') {
+    // Check if Cloud has a newer CUSTOM pin that Device B's cache hasn't seen yet
+    let cloudHasCustom = false;
+    try {
+      const snap = await getDoc(doc(db, STAFF_COLLECTION, matched.id));
+      if (snap.exists()) {
+        const cloudData = snap.data();
+        if (cloudData.pinStatus === 'CUSTOM' && cloudData.pinHash) {
+          cloudHasCustom = true;
+          matched.pinStatus = 'CUSTOM';
+          matched.pinHash = cloudData.pinHash;
+          matched.pinChangedAt = cloudData.pinChangedAt;
+          if (typeof window !== 'undefined') {
+            try {
+              localStorage.setItem(`kpmbp_staff_pin_hash_${matched.id.toLowerCase()}`, cloudData.pinHash);
+            } catch {}
+          }
+        }
+      }
+    } catch {}
+
+    if (!cloudHasCustom) {
       resetClientRateLimit(matched.id);
       setStaffSessionPin(matched.id, cleanPin);
       return {
@@ -887,47 +946,96 @@ export async function verifyStaffCredentials(
         staff: sanitizeStaffForClient(matched),
         isDefaultPin: true,
       };
-    } else {
-      recordClientFailure(matched.id);
-      return {
-        success: false,
-        errorMsg: 'PIN tidak sah. Sila masukkan PIN lalai (1234) untuk log masuk kali pertama.'
-      };
     }
   }
 
-  // (B) Staff on CUSTOM PIN status: verified against active session memory or hash
-  const sessionPin = getStaffSessionPin(matched.id);
-  const isSessionMatch = Boolean(sessionPin && sessionPin === cleanPin);
+  // Real-Time Multi-Device Cloud Verification:
+  // When Device B has stale cache or when PIN was updated on another device (Device A),
+  // fetch the single authoritative staff record directly from Cloud Firestore (/staff_users/{staffId}).
+  try {
+    const docRef = doc(db, STAFF_COLLECTION, matched.id);
+    const snap = await getDoc(docRef);
+    if (snap.exists()) {
+      const cloudData = snap.data();
+      const cloudStatus = cloudData.pinStatus === 'CUSTOM' ? 'CUSTOM' : 'DEFAULT';
+      const cloudHash = cloudData.pinHash;
 
-  const candidateHash = await hashStaffPin(matched.id, cleanPin);
-  const expectedHash = matched.pinHash || (typeof window !== 'undefined' ? localStorage.getItem(`kpmbp_staff_pin_hash_${matched.id.toLowerCase()}`) : null);
+      if (cloudStatus === 'CUSTOM' && cloudHash) {
+        let isCloudMatch = Boolean(cloudHash === candidateHash);
+        if (!isCloudMatch) {
+          const legacyHash = await hashStaffPinLegacy(cleanPin);
+          if (legacyHash === cloudHash) {
+            isCloudMatch = true;
+          }
+        }
 
-  let isHashMatch = Boolean(expectedHash && expectedHash === candidateHash);
-  if (!isHashMatch && expectedHash) {
-    const legacyHash = await hashStaffPinLegacy(cleanPin);
-    if (legacyHash === expectedHash) {
-      isHashMatch = true;
+        if (isCloudMatch) {
+          resetClientRateLimit(matched.id);
+          setStaffSessionPin(matched.id, cleanPin);
+
+          // Synchronize local in-memory object and browser cache
+          matched.pinStatus = 'CUSTOM';
+          matched.pinHash = cloudHash;
+          if (cloudData.pinChangedAt) {
+            matched.pinChangedAt = cloudData.pinChangedAt;
+          }
+
+          if (typeof window !== 'undefined') {
+            try {
+              localStorage.setItem(`kpmbp_staff_pin_hash_${matched.id.toLowerCase()}`, cloudHash);
+              const stored = getStoredStaffUsers();
+              if (stored && stored.length > 0) {
+                const updatedList: StaffUser[] = stored.map((s) =>
+                  s.id.toLowerCase() === matched.id.toLowerCase()
+                    ? { ...s, pinStatus: 'CUSTOM' as const, pinHash: cloudHash, pinChangedAt: cloudData.pinChangedAt }
+                    : s
+                );
+                saveStoredStaffUsers(updatedList);
+              }
+              invalidateStaticCache(STAFF_COLLECTION);
+            } catch {}
+          }
+
+          return {
+            success: true,
+            staff: sanitizeStaffForClient(matched),
+            isDefaultPin: false,
+          };
+        }
+      } else if (cloudStatus === 'DEFAULT' && cleanPin === '1234') {
+        resetClientRateLimit(matched.id);
+        setStaffSessionPin(matched.id, cleanPin);
+        matched.pinStatus = 'DEFAULT';
+        matched.pinHash = undefined;
+        matched.pinChangedAt = undefined;
+        if (typeof window !== 'undefined') {
+          try {
+            localStorage.removeItem(`kpmbp_staff_pin_hash_${matched.id.toLowerCase()}`);
+          } catch {}
+        }
+        return {
+          success: true,
+          staff: sanitizeStaffForClient(matched),
+          isDefaultPin: true,
+        };
+      }
     }
+  } catch (cloudErr) {
+    console.warn('[Staff Auth] Real-time cloud verification fallback error:', cloudErr);
   }
 
-  console.info(`[Staff Auth Custom PIN] ID: ${matched.id}, pinHash wujud: ${Boolean(matched.pinHash)}, perbandingan hash: ${isHashMatch ? 'match' : 'tidak'}`);
-
-  if (isSessionMatch || isHashMatch) {
-    resetClientRateLimit(matched.id);
-    setStaffSessionPin(matched.id, cleanPin);
+  // If both local and cloud verification failed
+  recordClientFailure(matched.id);
+  if (matched.pinStatus === 'DEFAULT' && cleanPin !== '1234') {
     return {
-      success: true,
-      staff: sanitizeStaffForClient(matched),
-      isDefaultPin: false,
+      success: false,
+      errorMsg: 'PIN tidak sah. Sila masukkan PIN lalai (1234) untuk log masuk kali pertama.'
     };
   }
 
-  // If custom pin does not match active session and backend server is offline
-  recordClientFailure(matched.id);
   return {
     success: false,
-    errorMsg: 'PIN tidak sah. Sila hubungi Pentadbir Kolej untuk menetapkan semula PIN anda kepada 1234 atau pastikan pelayan auth aktif.'
+    errorMsg: 'PIN tidak sah. Sila masukkan PIN 4-digit yang betul atau hubungi Pentadbir Kolej.'
   };
 }
 

@@ -8,7 +8,8 @@ const __dirname = path.dirname(__filename);
 
 async function startServer() {
   const app = express();
-  const PORT = Number(process.env.PORT) || 3000;
+  // In AI Studio development, dev server must run on port 3000 (container port 8080 is reserved for proxy)
+  const PORT = process.env.NODE_ENV === 'production' && process.env.PORT ? Number(process.env.PORT) : 3000;
   const HOST = '0.0.0.0';
 
   app.use(express.json());
