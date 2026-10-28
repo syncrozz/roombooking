@@ -1,7 +1,7 @@
 import express from 'express';
 import path from 'path';
 import { fileURLToPath } from 'url';
-import { serverAuthVault } from './src/server/auth-service';
+import { serverAuthVault, createStaffFirebaseCustomToken } from './src/server/auth-service';
 
 const __filename = fileURLToPath(import.meta.url);
 const __dirname = path.dirname(__filename);
@@ -23,7 +23,7 @@ async function startServer() {
     });
   });
 
-  // Secure Server-Side Staff Verification Endpoint (scrypt + rate limiting)
+  // Secure Server-Side Staff Verification Endpoint (scrypt + rate limiting + Firebase Custom Token Bridge)
   app.post('/api/auth/staff-verify', async (req, res) => {
     try {
       const { email, pin } = req.body || {};
@@ -39,7 +39,25 @@ async function startServer() {
         return res.status(401).json(result);
       }
 
-      return res.status(200).json(result);
+      // Phase 2: Authentication Bridge — Issue Firebase Custom Token if signing credentials exist
+      let customToken: string | undefined;
+      let tokenBridgeStatus: 'issued' | 'prerequisite_missing' | 'skipped' = 'skipped';
+
+      if (result.staff) {
+        const tokenRes = await createStaffFirebaseCustomToken(result.staff);
+        if (tokenRes.customToken) {
+          customToken = tokenRes.customToken;
+          tokenBridgeStatus = 'issued';
+        } else if (tokenRes.prerequisiteMissing) {
+          tokenBridgeStatus = 'prerequisite_missing';
+        }
+      }
+
+      return res.status(200).json({
+        ...result,
+        customToken,
+        tokenBridgeStatus,
+      });
     } catch (err) {
       console.error('Error during staff verification:', err);
       return res.status(500).json({ success: false, errorMsg: 'Ralat pelayan dalaman.' });

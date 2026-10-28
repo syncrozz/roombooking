@@ -117,6 +117,5 @@ export interface StaffUser {
   aliases?: string[];
   pinStatus: 'DEFAULT' | 'CUSTOM';
   pinChangedAt?: string;
-  pinHash?: string;
 }
 

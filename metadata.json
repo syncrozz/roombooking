@@ -1,6 +1,6 @@
 {
-  "name": "KPMBP SmartHub — Room Booking",
-  "description": "Sistem Tempahan Ruang & Semakan Pertembungan Jadual Bilik Kuliah KPMBP (42 Ruang & Fasiliti, Academic Timetable Engine & WhatsApp Sharing)",
+  "name": "BookBK KPMBP — Tempahan Bilik Kuliah KPM Bandar Penawar",
+  "description": "Semak ketersediaan dan tempah bilik kuliah KPMBP dalam talian. Pantas, mudah dan bebas pertembungan jadual.",
   "requestFramePermissions": [],
   "majorCapabilities": ["MAJOR_CAPABILITY_SERVER_SIDE_GEMINI_API"]
 }

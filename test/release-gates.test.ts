@@ -168,6 +168,9 @@ async function runAllGateTests() {
     // 2. Staff credentials vault locked down (no client reads or writes)
     assert.match(rulesContent, /match\s+\/staff_credentials\/\{staffId\}\s*\{\s*allow\s+read,\s*write:\s*if\s+false;/, 'staff_credentials locked from client SDK');
 
+    // 2b. Staff users directory write strictly locked to admin
+    assert.match(rulesContent, /match\s+\/staff_users\/\{staffId\}\s*\{[\s\S]*allow\s+write:\s*if\s+isAdmin\(\);/, 'staff_users write restricted to admin only (no public writes)');
+
     // 3. Admin authorization requirement
     assert.match(rulesContent, /function\s+isAdmin\(\)/, 'isAdmin function defined');
     assert.match(rulesContent, /request\.auth\.token\.email_verified\s*==\s*true/, 'Requires verified email for sensitive operations');

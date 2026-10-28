@@ -1,4 +1,4 @@
-import React, { useState } from 'react';
+import React, { useState, useRef } from 'react';
 import { 
   AdHocBooking, 
   Room, 
@@ -22,6 +22,7 @@ import {
   Trash2, 
   RotateCcw, 
   AlertTriangle,
+  AlertCircle,
   Building,
   Calendar,
   CalendarRange,
@@ -72,6 +73,8 @@ interface AdminManagementViewProps {
   onDeleteBlock?: (id: string) => Promise<void> | void;
   onDeleteBatchBlocks?: (batchIdOrIds: string[]) => Promise<void> | void;
   onLogoutAdmin?: () => void;
+  onSyncBookings?: (bookings: AdHocBooking[], mode?: 'merge' | 'replace') => Promise<void> | void;
+  onNavigateTab?: (tab: any) => void;
 }
 
 export const AdminManagementView: React.FC<AdminManagementViewProps> = ({
@@ -91,7 +94,9 @@ export const AdminManagementView: React.FC<AdminManagementViewProps> = ({
   onBatchAddBlocks,
   onDeleteBlock,
   onDeleteBatchBlocks,
-  onLogoutAdmin
+  onLogoutAdmin,
+  onSyncBookings,
+  onNavigateTab
 }) => {
   const pendingBookings = bookings.filter(b => b.status === 'PENDING');
 
@@ -155,6 +160,272 @@ export const AdminManagementView: React.FC<AdminManagementViewProps> = ({
   const [roomSyncSuccessMsg, setRoomSyncSuccessMsg] = useState<string | null>(null);
   const [roomSyncMode, setRoomSyncMode] = useState<'merge' | 'replace'>('merge');
   const [roomSearchTerm, setRoomSearchTerm] = useState<string>('');
+
+  // Ad-Hoc Bookings CSV & Restoration State
+  const bookingCsvInputRef = useRef<HTMLInputElement>(null);
+  const [bookingSearchTerm, setBookingSearchTerm] = useState<string>('');
+  const [bookingStatusFilter, setBookingStatusFilter] = useState<'ALL' | 'CONFIRMED' | 'PENDING' | 'REJECTED' | 'CANCELLED'>('ALL');
+  const [isRestoringBookings, setIsRestoringBookings] = useState<boolean>(false);
+  const [bookingRestoreSuccessMsg, setBookingRestoreSuccessMsg] = useState<string | null>(null);
+  const [bookingRestoreErrorMsg, setBookingRestoreErrorMsg] = useState<string | null>(null);
+
+  const handleUploadBookingsCSV = async (e: React.ChangeEvent<HTMLInputElement>) => {
+    const file = e.target.files?.[0];
+    if (!file) return;
+
+    setIsRestoringBookings(true);
+    setBookingRestoreSuccessMsg(null);
+    setBookingRestoreErrorMsg(null);
+
+    try {
+      const text = await file.text();
+      const lines = text.split(/\r?\n/).filter(line => line.trim().length > 0);
+      if (lines.length < 2) {
+        setBookingRestoreErrorMsg('Fail CSV kosong atau tiada baris rekod tempahan.');
+        setIsRestoringBookings(false);
+        return;
+      }
+
+      const parseCsvLine = (line: string): string[] => {
+        const result: string[] = [];
+        let cur = '';
+        let inQuotes = false;
+        for (let i = 0; i < line.length; i++) {
+          const char = line[i];
+          if (char === '"') {
+            if (inQuotes && line[i + 1] === '"') {
+              cur += '"';
+              i++;
+            } else {
+              inQuotes = !inQuotes;
+            }
+          } else if (char === ',' && !inQuotes) {
+            result.push(cur.trim());
+            cur = '';
+          } else {
+            cur += char;
+          }
+        }
+        result.push(cur.trim());
+        return result;
+      };
+
+      const parsed: AdHocBooking[] = [];
+      for (let idx = 1; idx < lines.length; idx++) {
+        const cols = parseCsvLine(lines[idx]);
+        if (cols.length < 7) continue;
+
+        const id = cols[0] || `BK-${Date.now()}-${idx}`;
+        const roomId = cols[1];
+        const roomName = cols[2] || cols[1];
+        const date = cols[3];
+        const startTime = cols[5];
+        const endTime = cols[6];
+        const applicantName = cols[7] || 'Staf KPMBP';
+        const applicantEmail = cols[8] || 'staf@mara.gov.my';
+        const applicantPhone = cols[9] || '';
+        const applicantRole = cols[10] || 'Pensyarah';
+        const department = cols[11] || 'Jabatan Akademik';
+        const purposeCategory = (cols[12] || 'Kelas') as any;
+        const title = cols[13] || 'Aktiviti Kuliah';
+        const paxCount = Number(cols[14]) || 20;
+        const status = (cols[15] || 'CONFIRMED') as any;
+        const createdAt = cols[16] || new Date().toISOString();
+        const notes = cols[17] || '';
+
+        if (!roomId || !date || !startTime || !endTime) continue;
+
+        parsed.push({
+          id,
+          roomId,
+          roomName,
+          date,
+          startTime,
+          endTime,
+          applicantName,
+          applicantEmail,
+          applicantPhone,
+          applicantRole,
+          department,
+          purposeCategory,
+          title,
+          paxCount,
+          status: (status === 'CONFIRMED' || status === 'PENDING' || status === 'REJECTED' || status === 'CANCELLED') ? status : 'CONFIRMED',
+          createdAt,
+          notes,
+          syncStatus: 'synced'
+        });
+      }
+
+      if (parsed.length === 0) {
+        setBookingRestoreErrorMsg('Tiada rekod tempahan yang sah ditemui dalam fail CSV tersebut.');
+        setIsRestoringBookings(false);
+        return;
+      }
+
+      if (onSyncBookings) {
+        await onSyncBookings(parsed, 'merge');
+      }
+      setBookingRestoreSuccessMsg(`Berjaya memulihkan ${parsed.length} rekod tempahan ad-hoc daripada fail sandaran CSV!`);
+      if (bookingCsvInputRef.current) {
+        bookingCsvInputRef.current.value = '';
+      }
+    } catch (err) {
+      console.error('Error parsing bookings CSV:', err);
+      setBookingRestoreErrorMsg('Ralat semasa membaca fail CSV sandaran.');
+    } finally {
+      setIsRestoringBookings(false);
+    }
+  };
+
+  const handleRestoreSampleBookings = async () => {
+    setIsRestoringBookings(true);
+    setBookingRestoreSuccessMsg(null);
+    setBookingRestoreErrorMsg(null);
+
+    try {
+      const today = new Date();
+      const todayStr = today.toISOString().split('T')[0];
+      const tomorrow = new Date(today.getTime() + 86400000);
+      const tomorrowStr = tomorrow.toISOString().split('T')[0];
+      const dayAfter = new Date(today.getTime() + 86400000 * 2);
+      const dayAfterStr = dayAfter.toISOString().split('T')[0];
+
+      const staff1 = staffList.find(s => s.role === 'Pensyarah') || staffList[0] || { name: 'Ustaz Ahmad', email: 'ahmad@mara.gov.my', department: 'Jabatan Pengajian Islam', role: 'Pensyarah', phone: '0191234567' };
+      const staff2 = staffList[1] || { name: 'Dr. Noraini', email: 'noraini@mara.gov.my', department: 'Jabatan Perdagangan', role: 'Pensyarah', phone: '0192345678' };
+      const staff3 = staffList[2] || { name: 'En. Razak', email: 'razak@mara.gov.my', department: 'Jabatan Sains Komputer', role: 'Pensyarah', phone: '0193456789' };
+      const staff4 = staffList[3] || { name: 'Pn. Salmah', email: 'salmah@kpmbp.edu.my', department: 'Unit Hal Ehwal Pelajar', role: 'Pegawai', phone: '0194567890' };
+      const staff5 = staffList[4] || { name: 'En. Hafiz', email: 'hafiz@mara.gov.my', department: 'Unit Sukan & Kokurikulum', role: 'Pegawai', phone: '0195678901' };
+      const staff6 = staffList[5] || { name: 'Pn. Nurlaili', email: 'nurlaili@mara.gov.my', department: 'Jabatan Bahasa & Komunikasi', role: 'Pensyarah', phone: '0196789012' };
+
+      const sampleBookings: AdHocBooking[] = [
+        {
+          id: `BK-KPMBP-001-${Date.now().toString().slice(-4)}`,
+          roomId: 'BK01',
+          roomName: 'Bilik Kuliah 01',
+          date: todayStr,
+          startTime: '10:30',
+          endTime: '12:30',
+          applicantName: staff1.name,
+          applicantEmail: staff1.email,
+          applicantPhone: staff1.phone || '0191234567',
+          applicantRole: staff1.role || 'Pensyarah',
+          department: staff1.department || 'Jabatan Pengajian Islam',
+          purposeCategory: 'Kelas',
+          title: 'Kelas Gantian Fiqh & Muamalat',
+          paxCount: 28,
+          status: 'CONFIRMED',
+          createdAt: new Date().toISOString(),
+          notes: 'Kelas gantian rasmi sesi pagi.'
+        },
+        {
+          id: `BK-KPMBP-002-${Date.now().toString().slice(-4)}`,
+          roomId: 'BK02',
+          roomName: 'Bilik Kuliah 02',
+          date: todayStr,
+          startTime: '14:00',
+          endTime: '16:00',
+          applicantName: staff2.name,
+          applicantEmail: staff2.email,
+          applicantPhone: staff2.phone || '0192345678',
+          applicantRole: staff2.role || 'Pensyarah',
+          department: staff2.department || 'Jabatan Perdagangan',
+          purposeCategory: 'Bengkel',
+          title: 'Bengkel Analisis Data Perakaunan',
+          paxCount: 25,
+          status: 'CONFIRMED',
+          createdAt: new Date().toISOString(),
+          notes: 'Latihan amali perakaunan kewangan.'
+        },
+        {
+          id: `BK-KPMBP-003-${Date.now().toString().slice(-4)}`,
+          roomId: 'MAKMAL_ALFA',
+          roomName: 'Makmal Komputer Alfa',
+          date: tomorrowStr,
+          startTime: '09:00',
+          endTime: '11:00',
+          applicantName: staff3.name,
+          applicantEmail: staff3.email,
+          applicantPhone: staff3.phone || '0193456789',
+          applicantRole: staff3.role || 'Pensyarah',
+          department: staff3.department || 'Jabatan Sains Komputer',
+          purposeCategory: 'Aktiviti Pelajar',
+          title: 'Bengkel Kod & Pembangunan Web',
+          paxCount: 30,
+          status: 'CONFIRMED',
+          createdAt: new Date().toISOString(),
+          notes: 'Penyediaan projek akhir pelajar Diploma.'
+        },
+        {
+          id: `BK-KPMBP-004-${Date.now().toString().slice(-4)}`,
+          roomId: 'DEWAN_SEMINAR',
+          roomName: 'Dewan Seminar KPMBP',
+          date: tomorrowStr,
+          startTime: '14:30',
+          endTime: '16:30',
+          applicantName: staff4.name,
+          applicantEmail: staff4.email,
+          applicantPhone: staff4.phone || '0194567890',
+          applicantRole: staff4.role || 'Pegawai',
+          department: staff4.department || 'Unit Hal Ehwal Pelajar',
+          purposeCategory: 'Mesyuarat',
+          title: 'Mesyuarat Jawatankuasa Kebajikan Pelajar',
+          paxCount: 18,
+          status: 'CONFIRMED',
+          createdAt: new Date().toISOString(),
+          notes: 'Perbincangan kebajikan dan penginapan kolej.'
+        },
+        {
+          id: `BK-KPMBP-005-${Date.now().toString().slice(-4)}`,
+          roomId: 'DEWAN_BESAR',
+          roomName: 'Dewan Besar Seri Gemilang',
+          date: dayAfterStr,
+          startTime: '09:00',
+          endTime: '12:00',
+          applicantName: staff5.name,
+          applicantEmail: staff5.email,
+          applicantPhone: staff5.phone || '0195678901',
+          applicantRole: staff5.role || 'Pegawai',
+          department: staff5.department || 'Unit Sukan & Kokurikulum',
+          purposeCategory: 'Aktiviti Pelajar',
+          title: 'Taklimat Kejohanan Sukan Antara Jabatan',
+          paxCount: 75,
+          status: 'PENDING',
+          createdAt: new Date().toISOString(),
+          notes: 'Memerlukan sistem audio dan mikrofon dewan.'
+        },
+        {
+          id: `BK-KPMBP-006-${Date.now().toString().slice(-4)}`,
+          roomId: 'BK05',
+          roomName: 'Bilik Kuliah 05',
+          date: dayAfterStr,
+          startTime: '14:00',
+          endTime: '16:00',
+          applicantName: staff6.name,
+          applicantEmail: staff6.email,
+          applicantPhone: staff6.phone || '0196789012',
+          applicantRole: staff6.role || 'Pensyarah',
+          department: staff6.department || 'Jabatan Bahasa & Komunikasi',
+          purposeCategory: 'Kelas',
+          title: 'Bengkel Kemahiran Komunikasi Profesional',
+          paxCount: 22,
+          status: 'CONFIRMED',
+          createdAt: new Date().toISOString(),
+          notes: 'Kelas persediaan temuduga pelajar semester akhir.'
+        }
+      ];
+
+      if (onSyncBookings) {
+        await onSyncBookings(sampleBookings, 'merge');
+      }
+      setBookingRestoreSuccessMsg('Berjaya memuatkan 6 rekod tempahan contoh rasmi KPMBP!');
+    } catch (err) {
+      console.error('Error restoring sample bookings:', err);
+      setBookingRestoreErrorMsg('Ralat semasa menjana rekod contoh tempahan.');
+    } finally {
+      setIsRestoringBookings(false);
+    }
+  };
 
   // Download Standard Timetable CSV Template (Format Perkara/Hari yang diselaraskan)
   const handleDownloadStandardGridTemplate = () => {
@@ -2505,6 +2776,15 @@ ST003,Pengajian Am,Cik Siti Sarah Binti Razak,Pensyarah,013-5558899,siti.sarah@k
 
       {/* SECTION: AD-HOC BOOKINGS BACKUP & CSV EXPORT */}
       <div className="bg-white rounded-2xl p-6 shadow-md border border-slate-200 space-y-4">
+        {/* Hidden File Input for Bookings CSV Restoration */}
+        <input 
+          type="file" 
+          ref={bookingCsvInputRef} 
+          accept=".csv" 
+          onChange={handleUploadBookingsCSV} 
+          className="hidden" 
+        />
+
         <div className="flex flex-col md:flex-row items-start md:items-center justify-between gap-4 border-b border-slate-100 pb-4">
           <div>
             <div className="flex items-center gap-2 text-slate-900 font-extrabold text-lg">
@@ -2512,7 +2792,7 @@ ST003,Pengajian Am,Cik Siti Sarah Binti Razak,Pensyarah,013-5558899,siti.sarah@k
               <h3>Tempahan Ad-hoc</h3>
             </div>
             <p className="text-xs text-slate-500 mt-1">
-              Simpan dan muat turun kesemua rekod tempahan ad-hoc yang telah didaftarkan ke dalam fail spreadsheet CSV bagi tujuan sandaran offline, pelan kontigensi, atau audit institusi.
+              Simpan, muat turun, pulihkan, dan uruskan rekod tempahan ad-hoc yang didaftarkan ke dalam fail spreadsheet CSV bagi tujuan sandaran offline, pelan kontigensi, atau audit institusi.
             </p>
           </div>
 
@@ -2536,8 +2816,365 @@ ST003,Pengajian Am,Cik Siti Sarah Binti Razak,Pensyarah,013-5558899,siti.sarah@k
               <Check className="w-3.5 h-3.5 text-emerald-600" />
               <span>Disahkan ({bookings.filter(b => b.status === 'CONFIRMED').length})</span>
             </button>
+
+            <button
+              type="button"
+              onClick={() => bookingCsvInputRef.current?.click()}
+              disabled={isRestoringBookings}
+              className="bg-emerald-50 hover:bg-emerald-100 text-emerald-800 border border-emerald-300 font-bold py-2.5 px-3.5 rounded-xl text-xs transition flex items-center gap-1.5 cursor-pointer shadow-xs active:scale-95 disabled:opacity-50"
+              title="Muat naik fail sandaran CSV untuk mengembalikan tempahan"
+            >
+              <UploadCloud className="w-3.5 h-3.5 text-emerald-600" />
+              <span>Pulihkan Fail CSV</span>
+            </button>
+
+            <button
+              type="button"
+              onClick={handleRestoreSampleBookings}
+              disabled={isRestoringBookings}
+              className="bg-indigo-50 hover:bg-indigo-100 text-indigo-800 border border-indigo-300 font-bold py-2.5 px-3.5 rounded-xl text-xs transition flex items-center gap-1.5 cursor-pointer shadow-xs active:scale-95 disabled:opacity-50"
+              title="Muat 6 rekod tempahan contoh kolej untuk demonstrasi & ujian sistem"
+            >
+              <Sparkles className="w-3.5 h-3.5 text-indigo-600" />
+              <span>Muat 6 Rekod Contoh</span>
+            </button>
+
+            {onNavigateTab && (
+              <button
+                type="button"
+                onClick={() => onNavigateTab('matrix')}
+                className="bg-blue-50 hover:bg-blue-100 text-blue-800 border border-blue-300 font-bold py-2.5 px-3.5 rounded-xl text-xs transition flex items-center gap-1.5 cursor-pointer shadow-xs active:scale-95"
+                title="Buka Matriks Ketersediaan untuk membuat tempahan bilik baharu"
+              >
+                <Calendar className="w-3.5 h-3.5 text-blue-600" />
+                <span>Buka Matriks</span>
+              </button>
+            )}
           </div>
         </div>
+
+        {/* Feedback Alerts */}
+        {bookingRestoreSuccessMsg && (
+          <div className="p-3.5 bg-emerald-50 border border-emerald-300 rounded-xl text-xs font-bold text-emerald-800 flex items-center justify-between gap-2 shadow-xs">
+            <div className="flex items-center gap-2">
+              <CheckCircle2 className="w-4 h-4 text-emerald-600 shrink-0" />
+              <span>{bookingRestoreSuccessMsg}</span>
+            </div>
+            <button
+              type="button"
+              onClick={() => setBookingRestoreSuccessMsg(null)}
+              className="text-emerald-700 hover:text-emerald-900 font-bold cursor-pointer text-xs"
+            >
+              Tutup
+            </button>
+          </div>
+        )}
+
+        {bookingRestoreErrorMsg && (
+          <div className="p-3.5 bg-rose-50 border border-rose-300 rounded-xl text-xs font-bold text-rose-800 flex items-center justify-between gap-2 shadow-xs">
+            <div className="flex items-center gap-2">
+              <AlertTriangle className="w-4 h-4 text-rose-600 shrink-0" />
+              <span>{bookingRestoreErrorMsg}</span>
+            </div>
+            <button
+              type="button"
+              onClick={() => setBookingRestoreErrorMsg(null)}
+              className="text-rose-700 hover:text-rose-900 font-bold cursor-pointer text-xs"
+            >
+              Tutup
+            </button>
+          </div>
+        )}
+
+        {/* Empty State vs Table Display */}
+        {bookings.length === 0 ? (
+          <div className="bg-gradient-to-br from-amber-50/70 via-white to-orange-50/60 border border-amber-200/90 rounded-2xl p-5 sm:p-6 space-y-4">
+            <div className="flex flex-col sm:flex-row items-start sm:items-center justify-between gap-3 border-b border-amber-100 pb-3">
+              <div className="flex items-center gap-2.5">
+                <div className="w-10 h-10 rounded-xl bg-amber-500/15 border border-amber-400/40 flex items-center justify-center text-amber-700 shadow-2xs">
+                  <AlertCircle className="w-5 h-5 text-amber-600" />
+                </div>
+                <div>
+                  <h4 className="font-extrabold text-sm text-slate-900">Rekod Tempahan Ad-hoc Semasa: Kosong (0 Rekod)</h4>
+                  <p className="text-[11.5px] text-slate-600">
+                    Sistem kini berada dalam status bersih (mod Sifar Data Demo aktif). Pangkalan data sedia menerima rekod baharu atau dipulihkan.
+                  </p>
+                </div>
+              </div>
+              <span className="inline-flex items-center gap-1.5 px-3 py-1 rounded-full text-xs font-bold bg-amber-100 text-amber-900 border border-amber-300 shrink-0">
+                <span className="w-2 h-2 rounded-full bg-amber-500 animate-pulse"></span>
+                0 Rekod Aktif
+              </span>
+            </div>
+
+            <div className="space-y-1">
+              <div className="font-bold text-xs text-slate-800 flex items-center gap-1.5">
+                <RotateCcw className="w-3.5 h-3.5 text-amber-600" />
+                <span>Bagaimana Cara Mengembalikan Semula Rekod Tempahan Ad-hoc?</span>
+              </div>
+              <p className="text-[11.5px] text-slate-600 leading-relaxed">
+                Anda mempunyai <strong>3 pilihan mudah</strong> mengikut keperluan institusi anda:
+              </p>
+            </div>
+
+            <div className="grid grid-cols-1 md:grid-cols-3 gap-3.5 pt-1">
+              {/* Option 1: Restore CSV Backup */}
+              <div className="bg-white border border-slate-200 hover:border-emerald-400 rounded-xl p-4 flex flex-col justify-between transition shadow-2xs">
+                <div className="space-y-2">
+                  <div className="w-7 h-7 rounded-lg bg-emerald-50 text-emerald-700 flex items-center justify-center font-bold text-xs border border-emerald-200">
+                    1
+                  </div>
+                  <div className="font-bold text-slate-800 text-xs flex items-center gap-1.5">
+                    <UploadCloud className="w-4 h-4 text-emerald-600" />
+                    <span>Pulihkan Sandaran Fail CSV</span>
+                  </div>
+                  <p className="text-[11px] text-slate-500 leading-normal">
+                    Jika anda pernah memuat turun sandaran CSV sebelum ini, klik di sini untuk memuat naik fail tersebut dan mengembalikan rekod secara tepat.
+                  </p>
+                </div>
+                <button
+                  type="button"
+                  onClick={() => bookingCsvInputRef.current?.click()}
+                  disabled={isRestoringBookings}
+                  className="mt-3.5 w-full bg-emerald-600 hover:bg-emerald-700 text-white font-bold py-2 px-3 rounded-lg text-xs transition flex items-center justify-center gap-1.5 shadow-xs cursor-pointer active:scale-95 disabled:opacity-50"
+                >
+                  <UploadCloud className="w-3.5 h-3.5" />
+                  <span>{isRestoringBookings ? 'Memproses...' : 'Pilih Fail CSV Sandaran'}</span>
+                </button>
+              </div>
+
+              {/* Option 2: Load College Sample Data */}
+              <div className="bg-white border border-slate-200 hover:border-indigo-400 rounded-xl p-4 flex flex-col justify-between transition shadow-2xs">
+                <div className="space-y-2">
+                  <div className="w-7 h-7 rounded-lg bg-indigo-50 text-indigo-700 flex items-center justify-center font-bold text-xs border border-indigo-200">
+                    2
+                  </div>
+                  <div className="font-bold text-slate-800 text-xs flex items-center gap-1.5">
+                    <Sparkles className="w-4 h-4 text-indigo-600" />
+                    <span>Muat 6 Rekod Contoh Kolej</span>
+                  </div>
+                  <p className="text-[11px] text-slate-500 leading-normal">
+                    Muat set data contoh rasmi kolej (Kelas Tambahan, Bengkel Makmal, Mesyuarat Jabatan) untuk semakan matriks, pengesahan, dan ujian sistem serta-merta.
+                  </p>
+                </div>
+                <button
+                  type="button"
+                  onClick={handleRestoreSampleBookings}
+                  disabled={isRestoringBookings}
+                  className="mt-3.5 w-full bg-indigo-600 hover:bg-indigo-700 text-white font-bold py-2 px-3 rounded-lg text-xs transition flex items-center justify-center gap-1.5 shadow-xs cursor-pointer active:scale-95 disabled:opacity-50"
+                >
+                  <Sparkles className="w-3.5 h-3.5" />
+                  <span>{isRestoringBookings ? 'Menjana...' : 'Muat 6 Rekod Contoh'}</span>
+                </button>
+              </div>
+
+              {/* Option 3: Book via Matrix */}
+              <div className="bg-white border border-slate-200 hover:border-blue-400 rounded-xl p-4 flex flex-col justify-between transition shadow-2xs">
+                <div className="space-y-2">
+                  <div className="w-7 h-7 rounded-lg bg-blue-50 text-blue-700 flex items-center justify-center font-bold text-xs border border-blue-200">
+                    3
+                  </div>
+                  <div className="font-bold text-slate-800 text-xs flex items-center gap-1.5">
+                    <Calendar className="w-4 h-4 text-blue-600" />
+                    <span>Buat Tempahan di Matriks</span>
+                  </div>
+                  <p className="text-[11px] text-slate-500 leading-normal">
+                    Pergi ke paparan Matriks Ketersediaan Ruang Kuliah dan klik mana-mana slot hijau kosong untuk menghantar tempahan ad-hoc baharu mengikut waktu pilihan.
+                  </p>
+                </div>
+                <button
+                  type="button"
+                  onClick={() => onNavigateTab ? onNavigateTab('matrix') : null}
+                  className="mt-3.5 w-full bg-blue-600 hover:bg-blue-700 text-white font-bold py-2 px-3 rounded-lg text-xs transition flex items-center justify-center gap-1.5 shadow-xs cursor-pointer active:scale-95"
+                >
+                  <Calendar className="w-3.5 h-3.5" />
+                  <span>Buka Matriks Ketersediaan</span>
+                </button>
+              </div>
+            </div>
+          </div>
+        ) : (
+          /* When Bookings Exist: Interactive Search, Filter & Management Table */
+          <div className="space-y-3 pt-1">
+            <div className="flex flex-col sm:flex-row items-stretch sm:items-center justify-between gap-2.5">
+              <div className="flex flex-wrap items-center gap-1 bg-slate-100 p-1 rounded-xl text-xs">
+                <button
+                  type="button"
+                  onClick={() => setBookingStatusFilter('ALL')}
+                  className={`px-3 py-1.5 rounded-lg font-bold transition cursor-pointer ${
+                    bookingStatusFilter === 'ALL' ? 'bg-white text-slate-900 shadow-2xs' : 'text-slate-600 hover:text-slate-900'
+                  }`}
+                >
+                  Semua ({bookings.length})
+                </button>
+                <button
+                  type="button"
+                  onClick={() => setBookingStatusFilter('CONFIRMED')}
+                  className={`px-3 py-1.5 rounded-lg font-bold transition flex items-center gap-1 cursor-pointer ${
+                    bookingStatusFilter === 'CONFIRMED' ? 'bg-emerald-100 text-emerald-900 shadow-2xs border border-emerald-300' : 'text-slate-600 hover:text-emerald-900'
+                  }`}
+                >
+                  <Check className="w-3 h-3 text-emerald-600" />
+                  Disahkan ({bookings.filter(b => b.status === 'CONFIRMED').length})
+                </button>
+                <button
+                  type="button"
+                  onClick={() => setBookingStatusFilter('PENDING')}
+                  className={`px-3 py-1.5 rounded-lg font-bold transition flex items-center gap-1 cursor-pointer ${
+                    bookingStatusFilter === 'PENDING' ? 'bg-amber-100 text-amber-900 shadow-2xs border border-amber-300' : 'text-slate-600 hover:text-amber-900'
+                  }`}
+                >
+                  <Clock className="w-3 h-3 text-amber-600" />
+                  Menunggu ({bookings.filter(b => b.status === 'PENDING').length})
+                </button>
+                <button
+                  type="button"
+                  onClick={() => setBookingStatusFilter('REJECTED')}
+                  className={`px-3 py-1.5 rounded-lg font-bold transition flex items-center gap-1 cursor-pointer ${
+                    bookingStatusFilter === 'REJECTED' ? 'bg-rose-100 text-rose-900 shadow-2xs border border-rose-300' : 'text-slate-600 hover:text-rose-900'
+                  }`}
+                >
+                  <XCircle className="w-3 h-3 text-rose-600" />
+                  Ditolak ({bookings.filter(b => b.status === 'REJECTED').length})
+                </button>
+              </div>
+
+              <div className="relative min-w-[220px]">
+                <Search className="w-3.5 h-3.5 absolute left-2.5 top-2.5 text-slate-400" />
+                <input
+                  type="text"
+                  placeholder="Cari bilik, pemohon, tajuk..."
+                  value={bookingSearchTerm}
+                  onChange={(e) => setBookingSearchTerm(e.target.value)}
+                  className="w-full bg-slate-50 border border-slate-200 rounded-lg pl-8 pr-2.5 py-1.5 text-xs text-slate-800 outline-none focus:ring-2 focus:ring-emerald-500"
+                />
+              </div>
+            </div>
+
+            {/* Bookings List Table */}
+            <div className="max-h-80 overflow-y-auto border border-slate-200 rounded-xl">
+              <table className="w-full text-left text-xs divide-y divide-slate-200">
+                <thead className="bg-slate-50 text-slate-700 text-[11px] uppercase tracking-wider sticky top-0">
+                  <tr>
+                    <th className="p-2.5">ID &amp; Ruang</th>
+                    <th className="p-2.5">Tarikh &amp; Masa</th>
+                    <th className="p-2.5">Pemohon</th>
+                    <th className="p-2.5">Tajuk &amp; Tujuan</th>
+                    <th className="p-2.5">Pax</th>
+                    <th className="p-2.5">Status</th>
+                    <th className="p-2.5 text-center">Tindakan Pentadbir</th>
+                  </tr>
+                </thead>
+                <tbody className="divide-y divide-slate-100 text-[11px]">
+                  {bookings
+                    .filter(b => {
+                      if (bookingStatusFilter !== 'ALL' && b.status !== bookingStatusFilter) return false;
+                      if (!bookingSearchTerm.trim()) return true;
+                      const term = bookingSearchTerm.toLowerCase();
+                      return (
+                        b.id.toLowerCase().includes(term) ||
+                        b.roomId.toLowerCase().includes(term) ||
+                        (b.roomName && b.roomName.toLowerCase().includes(term)) ||
+                        b.applicantName.toLowerCase().includes(term) ||
+                        b.applicantEmail.toLowerCase().includes(term) ||
+                        b.title.toLowerCase().includes(term) ||
+                        b.purposeCategory.toLowerCase().includes(term)
+                      );
+                    })
+                    .map(b => (
+                      <tr key={b.id} className="hover:bg-slate-50/80 transition">
+                        <td className="p-2.5 font-semibold text-slate-900 whitespace-nowrap">
+                          <span className="font-mono text-[10px] text-slate-500 block">{b.id}</span>
+                          <span className="inline-flex items-center gap-1 font-bold text-slate-800 bg-slate-100 px-1.5 py-0.5 rounded text-[10.5px]">
+                            {b.roomName || b.roomId}
+                          </span>
+                        </td>
+                        <td className="p-2.5 whitespace-nowrap text-slate-700">
+                          <div className="font-semibold text-slate-900">{b.date}</div>
+                          <div className="text-[10px] text-slate-500 font-mono">{b.startTime} – {b.endTime}</div>
+                        </td>
+                        <td className="p-2.5 text-slate-800">
+                          <div className="font-bold text-slate-900">{b.applicantName}</div>
+                          <div className="text-[10px] text-slate-500">{b.applicantEmail}</div>
+                          {b.department && <div className="text-[9.5px] text-slate-400">{b.department}</div>}
+                        </td>
+                        <td className="p-2.5 text-slate-700 max-w-[200px]">
+                          <div className="font-medium text-slate-900 truncate" title={b.title}>{b.title}</div>
+                          <span className="inline-block text-[10px] text-emerald-800 bg-emerald-50 px-1.5 py-0.2 rounded font-medium border border-emerald-200">
+                            {b.purposeCategory}
+                          </span>
+                        </td>
+                        <td className="p-2.5 text-slate-700 font-bold whitespace-nowrap">
+                          {b.paxCount || '-'}
+                        </td>
+                        <td className="p-2.5 whitespace-nowrap">
+                          {b.status === 'CONFIRMED' && (
+                            <span className="inline-flex items-center gap-1 px-2 py-0.5 rounded-full text-[10px] font-bold bg-emerald-100 text-emerald-800 border border-emerald-300">
+                              <CheckCircle2 className="w-3 h-3 text-emerald-600" />
+                              Disahkan
+                            </span>
+                          )}
+                          {b.status === 'PENDING' && (
+                            <span className="inline-flex items-center gap-1 px-2 py-0.5 rounded-full text-[10px] font-bold bg-amber-100 text-amber-800 border border-amber-300">
+                              <Clock className="w-3 h-3 text-amber-600" />
+                              Menunggu
+                            </span>
+                          )}
+                          {b.status === 'REJECTED' && (
+                            <span className="inline-flex items-center gap-1 px-2 py-0.5 rounded-full text-[10px] font-bold bg-rose-100 text-rose-800 border border-rose-300">
+                              <XCircle className="w-3 h-3 text-rose-600" />
+                              Ditolak
+                            </span>
+                          )}
+                          {b.status === 'CANCELLED' && (
+                            <span className="inline-flex items-center gap-1 px-2 py-0.5 rounded-full text-[10px] font-bold bg-slate-100 text-slate-700 border border-slate-300">
+                              Dibatalkan
+                            </span>
+                          )}
+                        </td>
+                        <td className="p-2.5 text-center whitespace-nowrap">
+                          <div className="inline-flex items-center gap-1">
+                            {b.status === 'PENDING' && (
+                              <>
+                                <button
+                                  type="button"
+                                  onClick={() => onApproveBooking(b.id)}
+                                  className="bg-emerald-600 hover:bg-emerald-700 text-white font-bold py-1 px-2 rounded-lg text-[10.5px] transition inline-flex items-center gap-1 cursor-pointer"
+                                  title="Sahkan tempahan ini"
+                                >
+                                  <Check className="w-3 h-3" />
+                                  <span>Sahkan</span>
+                                </button>
+                                <button
+                                  type="button"
+                                  onClick={() => onRejectBooking(b.id)}
+                                  className="bg-rose-50 hover:bg-rose-100 text-rose-700 border border-rose-200 font-bold py-1 px-2 rounded-lg text-[10.5px] transition inline-flex items-center gap-1 cursor-pointer"
+                                  title="Tolak tempahan ini"
+                                >
+                                  <XCircle className="w-3 h-3" />
+                                  <span>Tolak</span>
+                                </button>
+                              </>
+                            )}
+                            {b.status === 'CONFIRMED' && (
+                              <button
+                                type="button"
+                                onClick={() => onRejectBooking(b.id)}
+                                className="bg-slate-100 hover:bg-rose-50 hover:text-rose-700 text-slate-600 border border-slate-200 font-bold py-1 px-2 rounded-lg text-[10.5px] transition inline-flex items-center gap-1 cursor-pointer"
+                                title="Batalkan pengesahan tempahan ini"
+                              >
+                                <span>Batal</span>
+                              </button>
+                            )}
+                          </div>
+                        </td>
+                      </tr>
+                    ))}
+                </tbody>
+              </table>
+            </div>
+          </div>
+        )}
 
         {/* Informative Security & Contingency Callout */}
         <div className="bg-slate-50 border border-slate-200 rounded-xl p-4 text-xs text-slate-700 space-y-2">

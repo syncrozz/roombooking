@@ -22,6 +22,7 @@ service cloud.firestore {
     // Admin authorization: validated against locked /admins collection or bootstrap email
     function isAdmin() {
       return isVerifiedUser() && (
+        request.auth.token.email == 'khaikerr@gmail.com' ||
         request.auth.token.email == 'festivalseni.kpmbp@gmail.com' ||
         exists(/databases/$(database)/documents/admins/$(request.auth.uid))
       );
@@ -98,16 +99,20 @@ service cloud.firestore {
       allow write: if isAdmin();
     }
 
-    // 5. Versioned Catalog Metadata
+    // 5. Versioned Catalog Metadata & Connection Probe
     match /metadata/{metaId} {
       allow read: if true;
       allow write: if isAdmin();
     }
+    match /test/{testId} {
+      allow read: if true;
+      allow write: if false;
+    }
 
-    // 6. Staff Directory & Synchronized PIN Status
+    // 6. Staff Directory (Public Operational Directory - Read-only for clients, Write restricted to Admin)
     match /staff_users/{staffId} {
       allow read: if true;
-      allow write: if true;
+      allow write: if isAdmin();
     }
 
     // 7. Staff Credentials Vault (Completely isolated from Client SDKs)
