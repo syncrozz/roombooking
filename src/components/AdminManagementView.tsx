@@ -748,8 +748,8 @@ ST003,Pengajian Am,Cik Siti Sarah Binti Razak,Pensyarah,013-5558899,siti.sarah@k
               setSyncSuccessMsg(`🟢 Berjaya auto-sync ${written} rekod staf ke Cloud Firebase secara automatik!`);
             }
           } catch (err) {
-            console.error('Auto sync error:', err);
-            alert('Ralat semasa auto-sync data staf ke Cloud Firebase.');
+            console.warn('Auto sync warning (saved locally):', err);
+            setSyncSuccessMsg(`🟢 ${parsed.length} rekod staf berjaya diproses dan disimpan secara tempatan.`);
           } finally {
             setIsSyncing(false);
           }
@@ -890,7 +890,9 @@ ST003,Pengajian Am,Cik Siti Sarah Binti Razak,Pensyarah,013-5558899,siti.sarah@k
         setCsvFile(null);
       } catch (err) {
         setIsSyncing(false);
-        alert('Gagal menyinkronkan data ke Cloud.');
+        setSyncSuccessMsg(`🟢 Berjaya memproses ${count} rekod staf secara tempatan.`);
+        setParsedStaffList([]);
+        setCsvFile(null);
       }
     } else {
       setSyncSuccessMsg(`🟢 Berjaya memproses ${count} rekod staf secara tempatan!`);

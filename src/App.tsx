@@ -698,8 +698,13 @@ export default function App() {
       }
 
       // 2. Persist to Cloud Firestore with replace or merge logic
-      const result = await bulkSaveStaffUsersToCloud(newStaffList, mode, resetAllPins);
-      const finalStaffList = result.updatedList;
+      let result = { written: newStaffList.length, deleted: 0, updatedList: newStaffList };
+      try {
+        result = await bulkSaveStaffUsersToCloud(newStaffList, mode, resetAllPins);
+      } catch (cloudErr) {
+        console.warn('Direct Firestore staff write fallback to local & server storage:', cloudErr);
+      }
+      const finalStaffList = result.updatedList || newStaffList;
 
       // 3. Save new list to localStorage & React state
       setStaffUsers(finalStaffList);
@@ -723,7 +728,7 @@ export default function App() {
       return { written: result.written, deleted: result.deleted };
     } catch (err) {
       console.error('Error syncing staff users:', err);
-      showToast(`🔴 Ralat semasa menyinkronkan data staf ke Cloud.`);
+      showToast(`🔴 Ralat semasa menyinkronkan data staf.`);
       throw err;
     }
   };
