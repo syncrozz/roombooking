@@ -51,6 +51,7 @@ import {
   bulkSaveScheduleToCloud,
   clearAllScheduleFromCloud,
   saveBookingToCloud, 
+  bulkSaveBookingsToCloud,
   deleteBookingFromCloud, 
   saveBlockToCloud, 
   deleteBlockFromCloud,
@@ -817,6 +818,28 @@ export default function App() {
     showToast(`🟢 Data sistem ditetapkan ke Master Data rasmi (Sifar Data Demo).`);
   };
 
+  const handleSyncBookings = async (newBookings: AdHocBooking[], mode: 'merge' | 'replace' = 'replace') => {
+    let finalBookings: AdHocBooking[];
+    if (mode === 'merge') {
+      const existingMap = new Map<string, AdHocBooking>();
+      adhocBookings.forEach(b => existingMap.set(b.id, b));
+      newBookings.forEach(b => existingMap.set(b.id, b));
+      finalBookings = Array.from(existingMap.values());
+    } else {
+      finalBookings = newBookings;
+    }
+    setAdhocBookings(finalBookings);
+    saveStoredAdHocBookings(finalBookings);
+
+    try {
+      await bulkSaveBookingsToCloud(finalBookings);
+      showToast(`🟢 ${newBookings.length} rekod tempahan ad-hoc berjaya dikembalikan & disimpan!`);
+    } catch (err) {
+      console.warn('Error syncing bookings to cloud:', err);
+      showToast(`🟢 ${newBookings.length} rekod tempahan ad-hoc disimpan secara tempatan.`);
+    }
+  };
+
   // Admin Remark & Slot Alignment Handlers
   const handleUpdateAcademicSlot = async (updatedSlot: AcademicScheduleSlot) => {
     const updated = academicSchedule.map(s => s.id === updatedSlot.id ? updatedSlot : s);
@@ -986,6 +1009,8 @@ export default function App() {
               onDeleteBlock={handleDeleteBlock}
               onDeleteBatchBlocks={handleDeleteBatchBlocks}
               onLogoutAdmin={handleLogoutAdmin}
+              onSyncBookings={handleSyncBookings}
+              onNavigateTab={handleSelectTab}
             />
           )}
         </main>

@@ -1156,6 +1156,33 @@ export async function deleteBookingFromCloud(bookingId: string): Promise<void> {
 }
 
 /**
+ * Bulk save multiple bookings to Firestore.
+ */
+export async function bulkSaveBookingsToCloud(
+  bookings: AdHocBooking[]
+): Promise<{ written: number }> {
+  try {
+    const batch = writeBatch(db);
+    let count = 0;
+    for (const b of bookings) {
+      const docRef = doc(db, BOOKINGS_COLLECTION, b.id);
+      batch.set(docRef, sanitizeForFirestore({
+        ...b,
+        idempotencyKey: b.idempotencyKey || generateBookingIdempotencyKey(b),
+        syncStatus: 'synced',
+        syncedAt: new Date().toISOString()
+      }), { merge: true });
+      count++;
+    }
+    await batch.commit();
+    return { written: count };
+  } catch (err) {
+    console.warn('bulkSaveBookingsToCloud fallback:', err);
+    return { written: 0 };
+  }
+}
+
+/**
  * Save or update an institutional block in Firestore.
  */
 export async function saveBlockToCloud(block: InstitutionalBlock): Promise<void> {
