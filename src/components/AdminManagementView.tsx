@@ -12,6 +12,7 @@ import { MASTER_TIMETABLE_CSV, STANDARD_GRID_TEMPLATE_CSV, INITIAL_ROOMS } from 
 import { CloudSyncModal } from './CloudSyncModal';
 import { updateStaffPinInCloud, resetStaffPinInCloud, getDirectFirestoreRoomsCount } from '../lib/firebase';
 import { getStoredRooms } from '../utils/storage';
+import { ensureBookbkPrefix } from '../utils/downloadHelper';
 import { WhatsAppIcon } from './WhatsAppIcon';
 import { 
   ShieldCheck, 
@@ -461,7 +462,7 @@ export const AdminManagementView: React.FC<AdminManagementViewProps> = ({
     const url = URL.createObjectURL(blob);
     const link = document.createElement('a');
     link.setAttribute('href', url);
-    link.setAttribute('download', 'kpmbp_jadual_perkara_hari_template.csv');
+    link.setAttribute('download', ensureBookbkPrefix('kpmbp_jadual_perkara_hari_template.csv'));
     document.body.appendChild(link);
     link.click();
     document.body.removeChild(link);
@@ -474,7 +475,7 @@ export const AdminManagementView: React.FC<AdminManagementViewProps> = ({
     const url = URL.createObjectURL(blob);
     const link = document.createElement('a');
     link.setAttribute('href', url);
-    link.setAttribute('download', 'jadual_waktu_kolej_master_template.csv');
+    link.setAttribute('download', ensureBookbkPrefix('jadual_waktu_kolej_master_template.csv'));
     document.body.appendChild(link);
     link.click();
     document.body.removeChild(link);
@@ -491,7 +492,7 @@ export const AdminManagementView: React.FC<AdminManagementViewProps> = ({
     const url = URL.createObjectURL(blob);
     const link = document.createElement('a');
     link.setAttribute('href', url);
-    link.setAttribute('download', `kpmbp_jadual_rasmi_terkini_${new Date().toISOString().slice(0, 10)}.csv`);
+    link.setAttribute('download', ensureBookbkPrefix(`kpmbp_jadual_rasmi_terkini_${new Date().toISOString().slice(0, 10)}.csv`));
     document.body.appendChild(link);
     link.click();
     document.body.removeChild(link);
@@ -609,7 +610,7 @@ ST003,Pengajian Am,Cik Siti Sarah Binti Razak,Pensyarah,013-5558899,siti.sarah@k
     const url = URL.createObjectURL(blob);
     const link = document.createElement('a');
     link.setAttribute('href', url);
-    link.setAttribute('download', 'kpmbp_staf_template.csv');
+    link.setAttribute('download', ensureBookbkPrefix('kpmbp_staf_template.csv'));
     document.body.appendChild(link);
     link.click();
     document.body.removeChild(link);
@@ -626,7 +627,7 @@ ST003,Pengajian Am,Cik Siti Sarah Binti Razak,Pensyarah,013-5558899,siti.sarah@k
     const url = URL.createObjectURL(blob);
     const link = document.createElement('a');
     link.setAttribute('href', url);
-    link.setAttribute('download', `kpmbp_senarai_staf_${new Date().toISOString().split('T')[0]}.csv`);
+    link.setAttribute('download', ensureBookbkPrefix(`kpmbp_senarai_staf_${new Date().toISOString().split('T')[0]}.csv`));
     document.body.appendChild(link);
     link.click();
     document.body.removeChild(link);

@@ -16,6 +16,7 @@ import {
   TimeSlotPeriod,
   validateBookingTime
 } from './timeSlots';
+import { ensureBookbkPrefix } from './downloadHelper';
 
 export { parseTimeMinutes };
 
@@ -340,7 +341,7 @@ export function exportBookingsToCSV(
   const link = document.createElement('a');
   link.setAttribute('href', url);
   const dateStr = new Date().toISOString().split('T')[0];
-  const filename = `${filenamePrefix}_${dateStr}.csv`;
+  const filename = ensureBookbkPrefix(`${filenamePrefix}_${dateStr}.csv`);
   link.setAttribute('download', filename);
   document.body.appendChild(link);
   link.click();

@@ -1,5 +1,6 @@
 import { Room, RoomCategory } from '../types';
 import { formatLevel } from './storage';
+import { ensureBookbkPrefix } from './downloadHelper';
 
 export const ROOMS_CSV_HEADERS = [
   'id',
@@ -119,7 +120,7 @@ export function exportRoomsToCSV(rooms: Room[]): { success: boolean; filename: s
   const link = document.createElement('a');
   link.setAttribute('href', url);
   const dateStr = new Date().toISOString().split('T')[0];
-  const filename = `kpmbp_direktori_ruang_${dateStr}.csv`;
+  const filename = ensureBookbkPrefix(`kpmbp_direktori_ruang_${dateStr}.csv`);
   link.setAttribute('download', filename);
   document.body.appendChild(link);
   link.click();
@@ -137,7 +138,7 @@ export function downloadRoomsCSVTemplate(): void {
   const url = URL.createObjectURL(blob);
   const link = document.createElement('a');
   link.setAttribute('href', url);
-  link.setAttribute('download', 'kpmbp_direktori_ruang_template.csv');
+  link.setAttribute('download', ensureBookbkPrefix('kpmbp_direktori_ruang_template.csv'));
   document.body.appendChild(link);
   link.click();
   document.body.removeChild(link);

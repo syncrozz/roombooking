@@ -3,6 +3,7 @@ import { AcademicScheduleSlot, Room, DayOfWeek } from '../types';
 import { MALAY_DAYS } from '../utils/availabilityEngine';
 import { exportTimetableToStandardGridCSV } from '../utils/timetableCsvParser';
 import { parseTimeMinutes } from '../utils/timeSlots';
+import { ensureBookbkPrefix } from '../utils/downloadHelper';
 import { 
   BookOpen, 
   Search, 
@@ -43,7 +44,7 @@ export const AcademicScheduleView: React.FC<AcademicScheduleViewProps> = ({
     const url = URL.createObjectURL(blob);
     const link = document.createElement('a');
     link.setAttribute('href', url);
-    link.setAttribute('download', `jadual_akademik_rasmi_${new Date().toISOString().slice(0, 10)}.csv`);
+    link.setAttribute('download', ensureBookbkPrefix(`jadual_akademik_rasmi_${new Date().toISOString().slice(0, 10)}.csv`));
     document.body.appendChild(link);
     link.click();
     document.body.removeChild(link);

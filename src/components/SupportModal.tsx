@@ -8,6 +8,7 @@ import {
   Smartphone,
   ExternalLink
 } from 'lucide-react';
+import { ensureBookbkPrefix } from '../utils/downloadHelper';
 
 interface SupportModalProps {
   isOpen: boolean;
@@ -46,7 +47,7 @@ export const SupportModal: React.FC<SupportModalProps> = ({ isOpen, onClose }) =
       const blobUrl = window.URL.createObjectURL(blob);
       const link = document.createElement('a');
       link.href = blobUrl;
-      link.download = 'QR-Sumbangan-Syncrozz.jpg';
+      link.download = ensureBookbkPrefix('QR-Sumbangan-Syncrozz.jpg');
       document.body.appendChild(link);
       link.click();
       document.body.removeChild(link);
@@ -60,7 +61,7 @@ export const SupportModal: React.FC<SupportModalProps> = ({ isOpen, onClose }) =
         link.href = LOCKED_QR_URL;
         link.target = '_blank';
         link.rel = 'noopener noreferrer';
-        link.download = 'QR-Sumbangan-Syncrozz.jpg';
+        link.download = ensureBookbkPrefix('QR-Sumbangan-Syncrozz.jpg');
         document.body.appendChild(link);
         link.click();
         document.body.removeChild(link);
