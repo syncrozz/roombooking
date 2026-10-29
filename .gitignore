@@ -6,3 +6,11 @@ coverage/
 *.log
 .env*
 !.env.example
+
+# Sensitive Server-Side Credential Vault & Auth Files
+server/data/
+*.vault.json
+staff-credentials-vault.json
+*credentials*.json
+serviceAccountKey.json
+

@@ -45,7 +45,7 @@ const app = !getApps().length ? initializeApp(firebaseConfig) : getApp();
 
 export const auth = getAuth(app);
 
-const USE_SERVER_AUTH = false;
+const USE_SERVER_AUTH = true;
 
 // Suppress Firestore internal diagnostic log warnings to prevent transient connection retry notifications
 try {
@@ -774,24 +774,55 @@ export async function updateStaffPinInCloud(
 }
 
 /**
+ * Pengesahan PIN Pentadbir secara Server-Side yang Selamat.
+ * Tidak menyimpan sebarang PIN, kata laluan atau rahsia di sisi klien (fail awam atau localStorage).
+ */
+export async function verifyAdminPin(pin: string): Promise<{ success: boolean; errorMsg?: string; isLocked?: boolean }> {
+  const cleanPin = pin.trim();
+  if (!cleanPin) {
+    return { success: false, errorMsg: 'Sila masukkan PIN Pentadbir.' };
+  }
+  try {
+    const res = await fetch('/api/auth/admin-verify', {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({ pin: cleanPin }),
+    });
+    const data = await res.json().catch(() => ({}));
+    if (res.ok && data.success) {
+      return { success: true };
+    }
+    return {
+      success: false,
+      errorMsg: data.errorMsg || 'PIN / Passcode Keselamatan Pentadbir Tidak Sah.',
+      isLocked: data.isLocked || res.status === 429,
+    };
+  } catch {
+    return { success: false, errorMsg: 'Ralat sambungan ke pelayan keselamatan pentadbir.' };
+  }
+}
+
+/**
  * Reset Staff PIN back to default 1234 via admin authorization.
  * Seamlessly updates server vault and resets pinStatus in staff_users directory.
+ * Authorization is strictly performed by the secure server endpoint.
  */
 export async function resetStaffPinInCloud(
   staffId: string,
   adminPasscode: string
 ): Promise<{ success: boolean; errorMsg?: string }> {
-  if (adminPasscode !== '5313') {
-    throw new Error('Passcode pentadbir tidak sah.');
+  const cleanPasscode = (adminPasscode || '').trim();
+  if (!cleanPasscode) {
+    throw new Error('Passcode pentadbir diperlukan.');
   }
 
-  // 1. Try server-side reset if API endpoint is hosted
-  if (USE_SERVER_AUTH && typeof window !== 'undefined' && typeof fetch !== 'undefined') {
+  // 1. Server-side reset: verified by server-side vault (no client-side hardcoded secrets)
+  if (typeof window !== 'undefined' && typeof fetch !== 'undefined') {
     try {
       const response = await fetch('/api/auth/staff-reset-pin', {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({ staffId, adminPasscode }),
+        body: JSON.stringify({ staffId, adminPasscode: cleanPasscode }),
       });
 
       if (response.status === 404) {
@@ -803,7 +834,7 @@ export async function resetStaffPinInCloud(
         }
       }
     } catch (err: any) {
-      if (err?.message && err.message.includes('ditolak')) {
+      if (err?.message && (err.message.includes('ditolak') || err.message.includes('Akses'))) {
         throw err;
       }
       console.warn('[Staff Auth] Sambungan ke pelayan auth gagal:', err);

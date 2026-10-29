@@ -7,6 +7,7 @@ import {
   RoomCategory,
   PurposeCategory 
 } from '../types';
+import { verifyAdminPin } from '../lib/firebase';
 import { 
   checkRoomAvailability, 
   formatDateMalay, 
@@ -169,9 +170,15 @@ export const RoomAvailabilityMatrix: React.FC<RoomAvailabilityMatrixProps> = ({
     setRemarkSuccessMsg(null);
   };
 
-  const handleVerifyAdminPinForEdit = (e: React.FormEvent) => {
+  const handleVerifyAdminPinForEdit = async (e: React.FormEvent) => {
     e.preventDefault();
-    if (adminPinInput.trim() === '5313') {
+    const cleanPin = adminPinInput.trim();
+    if (!cleanPin) {
+      setAdminPinError('Sila masukkan PIN Pentadbir.');
+      return;
+    }
+    const res = await verifyAdminPin(cleanPin);
+    if (res.success) {
       if (onAdminUnlock) {
         onAdminUnlock();
       }
@@ -180,7 +187,7 @@ export const RoomAvailabilityMatrix: React.FC<RoomAvailabilityMatrixProps> = ({
       setAdminPinInput('');
       setAdminPinError(null);
     } else {
-      setAdminPinError('PIN Pentadbir tidak sah (Sila gunakan 5313).');
+      setAdminPinError(res.errorMsg || 'PIN Pentadbir tidak sah.');
     }
   };
 
@@ -705,14 +712,14 @@ export const RoomAvailabilityMatrix: React.FC<RoomAvailabilityMatrixProps> = ({
                     <span>Akses Pentadbir Diperlukan untuk Ubah Remark</span>
                   </div>
                   <p className="text-[11px] text-amber-800">
-                    Sila masukkan PIN Pentadbir (5313) untuk mengaktifkan kebenaran menyunting remark:
+                    Sila masukkan PIN Pentadbir untuk mengaktifkan kebenaran menyunting catatan:
                   </p>
                   <div className="flex gap-2">
                     <input
                       type="password"
                       inputMode="numeric"
                       maxLength={8}
-                      placeholder="PIN Pentadbir (5313)"
+                      placeholder="PIN Pentadbir"
                       value={adminPinInput}
                       onChange={(e) => {
                         setAdminPinInput(e.target.value);

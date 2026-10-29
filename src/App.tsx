@@ -68,7 +68,8 @@ import {
   ConnectionStatusState,
   syncPendingBookingsQueue,
   saveScheduleSlotToCloud,
-  refreshStaffUsersFromCloud
+  refreshStaffUsersFromCloud,
+  verifyAdminPin
 } from './lib/firebase';
 import { INITIAL_STAFF_DATA } from './data/staffData';
 
@@ -85,6 +86,7 @@ import { QRCodeModal } from './components/QRCodeModal';
 import { SupportModal } from './components/SupportModal';
 import { SetPinModal } from './components/SetPinModal';
 import { OfflineFallbackBanner } from './components/OfflineFallbackBanner';
+import { APP_VERSION_LABEL } from './config/version';
 
 import { Building2, Shield, Heart, Sparkles, CheckCircle2, Lock, X, KeyRound, ShieldCheck, AlertCircle, AlertTriangle } from 'lucide-react';
 
@@ -138,9 +140,15 @@ export default function App() {
     }
   };
 
-  const handleVerifyAdminPin = (e: React.FormEvent) => {
+  const handleVerifyAdminPin = async (e: React.FormEvent) => {
     e.preventDefault();
-    if (adminPinInput.trim() === '5313') {
+    const cleanPin = adminPinInput.trim();
+    if (!cleanPin) {
+      setAdminPinError('Sila masukkan PIN / Passcode Pentadbir.');
+      return;
+    }
+    const res = await verifyAdminPin(cleanPin);
+    if (res.success) {
       setIsAdminUnlocked(true);
       if (typeof window !== 'undefined') {
         sessionStorage.setItem('kpmbp_admin_unlocked', 'true');
@@ -153,7 +161,7 @@ export default function App() {
       setAdminPinError(null);
       showToast('🟢 Akses Pentadbir Disahkan.');
     } else {
-      setAdminPinError('PIN / Passcode Keselamatan Pentadbir Tidak Sah.');
+      setAdminPinError(res.errorMsg || 'PIN / Passcode Keselamatan Pentadbir Tidak Sah.');
     }
   };
 
@@ -1150,6 +1158,19 @@ export default function App() {
                 />
               </a>
             </div>
+
+            {/* Penanda Versi Keluaran */}
+            <div className="flex items-center justify-center">
+              <span
+                id="footer-version-tag"
+                className="inline-flex items-center gap-1.5 px-2.5 py-0.5 rounded-full bg-slate-800/90 border border-slate-700/60 text-slate-300 text-[11px] font-medium tracking-tight shadow-xs select-none"
+                title={`Keluaran Semasa: ${APP_VERSION_LABEL}`}
+              >
+                <span className="w-1.5 h-1.5 rounded-full bg-emerald-400 shrink-0"></span>
+                <span>{APP_VERSION_LABEL}</span>
+              </span>
+            </div>
+
             <div>
               <button
                 type="button"

@@ -234,7 +234,8 @@ interface StaffCredentialRecord {
   updatedAt: string;
 }
 
-export const VAULT_STORAGE_PATH = path.resolve(process.cwd(), 'src/data/staff-credentials-vault.json');
+export const VAULT_STORAGE_PATH = process.env.STAFF_VAULT_PATH || path.resolve(process.cwd(), 'server/data/staff-credentials-vault.json');
+export const LEGACY_VAULT_STORAGE_PATH = path.resolve(process.cwd(), 'src/data/staff-credentials-vault.json');
 
 export class StaffCredentialsVault {
   private vault = new Map<string, StaffCredentialRecord>();
@@ -266,11 +267,17 @@ export class StaffCredentialsVault {
   /**
    * Loads saved persistent custom credentials from disk so they survive
    * server restarts, container cold boots, and code updates.
+   * Loads from server/data/ and automatically migrates legacy src/data/ if present.
    */
   public loadPersistentVault(): void {
     try {
-      if (fs.existsSync(VAULT_STORAGE_PATH)) {
-        const raw = fs.readFileSync(VAULT_STORAGE_PATH, 'utf-8');
+      let targetPath = VAULT_STORAGE_PATH;
+      if (!fs.existsSync(targetPath) && fs.existsSync(LEGACY_VAULT_STORAGE_PATH)) {
+        targetPath = LEGACY_VAULT_STORAGE_PATH;
+      }
+
+      if (fs.existsSync(targetPath)) {
+        const raw = fs.readFileSync(targetPath, 'utf-8');
         const data = JSON.parse(raw);
         if (Array.isArray(data)) {
           for (const item of data) {
@@ -278,6 +285,14 @@ export class StaffCredentialsVault {
               this.vault.set(item.staffId.toLowerCase(), item);
             }
           }
+        }
+
+        // If loaded from legacy path, persist to new server/data/ path and clean up legacy
+        if (targetPath === LEGACY_VAULT_STORAGE_PATH && targetPath !== VAULT_STORAGE_PATH) {
+          this.savePersistentVault();
+          try {
+            fs.unlinkSync(LEGACY_VAULT_STORAGE_PATH);
+          } catch {}
         }
       }
     } catch (err) {
@@ -703,7 +718,8 @@ export class StaffCredentialsVault {
 
     // Authentication / Authorization Check
     if (!skipAuth) {
-      const isAdmin = adminPasscode === '5313';
+      const MASTER_ADMIN_PASSCODE = process.env.ADMIN_PASSCODE || process.env.ADMIN_PIN || '5313';
+      const isAdmin = typeof adminPasscode === 'string' && adminPasscode.trim() === MASTER_ADMIN_PASSCODE;
       if (!isAdmin) {
         if (!currentPin) {
           return { success: false, errorMsg: 'PIN semasa atau Passcode Pentadbir diperlukan untuk pengesahan.' };
@@ -791,7 +807,8 @@ export class StaffCredentialsVault {
       };
     }
 
-    if (!skipAuth && adminPasscode !== '5313') {
+    const MASTER_ADMIN_PASSCODE = process.env.ADMIN_PASSCODE || process.env.ADMIN_PIN || '5313';
+    if (!skipAuth && (typeof adminPasscode !== 'string' || adminPasscode.trim() !== MASTER_ADMIN_PASSCODE)) {
       this.rateLimiter.recordFailure(rateKey);
       return { success: false, errorMsg: 'Akses dinafikan: Passcode Pentadbir diperlukan atau tidak sah.' };
     }

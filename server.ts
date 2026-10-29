@@ -130,6 +130,53 @@ async function startServer() {
     }
   });
 
+  // Secure Server-Side Admin PIN Verification Endpoint (Protected by Server-Side Rate Limiter)
+  app.post('/api/auth/admin-verify', async (req, res) => {
+    try {
+      const { pin } = req.body || {};
+      const clientIp = (req.headers['x-forwarded-for'] as string) || req.socket.remoteAddress || '127.0.0.1';
+      const cleanPin = typeof pin === 'string' ? pin.trim() : '';
+
+      if (!cleanPin) {
+        return res.status(400).json({ success: false, errorMsg: 'PIN Pentadbir diperlukan.' });
+      }
+
+      const rateKey = `admin_verify_${clientIp}`;
+      const rateLimitCheck = serverAuthVault.rateLimiter.checkLimit(rateKey);
+      if (!rateLimitCheck.allowed) {
+        return res.status(429).json({
+          success: false,
+          isLocked: true,
+          errorMsg: `Akses pentadbir dikunci sementara kerana melebihi had cubaan. Sila cuba lagi selepas ${rateLimitCheck.remainingLockoutSeconds} saat.`,
+        });
+      }
+
+      const MASTER_ADMIN_PASSCODE = process.env.ADMIN_PASSCODE || process.env.ADMIN_PIN || '5313';
+      if (cleanPin === MASTER_ADMIN_PASSCODE) {
+        serverAuthVault.rateLimiter.reset(rateKey);
+        return res.status(200).json({ success: true, message: 'Akses Pentadbir disahkan.' });
+      }
+
+      const fail = serverAuthVault.rateLimiter.recordFailure(rateKey);
+      if (fail.locked) {
+        return res.status(429).json({
+          success: false,
+          isLocked: true,
+          errorMsg: `Akses pentadbir dikunci sementara kerana melebihi had cubaan. Sila cuba lagi selepas ${fail.remainingLockoutSeconds} saat.`,
+        });
+      }
+
+      return res.status(401).json({
+        success: false,
+        errorMsg: 'PIN / Passcode Keselamatan Pentadbir Tidak Sah.',
+        remainingAttempts: fail.attemptsLeft,
+      });
+    } catch (err) {
+      console.error('Error during admin PIN verification:', err);
+      return res.status(500).json({ success: false, errorMsg: 'Ralat pelayan dalaman.' });
+    }
+  });
+
   // Secure Server-Side Staff Unlock Endpoint (Unlocks 15-min rate limit lock)
   app.post('/api/auth/staff-unlock', async (req, res) => {
     try {
@@ -140,7 +187,8 @@ async function startServer() {
         return res.status(400).json({ success: false, errorMsg: 'staffId diperlukan.' });
       }
 
-      if ((adminPasscode || headerPasscode) !== '5313') {
+      const MASTER_ADMIN_PASSCODE = process.env.ADMIN_PASSCODE || process.env.ADMIN_PIN || '5313';
+      if ((adminPasscode || headerPasscode) !== MASTER_ADMIN_PASSCODE) {
         return res.status(403).json({ success: false, errorMsg: 'Passcode Pentadbir diperlukan.' });
       }
 

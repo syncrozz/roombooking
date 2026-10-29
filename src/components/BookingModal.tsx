@@ -30,7 +30,7 @@ import {
 } from '../utils/storage';
 import { generateBookingIdempotencyKey } from '../utils/idempotency';
 import { matchStaffByEmail } from '../utils/staff-matcher';
-import { verifyStaffCredentials, setStaffSessionPin, getStaffSessionPin } from '../lib/firebase';
+import { verifyStaffCredentials, setStaffSessionPin, getStaffSessionPin, verifyAdminPin } from '../lib/firebase';
 import { INITIAL_STAFF_DATA } from '../data/staffData';
 import { ForgotPinHelp } from './ForgotPinHelp';
 import { 
@@ -284,12 +284,18 @@ export const BookingModal: React.FC<BookingModalProps> = ({
     }
   };
 
-  const handleVerifyAdminPasscode = () => {
-    if (adminPasscodeInput.trim() === '5313') {
+  const handleVerifyAdminPasscode = async () => {
+    const cleanPasscode = adminPasscodeInput.trim();
+    if (!cleanPasscode) {
+      setVerificationError('Sila masukkan Passcode Pentadbir.');
+      return;
+    }
+    const res = await verifyAdminPin(cleanPasscode);
+    if (res.success) {
       setIsAdminAuthenticated(true);
       setVerificationError(null);
     } else {
-      setVerificationError('Passcode Pentadbir tidak sah.');
+      setVerificationError(res.errorMsg || 'Passcode Pentadbir tidak sah.');
     }
   };
 
@@ -444,10 +450,11 @@ export const BookingModal: React.FC<BookingModalProps> = ({
     if (isAdminBooking) {
       // 1. Verify Admin Access
       if (!isAdminAuthenticated) {
-        if (adminPasscodeInput.trim() === '5313') {
+        const verifyRes = await verifyAdminPin(adminPasscodeInput.trim());
+        if (verifyRes.success) {
           setIsAdminAuthenticated(true);
         } else {
-          setVerificationError('Sila masukkan Passcode Pentadbir yang sah untuk mengesahkan tempahan.');
+          setVerificationError(verifyRes.errorMsg || 'Sila masukkan Passcode Pentadbir yang sah untuk mengesahkan tempahan.');
           return;
         }
       }
