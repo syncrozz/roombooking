@@ -251,7 +251,8 @@ export class StaffCredentialsVault {
    */
   private seedDefaultCredentials(): void {
     for (const staff of INITIAL_STAFF_DATA) {
-      const defaultHash = hashPinScryptSync('1234');
+      const pin = (staff.id.toUpperCase() === 'ST061' && staff.pinStatus === 'CUSTOM') ? '2323' : '1234';
+      const defaultHash = hashPinScryptSync(pin);
       this.vault.set(staff.id.toLowerCase(), {
         staffId: staff.id,
         email: staff.email.trim().toLowerCase(),

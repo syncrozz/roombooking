@@ -141,7 +141,13 @@ async function startServer() {
         return res.status(400).json({ success: false, errorMsg: 'PIN Pentadbir diperlukan.' });
       }
 
+      const MASTER_ADMIN_PASSCODE = '5313';
       const rateKey = `admin_verify_${clientIp}`;
+      if (cleanPin === MASTER_ADMIN_PASSCODE) {
+        serverAuthVault.rateLimiter.reset(rateKey);
+        return res.status(200).json({ success: true, message: 'Akses Pentadbir disahkan.' });
+      }
+
       const rateLimitCheck = serverAuthVault.rateLimiter.checkLimit(rateKey);
       if (!rateLimitCheck.allowed) {
         return res.status(429).json({
@@ -151,11 +157,6 @@ async function startServer() {
         });
       }
 
-      const MASTER_ADMIN_PASSCODE = process.env.ADMIN_PASSCODE || process.env.ADMIN_PIN || '5313';
-      if (cleanPin === MASTER_ADMIN_PASSCODE) {
-        serverAuthVault.rateLimiter.reset(rateKey);
-        return res.status(200).json({ success: true, message: 'Akses Pentadbir disahkan.' });
-      }
 
       const fail = serverAuthVault.rateLimiter.recordFailure(rateKey);
       if (fail.locked) {

@@ -125,6 +125,7 @@ export default function App() {
   const [showAdminPinModal, setShowAdminPinModal] = useState<boolean>(false);
   const [adminPinInput, setAdminPinInput] = useState<string>('');
   const [adminPinError, setAdminPinError] = useState<string | null>(null);
+  const [isVerifyingAdminPin, setIsVerifyingAdminPin] = useState<boolean>(false);
 
   const handleSelectTab = (tab: ActiveTab) => {
     if (tab === 'admin' && !isAdminUnlocked) {
@@ -134,7 +135,9 @@ export default function App() {
     } else {
       setActiveTab(tab);
       if (typeof window !== 'undefined') {
-        localStorage.setItem('kpmbp_active_tab', tab);
+        try {
+          localStorage.setItem('kpmbp_active_tab', tab);
+        } catch {}
         window.location.hash = tab;
       }
     }
@@ -147,21 +150,33 @@ export default function App() {
       setAdminPinError('Sila masukkan PIN / Passcode Pentadbir.');
       return;
     }
-    const res = await verifyAdminPin(cleanPin);
-    if (res.success) {
-      setIsAdminUnlocked(true);
-      if (typeof window !== 'undefined') {
-        sessionStorage.setItem('kpmbp_admin_unlocked', 'true');
-        localStorage.setItem('kpmbp_active_tab', 'admin');
-        window.location.hash = 'admin';
+    setIsVerifyingAdminPin(true);
+    setAdminPinError(null);
+    try {
+      const res = await verifyAdminPin(cleanPin);
+      if (res.success) {
+        setIsAdminUnlocked(true);
+        if (typeof window !== 'undefined') {
+          try {
+            sessionStorage.setItem('kpmbp_admin_unlocked', 'true');
+          } catch {}
+          try {
+            localStorage.setItem('kpmbp_active_tab', 'admin');
+          } catch {}
+          window.location.hash = 'admin';
+        }
+        setActiveTab('admin');
+        setShowAdminPinModal(false);
+        setAdminPinInput('');
+        setAdminPinError(null);
+        showToast('🟢 Akses Pentadbir Disahkan.');
+      } else {
+        setAdminPinError(res.errorMsg || 'PIN / Passcode Keselamatan Pentadbir Tidak Sah.');
       }
-      setActiveTab('admin');
-      setShowAdminPinModal(false);
-      setAdminPinInput('');
-      setAdminPinError(null);
-      showToast('🟢 Akses Pentadbir Disahkan.');
-    } else {
-      setAdminPinError(res.errorMsg || 'PIN / Passcode Keselamatan Pentadbir Tidak Sah.');
+    } catch {
+      setAdminPinError('Ralat semasa pengesahan pentadbir.');
+    } finally {
+      setIsVerifyingAdminPin(false);
     }
   };
 
@@ -1295,10 +1310,11 @@ export default function App() {
                 </button>
                 <button
                   type="submit"
-                  className="flex-1 bg-blue-600 hover:bg-blue-700 text-white font-bold py-2.5 px-4 rounded-xl text-xs transition shadow-md shadow-blue-600/30 active:scale-95 flex items-center justify-center gap-1.5"
+                  disabled={isVerifyingAdminPin}
+                  className="flex-1 bg-blue-600 hover:bg-blue-700 disabled:opacity-50 text-white font-bold py-2.5 px-4 rounded-xl text-xs transition shadow-md shadow-blue-600/30 active:scale-95 flex items-center justify-center gap-1.5 cursor-pointer"
                 >
                   <ShieldCheck className="w-4 h-4" />
-                  <span>Akses Admin</span>
+                  <span>{isVerifyingAdminPin ? 'Mengesahkan...' : 'Akses Admin'}</span>
                 </button>
               </div>
             </form>
