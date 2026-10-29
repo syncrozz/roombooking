@@ -141,13 +141,16 @@ async function startServer() {
         return res.status(400).json({ success: false, errorMsg: 'PIN Pentadbir diperlukan.' });
       }
 
-      const MASTER_ADMIN_PASSCODE = '5313';
+      const MASTER_ADMIN_PASSCODE = process.env.ADMIN_PASSCODE || process.env.ADMIN_PIN || '5313';
       const rateKey = `admin_verify_${clientIp}`;
+
+      // 1. Correct master admin passcode always succeeds and unlocks any previous rate lockouts
       if (cleanPin === MASTER_ADMIN_PASSCODE) {
         serverAuthVault.rateLimiter.reset(rateKey);
         return res.status(200).json({ success: true, message: 'Akses Pentadbir disahkan.' });
       }
 
+      // 2. For incorrect attempts, check and record rate limits
       const rateLimitCheck = serverAuthVault.rateLimiter.checkLimit(rateKey);
       if (!rateLimitCheck.allowed) {
         return res.status(429).json({
@@ -156,7 +159,6 @@ async function startServer() {
           errorMsg: `Akses pentadbir dikunci sementara kerana melebihi had cubaan. Sila cuba lagi selepas ${rateLimitCheck.remainingLockoutSeconds} saat.`,
         });
       }
-
 
       const fail = serverAuthVault.rateLimiter.recordFailure(rateKey);
       if (fail.locked) {
