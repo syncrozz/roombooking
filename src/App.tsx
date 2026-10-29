@@ -120,6 +120,22 @@ export default function App() {
   });
 
   const [isSupportOpen, setIsSupportOpen] = useState<boolean>(false);
+  const [liveVersionLabel, setLiveVersionLabel] = useState<string>(APP_VERSION_LABEL);
+
+  useEffect(() => {
+    let isMounted = true;
+    fetch('/api/version')
+      .then((res) => res.json())
+      .then((data) => {
+        if (isMounted && data?.label) {
+          setLiveVersionLabel(data.label);
+        }
+      })
+      .catch(() => {});
+    return () => {
+      isMounted = false;
+    };
+  }, []);
 
   // Admin PIN verification state
   const [showAdminPinModal, setShowAdminPinModal] = useState<boolean>(false);
@@ -1179,10 +1195,10 @@ export default function App() {
               <span
                 id="footer-version-tag"
                 className="inline-flex items-center gap-1.5 px-2.5 py-0.5 rounded-full bg-slate-800/90 border border-slate-700/60 text-slate-300 text-[11px] font-medium tracking-tight shadow-xs select-none"
-                title={`Keluaran Semasa: ${APP_VERSION_LABEL}`}
+                title={`Keluaran Semasa: ${liveVersionLabel}`}
               >
                 <span className="w-1.5 h-1.5 rounded-full bg-emerald-400 shrink-0"></span>
-                <span>{APP_VERSION_LABEL}</span>
+                <span>{liveVersionLabel}</span>
               </span>
             </div>
 

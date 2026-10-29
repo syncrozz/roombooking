@@ -5,6 +5,9 @@ import { execSync } from 'child_process';
 import { defineConfig } from 'vite';
 
 function getGitRemarkVersion(): string {
+  if (process.env.VITE_APP_VERSION) return process.env.VITE_APP_VERSION.trim();
+  if (process.env.APP_VERSION) return process.env.APP_VERSION.trim();
+
   try {
     const commitMsg = execSync('git log -1 --pretty=%B', {
       encoding: 'utf-8',
@@ -12,8 +15,8 @@ function getGitRemarkVersion(): string {
     }).trim();
 
     if (commitMsg) {
-      const match = commitMsg.match(/adjustment\s+([0-9]{1,2}\.[0-9]{1,2}(?:\s+[vV][0-9]+)?)/i) ||
-                    commitMsg.match(/(?:versi|version)\s+([0-9]{1,2}\.[0-9]{1,2}(?:\s+[vV][0-9]+)?)/i);
+      const match = commitMsg.match(/(?:adjustment|versi|version|release|tag)\s+([0-9]{1,2}\.[0-9]{1,2}(?:\s+[vV][0-9]+)?)/i) ||
+                    commitMsg.match(/([0-9]{1,2}\.[0-9]{1,2}\s+[vV][0-9]+)/i);
       if (match && match[1]) {
         return match[1].trim();
       }
