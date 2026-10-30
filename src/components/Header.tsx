@@ -3,6 +3,7 @@ import { LoginUserCard } from './LoginUserCard';
 import { CloudSyncModal } from './CloudSyncModal';
 import { StaffUser } from '../types';
 import { getStoredActiveUser, clearActiveUser, subscribeToActiveUser } from '../utils/storage';
+import { APP_VERSION_LABEL } from '../config/version';
 import { 
   Menu,
   X,
@@ -89,13 +90,21 @@ export const Header: React.FC<HeaderProps> = ({
                   className="w-full h-full object-contain p-0.5"
                 />
               </div>
-              <div className="leading-tight">
+              <div className="flex items-center gap-2 leading-tight">
                 <span className="font-bold text-base tracking-tight">
                   <span className="text-white">Book</span>
                   <span className="text-blue-400">BK</span>
                 </span>
-                <span className="hidden sm:inline-block ml-2 text-[10px] font-semibold uppercase tracking-wider px-1.5 py-0.5 bg-slate-800 text-blue-300 rounded border border-slate-700">
+                <span className="hidden sm:inline-block text-[10px] font-semibold uppercase tracking-wider px-1.5 py-0.5 bg-slate-800 text-blue-300 rounded border border-slate-700">
                   KPMBP
+                </span>
+                <span
+                  id="header-version-tag"
+                  className="inline-flex items-center gap-1.5 text-[11px] font-mono tabular-nums text-slate-400 tracking-tight px-1.5 py-0.5 rounded bg-slate-800/80 border border-slate-700/60 select-none shadow-xs"
+                  title={`Versi Platform: ${APP_VERSION_LABEL}`}
+                >
+                  <span className="w-1.5 h-1.5 rounded-full bg-emerald-400 shrink-0"></span>
+                  <span>{APP_VERSION_LABEL}</span>
                 </span>
               </div>
             </button>

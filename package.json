@@ -6,9 +6,7 @@
   "scripts": {
     "dev": "tsx server.ts",
     "start": "node server.ts",
-    "prebuild": "node scripts/sync-version.js",
     "build": "vite build",
-    "sync-version": "node scripts/sync-version.js",
     "preview": "vite preview",
     "clean": "rm -rf dist",
     "lint": "tsc --noEmit",
