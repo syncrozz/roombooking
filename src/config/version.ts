@@ -3,19 +3,13 @@
  * SPDX-License-Identifier: Apache-2.0
  */
 
-declare const __APP_VERSION__: string | undefined;
-
 /**
- * Konfigurasi Versi Keluaran Aplikasi (Bundled Release Version)
- * Nilai dibundel semasa build mengikut masa commit Git terakhir (format v{DD}.{MM}.{HHmm} waktu Malaysia UTC+8).
- * Jika __APP_VERSION__ tidak dibekalkan oleh bundler, gunakan penanda ralat statik tanpa mengira masa di pelayar.
+ * Nilai versi lalai/sandaran (fallback) apabila dokumen Firestore tidak tersedia atau luar talian.
+ * Versi rasmi kini disimpan dan disunting secara dinamik oleh Admin dalam Firestore (metadata/appVersion).
  */
-export const APP_VERSION =
-  typeof __APP_VERSION__ !== 'undefined' && __APP_VERSION__
-    ? __APP_VERSION__
-    : 'v-.--.----';
+export const APP_VERSION = 'v30.10.0842';
 
 /**
- * Label paparan versi (format sudah bermula dengan 'v', cth: v30.10.0815)
+ * Label paparan versi lalai
  */
 export const APP_VERSION_LABEL = APP_VERSION;
